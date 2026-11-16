@@ -1,4 +1,4 @@
-import { categorySearchQuery, lookupListingCategory } from '@/lib/categoryLookup';
+import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
 import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
 import { usePublicationAttempt } from '@/hooks/usePublicationAttempt';
 import { listingReadiness, publicationBlock } from '@/lib/listingReadiness';
@@ -83,7 +83,10 @@ export default function ListingEditor() {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new Error('SWISH backend is not connected');
       if (!tenantId) throw new Error('Your SWISH workspace is not ready');
-      const suggestion = await lookupListingCategory(tenantId, categorySearchQuery(title, getActiveNicheId(), (linkedItem?.attributes || {}) as Record<string, unknown>), (endpoint, body) => callEdgeFunction(endpoint, body, sb), { nicheId: getActiveNicheId(), title, attributes: (linkedItem?.attributes || {}) as Record<string, unknown> });
+      const nicheId = getActiveNicheId();
+      const suggestion = await lookupScopedListingCategory({ client: sb, userId: user.id, tenantId, nicheId, title,
+        attributes: (linkedItem?.attributes || {}) as Record<string, unknown>,
+        isCurrent: () => getActiveNicheId() === nicheId && categoryTitleRef.current === title });
       if (categoryTitleRef.current !== title) return;
       setCategorySuggestion(suggestion);
       setF('category', suggestion.name);

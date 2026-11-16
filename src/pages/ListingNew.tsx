@@ -1,5 +1,5 @@
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
-import { categorySearchQuery, lookupListingCategory } from '@/lib/categoryLookup';
+import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
 /**
  * ListingNew — Create a new listing
  *
@@ -365,7 +365,10 @@ export default function ListingNew() {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new Error('Backend not connected');
       if (!tenantId) throw new Error('Your SWISH workspace is not ready');
-      const suggestion = await lookupListingCategory(tenantId, categorySearchQuery(title, getActiveNicheId(), (inv?.attributes || {}) as Record<string, unknown>), (endpoint, body) => callEdgeFunction(endpoint, body, sb), { nicheId: getActiveNicheId(), title, attributes: (inv?.attributes || {}) as Record<string, unknown> });
+      const nicheId = getActiveNicheId();
+      const suggestion = await lookupScopedListingCategory({ client: sb, userId: user.id, tenantId, nicheId, title,
+        attributes: (inv?.attributes || {}) as Record<string, unknown>,
+        isCurrent: () => getActiveNicheId() === nicheId && categoryTitleRef.current === title });
       if (categoryTitleRef.current !== title) return;
       setCategorySuggestion(suggestion);
       setF('category', suggestion.name);

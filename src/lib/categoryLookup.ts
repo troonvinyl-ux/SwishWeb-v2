@@ -1,7 +1,7 @@
 export interface CategorySuggestion { id: string; name: string; }
 interface LookupResponse { data: unknown; error: { message: string; displayMessage?: string; status?: number } | null; }
 type InvokeCategory = (endpoint: string, body: Record<string, unknown>) => Promise<LookupResponse>;
-export interface CategoryLookupContext { nicheId?: string; title?: string; attributes?: Record<string, unknown>; }
+export interface CategoryLookupContext { nicheId?: string; title?: string; attributes?: Record<string, unknown>; isCurrent?: () => boolean; }
 type MusicFormat = 'cd' | 'vinyl' | 'cassette' | null;
 export function musicFormat(attributes: Record<string, unknown> = {}, title = ''): MusicFormat {
   const value = String(attributes.format || attributes.media_format || attributes.media_type || title);
@@ -42,9 +42,11 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
   const queries = music && formatQuery && text.toLowerCase() !== formatQuery.toLowerCase() ? [text, formatQuery] : [text];
   for (const search of queries) {
   for (const endpoint of ['swish-ebay-category', 'swish-ebay-list']) {
+    if (context.isCurrent?.() === false) throw new Error('Your workspace or category search changed. Retry from the active item.');
     let result: LookupResponse;
-    try { result = await invoke(endpoint, { route: 'get_category_suggestions', tenantId, query: search.slice(0, 100) }); }
+    try { result = await invoke(endpoint, { route: 'get_category_suggestions', tenantId, ...(context.nicheId ? { nicheId: context.nicheId } : {}), query: search.slice(0, 100) }); }
     catch (error) { failures.push(error instanceof Error ? error.message : 'Category service could not be reached.'); continue; }
+    if (context.isCurrent?.() === false) throw new Error('Your workspace or category search changed. Retry from the active item.');
     if (result.error) {
       if (result.error.status === 401 || result.error.status === 403) throw new Error(result.error.displayMessage || result.error.message);
       failures.push(result.error.displayMessage || result.error.message); continue;

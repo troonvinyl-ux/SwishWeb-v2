@@ -47,8 +47,8 @@ test('Tunes search carries real music format and bounds the eBay query', () => {
 test('new and saved listing screens use the shared lookup; music avoids coin defaults', async () => {
   for (const page of ['ListingNew', 'ListingEditor']) {
     const source = await readFile(`src/pages/${page}.tsx`, 'utf8');
-    assert.match(source, /await lookupListingCategory/);
-    assert.match(source, /nicheId: getActiveNicheId\(\)/);
+    assert.match(source, /await lookupScopedListingCategory/);
+    assert.match(source, /const nicheId = getActiveNicheId\(\)/);
     assert.match(source, /categoryTitleRef.current !== title/);
     assert.doesNotMatch(source, /route: 'get_category_suggestions'/);
   }
@@ -90,4 +90,13 @@ test('known music leaf labels work without paths; unknown names require a music 
   assert.equal(isRecordedMusicCategory({name:'Other Formats',categoryPath:'Music > Other Formats'},null),true);
   assert.equal(isRecordedMusicCategory({name:'T-Shirts'},null),false);
   assert.equal(isRecordedMusicCategory({name:'Other Formats',categoryPath:'Music > Other Formats'},'cd'),false);
+});
+
+test('module identity is sent to category services; changed searches cannot apply results', async () => {
+  const calls = [];
+  await lookupListingCategory('tenant-1','Band album',async (endpoint,body)=>{calls.push(body);return ok();},tunesCD);
+  assert.equal(calls[0].nicheId,'tunes_flip');
+  let current=true, attempted=0;
+  await assert.rejects(lookupListingCategory('tenant-1','Band album',async()=>{attempted++;current=false;return ok();},{...tunesCD,isCurrent:()=>current}),/workspace/);
+  assert.equal(attempted,1);
 });
