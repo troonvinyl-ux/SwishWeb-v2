@@ -1,3 +1,5 @@
+import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
+import { categorySearchQuery, lookupListingCategory } from '@/lib/categoryLookup';
 /**
  * ListingNew — Create a new listing
  *
@@ -12,7 +14,7 @@
  *   - suggested price from valuation (ebay_realised > median > sale_price)
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
@@ -152,7 +154,7 @@ const DEFAULT_FORM: Record<string, unknown> = {
   status: 'draft',       // REQ-LST-002 — always draft on create
   price: '',
   condition: '',
-  category: 'Coins: British',
+  category: '',
   item_id: '',
   shipping_type: 'simple_delivery',  // REQ-LST-003
   shipping_paid_by: 'buyer',         // REQ-LST-003
@@ -187,6 +189,8 @@ export default function ListingNew() {
 
   const setF = (key: string, val: unknown) => setForm(p => ({ ...p, [key]: val }));
   const f = (key: string) => (form[key] as string) || '';
+  const categoryTitleRef = useRef('');
+  categoryTitleRef.current = f('title').trim();
 
   // Query params injected by Coin Flipper confirmed screen or InventoryItem "List" button
   const itemIdParam = searchParams.get('item_id') || '';
@@ -219,7 +223,8 @@ export default function ListingNew() {
     const scanMeta   = (idData.scan_metadata || {}) as Record<string, unknown>;
     const valuation  = (idData.valuation || {}) as ValuationPanel;
 
-    const hasAiData = Object.keys(candidate).length > 0;
+    const isCoinItem = inv.specialist_id ? getSpecialistIdsForNiche('coins').includes(String(inv.specialist_id)) : getActiveNicheId() === 'coins';
+    const hasAiData = isCoinItem && Object.keys(candidate).length > 0;
 
     // Build eBay-ready description from AI evidence
     const generatedDescription = hasAiData
@@ -227,21 +232,23 @@ export default function ListingNew() {
       : ((inv.description as string) || '');
 
     // Map coin grade to eBay condition option
-    const mappedCondition = mapCoinCondition(
+    const mappedCondition = isCoinItem ? mapCoinCondition(
       (candidate.condition_assumed as string) || (inv.condition as string)
-    );
+    ) : String(inv.condition || '');
 
     // Map category
-    const mappedCategory = mapCoinCategory(
+    const mappedCategory = isCoinItem ? mapCoinCategory(
       candidate.category as string | undefined,
       candidate.country as string | undefined
-    );
+    ) : '';
 
     // Suggest price: prefer eBay realised > median > estimated > sale_price > valuation
     const suggestedPrice: number | null =
       (valuation.ebay_realised ?? null) ||
       (valuation.median ?? null) ||
       (valuation.estimated_value ?? null) ||
+      ((inv.expected_selling_price as number) ?? null) ||
+      ((inv.valuation_mid as number) ?? null) ||
       ((inv.sale_price as number) ?? null) ||
       ((inv.valuation as number) ?? null) ||
       null;
@@ -272,9 +279,9 @@ export default function ListingNew() {
 
     setForm(p => ({
       ...p,
-      title: (p.title as string) || (inv.title as string) || (candidate.title as string) || (candidate.denomination as string) || '',
+      title: (p.title as string) || (inv.canonical_title as string) || (inv.title as string) || (candidate.title as string) || (candidate.denomination as string) || '',
       description: (p.description as string) || generatedDescription,
-      category: mappedCategory || (p.category as string) || 'Coins: British',
+      category: mappedCategory || (p.category as string) || '',
       condition: mappedCondition || (p.condition as string) || '',
       price: (p.price as string) || (suggestedPrice ? suggestedPrice.toFixed(2) : ''),
       // Coin item specifics from scan metadata
@@ -358,24 +365,12 @@ export default function ListingNew() {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new Error('Backend not connected');
       if (!tenantId) throw new Error('Your SWISH workspace is not ready');
-      const { data: payload, error } = await callEdgeFunction<{
-        success?: boolean;
-        error?: string;
-        suggestions?: Array<{ id?: string | number; name?: string; isLeaf?: boolean }>;
-      }>('swish-ebay-list', {
-        route: 'get_category_suggestions', tenantId, query: title.slice(0, 100),
-      });
-      if (error) throw error;
-      const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
-      const best = suggestions.find(cat => cat.id !== undefined && cat.id !== '' && !!cat.name && cat.isLeaf === true);
-      if (!payload?.success || !best) {
-        throw new Error(payload?.error || 'No matching eBay leaf category was found. Try a more descriptive title.');
-      }
-      const suggestion = { id: String(best.id), name: String(best.name) };
+      const suggestion = await lookupListingCategory(tenantId, categorySearchQuery(title, getActiveNicheId(), (inv?.attributes || {}) as Record<string, unknown>), (endpoint, body) => callEdgeFunction(endpoint, body, sb));
+      if (categoryTitleRef.current !== title) return;
       setCategorySuggestion(suggestion);
       setF('category', suggestion.name);
       setF('category_id', suggestion.id);
-      toast.success('AI suggested an eBay category. Please verify it before publishing.');
+      toast.success('eBay suggested a category. Please verify it before publishing.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not suggest an eBay category');
     } finally {

@@ -1,3 +1,4 @@
+import { categorySearchQuery, lookupListingCategory } from '@/lib/categoryLookup';
 import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
 import { usePublicationAttempt } from '@/hooks/usePublicationAttempt';
 import { listingReadiness, publicationBlock } from '@/lib/listingReadiness';
@@ -64,6 +65,8 @@ export default function ListingEditor() {
   const readiness = listingReadiness({listing:form,item:linkedItem as Record<string, unknown> | null,tenantId,specialistIds:getSpecialistIdsForNiche(getActiveNicheId()),photos:selectedImages,dirty:draftDirty});
   const publicationReason = publicationBlock(form) || (publicationAttempt.attempted ? 'A previous submission needs inspection. Check saved status and eBay before trying again.' : null);
   const f = (key: string): string => (form[key] as string) || '';
+  const categoryTitleRef = useRef('');
+  categoryTitleRef.current = f('title').trim();
   const setF = (key: string, val: unknown) => {
     setDraftDirty(true);
     setVerification(null);
@@ -80,23 +83,12 @@ export default function ListingEditor() {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new Error('SWISH backend is not connected');
       if (!tenantId) throw new Error('Your SWISH workspace is not ready');
-      const { data: payload, error } = await callEdgeFunction<{
-        success?: boolean; error?: string;
-        suggestions?: Array<{ id?: string | number; name?: string; isLeaf?: boolean }>;
-      }>('swish-ebay-list', {
-        route: 'get_category_suggestions',
-        tenantId,
-        query: title.slice(0, 100),
-      });
-      if (error) throw error;
-      const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
-      const best = suggestions.find(cat => cat.id !== undefined && cat.id !== '' && !!cat.name && cat.isLeaf === true);
-      if (!payload?.success || !best) throw new Error(payload?.error || 'No matching eBay leaf category found. Try a more descriptive title.');
-      const suggestion = { id: String(best.id), name: String(best.name) };
+      const suggestion = await lookupListingCategory(tenantId, categorySearchQuery(title, getActiveNicheId(), (linkedItem?.attributes || {}) as Record<string, unknown>), (endpoint, body) => callEdgeFunction(endpoint, body, sb));
+      if (categoryTitleRef.current !== title) return;
       setCategorySuggestion(suggestion);
       setF('category', suggestion.name);
       setF('category_id', suggestion.id);
-      toast.success('AI suggested an eBay category. Verify it before publishing.');
+      toast.success('eBay suggested a category. Verify it before publishing.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not suggest an eBay category');
     } finally {
