@@ -83,7 +83,7 @@ export default function ListingEditor() {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new Error('SWISH backend is not connected');
       if (!tenantId) throw new Error('Your SWISH workspace is not ready');
-      const suggestion = await lookupListingCategory(tenantId, categorySearchQuery(title, getActiveNicheId(), (linkedItem?.attributes || {}) as Record<string, unknown>), (endpoint, body) => callEdgeFunction(endpoint, body, sb));
+      const suggestion = await lookupListingCategory(tenantId, categorySearchQuery(title, getActiveNicheId(), (linkedItem?.attributes || {}) as Record<string, unknown>), (endpoint, body) => callEdgeFunction(endpoint, body, sb), { nicheId: getActiveNicheId(), title, attributes: (linkedItem?.attributes || {}) as Record<string, unknown> });
       if (categoryTitleRef.current !== title) return;
       setCategorySuggestion(suggestion);
       setF('category', suggestion.name);
