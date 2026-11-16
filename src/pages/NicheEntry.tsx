@@ -72,7 +72,7 @@ export default function NicheEntry() {
     localStorage.setItem('swish_active_niche', niche.id);
     localStorage.setItem('swish_active_niche_name', niche.name);
   };
-  const toggleEnabled = (id: string) => {
+  const toggleEnabled = (id: SwishNicheId) => {
     // Browser storage must never grant access to an unentitled niche.
     if (enabled.includes(id)) selectNiche(NICHES.find(n => n.id === id) || NICHES[0]);
   };

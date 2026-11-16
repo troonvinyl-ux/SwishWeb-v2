@@ -4,7 +4,7 @@ import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useTable } from '@/hooks/useSupabaseQuery';
 import { formatDateTime } from '@/lib/utils';
 import EbayCapabilities from '@/components/features/EbayCapabilities';
-import type { EbayConnector } from '@/types/marketplace';
+import { readEbayConnector } from '@/types/marketplace';
 
 export default function EbayAccount() {
   const { tenantId, isLoading: tenantLoading, error: tenantError } = useCurrentTenantId();
@@ -12,7 +12,7 @@ export default function EbayAccount() {
     select: 'status,seller_account_id,access_token_expires_at,connected_at,last_sync_at,can_list,can_publish,can_reprice,can_read_orders,can_fulfil',
     filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, enabled: Boolean(tenantId), limit: 1,
   });
-  const connector = (query.data?.[0] as EbayConnector | undefined) ?? null;
+  const connector = readEbayConnector(query.data?.[0]);
   const error = tenantError || query.error;
   const loading = tenantLoading || (Boolean(tenantId) && query.isLoading);
   const expired = Boolean(connector?.access_token_expires_at && new Date(connector.access_token_expires_at) <= new Date());

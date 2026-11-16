@@ -5,7 +5,7 @@ import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useEbayHubActions } from '@/hooks/useEbayHubActions';
 import EbaySyncStatus from '@/components/features/EbaySyncStatus';
 import { formatDateTime } from '@/lib/utils';
-import type { EbayConnector } from '@/types/marketplace';
+import { readEbayConnector } from '@/types/marketplace';
 
 const QUICK_LINKS = [
   { to: '/ebay/account', label: 'Account health' }, { to: '/ebay/listings', label: 'Listings' },
@@ -22,7 +22,7 @@ export default function EbayHub() {
     filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, enabled: Boolean(tenantId), limit: 1,
   });
   const { connect, sync, connecting, syncing, syncError, syncProgress } = useEbayHubActions(tenantId);
-  const account = (query.data?.[0] as EbayConnector | undefined) ?? null;
+  const account = readEbayConnector(query.data?.[0]);
   const isConnected = account?.status === 'connected';
   const tokenExpiry = account?.access_token_expires_at;
   const tokenExpired = Boolean(tokenExpiry && new Date(tokenExpiry) <= new Date());
