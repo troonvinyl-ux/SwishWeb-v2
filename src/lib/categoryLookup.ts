@@ -4,7 +4,9 @@ type InvokeCategory = (endpoint: string, body: Record<string, unknown>) => Promi
 export interface CategoryLookupContext { nicheId?: string; title?: string; attributes?: Record<string, unknown>; isCurrent?: () => boolean; }
 type MusicFormat = 'cd' | 'vinyl' | 'cassette' | null;
 export function musicFormat(attributes: Record<string, unknown> = {}, title = ''): MusicFormat {
-  const value = String(attributes.format || attributes.media_format || attributes.media_type || title);
+  // Discogs formats can be arrays/objects; an unrelated format label must not hide the title.
+  const value = [attributes.format, attributes.formats, attributes.media_format, attributes.media_type, title]
+    .map(value => typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '')).join(' ');
   if (/\bvinyl\b|\blp\b|\b(?:7|12)[ -]?inch\b/i.test(value)) return 'vinyl';
   if (/\bcds?\b|compact discs?/i.test(value)) return 'cd';
   if (/cassette/i.test(value)) return 'cassette';
@@ -26,7 +28,7 @@ export function categorySearchQuery(title: string, niche: string, attributes: Re
   const clean = title.trim().replace(/\s+/g, ' ');
   if (niche !== 'tunes_flip') return clean.slice(0, 100);
   const format = musicFormat(attributes, clean);
-  const context = format === 'vinyl' ? 'vinyl record' : format === 'cd' ? 'music CD' : format === 'cassette' ? 'music cassette' : 'music';
+  const context = format === 'vinyl' ? 'vinyl record' : format === 'cd' ? 'music CD' : format === 'cassette' ? 'music cassette' : 'recorded music album';
   return `${context} ${clean}`.slice(0, 100);
 }
 
@@ -38,7 +40,7 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
   const failures: string[] = [];
   const music = context.nicheId === 'tunes_flip';
   const format = musicFormat(context.attributes, context.title);
-  const formatQuery = format === 'cd' ? 'music CDs' : format === 'vinyl' ? 'vinyl records' : format === 'cassette' ? 'music cassettes' : null;
+  const formatQuery = format === 'cd' ? 'music CDs' : format === 'vinyl' ? 'vinyl records' : format === 'cassette' ? 'music cassettes' : 'recorded music albums';
   const queries = music && formatQuery && text.toLowerCase() !== formatQuery.toLowerCase() ? [text, formatQuery] : [text];
   for (const search of queries) {
   for (const endpoint of ['swish-ebay-category', 'swish-ebay-list']) {
@@ -64,5 +66,5 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
     failures.push(typeof payload.error === 'string' ? payload.error : music ? 'No matching recorded-music category was returned. Clothing and merchandise suggestions were rejected.' : 'No matching eBay leaf category was returned.');
   }
   }
-  throw new Error(`Category lookup unavailable. ${failures[failures.length - 1] || 'Try again with the artist, title and music format.'}`);
+  throw new Error(`Category lookup unavailable. ${failures[failures.length - 1] || 'Add the music format (vinyl, CD or cassette) to the item title and retry.'}`);
 }

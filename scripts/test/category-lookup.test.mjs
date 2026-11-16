@@ -40,7 +40,7 @@ test('missing tenant or title never sends a request', async () => {
 test('Tunes search carries real music format and bounds the eBay query', () => {
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip', { format: 'CD box set' }), 'music CD Artist Album');
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip', { format: 'Vinyl LP' }), 'vinyl record Artist Album');
-  assert.equal(categorySearchQuery('Artist Album', 'tunes_flip'), 'music Artist Album');
+  assert.equal(categorySearchQuery('Artist Album', 'tunes_flip'), 'recorded music album Artist Album');
   assert.equal(categorySearchQuery('Roman coin', 'coins'), 'Roman coin');
   assert.equal(categorySearchQuery('A'.repeat(150), 'tunes_flip', { format: 'CD' }).length, 100);
 });
@@ -99,4 +99,18 @@ test('module identity is sent to category services; changed searches cannot appl
   let current=true, attempted=0;
   await assert.rejects(lookupListingCategory('tenant-1','Band album',async()=>{attempted++;current=false;return ok();},{...tunesCD,isCurrent:()=>current}),/workspace/);
   assert.equal(attempted,1);
+});
+
+test('Tunes without a format retries a recorded-music query after band merchandise', async () => {
+  const calls = [];
+  const result = await lookupListingCategory('tenant-1', 'music The Specials - The Specials', async (endpoint, body) => {
+    calls.push(body.query);
+    return body.query === 'recorded music albums' ? ok() : ok([tshirt]);
+  }, { nicheId: 'tunes_flip', title: 'The Specials - The Specials' });
+  assert.equal(result.name, 'CDs');
+  assert.deepEqual(calls, ['music The Specials - The Specials', 'music The Specials - The Specials', 'recorded music albums']);
+});
+test('Discogs format arrays and title formats survive uninformative attribute labels', () => {
+  assert.equal(categorySearchQuery('The Specials', 'tunes_flip', {formats: [{name: 'Vinyl', descriptions: ['LP', 'Album']}]}), 'vinyl record The Specials');
+  assert.equal(categorySearchQuery('The Specials CD', 'tunes_flip', {format: 'Album'}), 'music CD The Specials CD');
 });
