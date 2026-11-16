@@ -1,61 +1,37 @@
-# Welcome to your OnSpace project
+# SWISH Web v2
 
-## How can I edit this code?
+The responsive web client for SWISH's shared inventory, identification and eBay engine. Uses the existing OnSpace Cloud backend and shared user accounts.
 
-There are several ways of editing your application.
+## Development
 
-**Use OnSpace**
-
-Simply visit the [OnSpace Project]() and start prompting.
-
-Changes made via OnSpace will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in OnSpace.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requires Node 20+ and npm.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The backend URL is defined in `src/lib/supabase.ts`. An optional `VITE_SUPABASE_ANON_KEY` must be an existing public/anon key for that project. Never use service-role keys, AI keys, eBay credentials or Stripe secrets in this client.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Verification
 
-**Use GitHub Codespaces**
+```sh
+node --test scripts/test/*.test.mjs
+npx tsc --noEmit -p tsconfig.app.json
+npm run build
+npm run lint
+npm run test:niches
+node scripts/verify-web-parity.mjs
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Main pushes run the web checks and retain a verified `dist` artifact. This workflow does not deploy. The separate source-contract and reviewed-release workflows retain their evidence requirements; a green build does not prove live eBay or billing acceptance.
 
-## What technologies are used for this project?
+## Features
 
-This project is built with:
+Public SWISH home, thirteen specialist workspaces, account onboarding, niche switching, photo identification, inventory, drafts and listing review, eBay seller operations, orders, dispatch and settings. Storage locations are suggested from saved workspace inventory. Suggested selling prices can be inserted at 5% below the available market valuation. Existing listing submissions are protected against blind client retries.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Publishing
 
-## How can I deploy this project?
+Use the existing OnSpace project and deployment settings. SPA hosts must route application paths to `index.html`; `public/_redirects` supplies this for compatible static hosts. Configure existing authentication callback URLs for the intended web origin. Do not create a replacement database or marketplace integration.
 
-Simply open [OnSpace]() and click on Share -> Publish.
+See `docs/production-readiness/2026-11-16-v2-recovery.md` for recovery details and remaining live acceptance requirements.

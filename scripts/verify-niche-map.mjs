@@ -22,6 +22,9 @@ async function loadNicheModule() {
 
 const niche = await loadNicheModule();
 const routeAliases = {
+  stamps: 'stamps',
+  philately: 'stamps',
+  'stamp-flipper': 'stamps',
   coins: 'coins',
   mx: 'motocross',
   bikes: 'bicycles',
@@ -54,7 +57,7 @@ for (const [alias, expectedNiche] of Object.entries(routeAliases)) {
 
 const canonicalNiches = [
   'coins', 'motocross', 'bicycles', 'clothing', 'trading_cards', 'antiques',
-  'fossils', 'beauty', 'tech', 'surplus_flip', 'tunes_flip', 'collectibles',
+  'fossils', 'beauty', 'tech', 'surplus_flip', 'tunes_flip', 'collectibles', 'stamps',
 ];
 assert.deepEqual(
   Object.keys(niche.NICHE_SPECIALISTS).sort(),
@@ -93,5 +96,5 @@ assert.match(entry, /name: 'Collectibles Flipper'/);
 assert.match(ebayHub, /useCurrentTenantId/);
 assert.doesNotMatch(ebayHub, /from\('tenant_memberships'\)/);
 
-console.log('All twelve niche route, capture, workspace, inventory, import, and eBay mappings are aligned.');
+console.log('All thirteen niche route, capture, workspace, inventory, import, and eBay mappings are aligned.');
 

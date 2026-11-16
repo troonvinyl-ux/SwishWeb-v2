@@ -34,3 +34,10 @@ jobs:
       - name: Niche mapping regression check
         run: npm run test:niches
 
+
+      - name: Retain verified web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: swish-web-v2-${{ github.sha }}
+          path: dist/
+          retention-days: 14
