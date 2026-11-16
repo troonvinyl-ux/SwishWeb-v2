@@ -2,7 +2,7 @@
 
 Authoritative source branches are troonvinyl-ux/SWISH main for the app and backend, and troonvinyl-ux/SwishWeb-v2 main for the website. Both keep the existing OnSpace Cloud backend and shared accounts.
 
-Native candidate: 4d620bb6ad7c0d1918286fadce3b13a2c74e4471. The web source-contract snapshot records this exact main revision and its root tree IDs, with release approval still pending. This is source alignment, not production acceptance.
+Native candidate: fab5c890e9186150de221753c5d5d7c232cb39ab. The web source-contract snapshot records this exact main revision and its root tree IDs, with release approval still pending. This is source alignment, not production acceptance.
 
 The app backend now establishes request-local member context after module authorization and its listing/status handlers use the member-scoped clients. Taxonomy does not inherit a seller binding. The website category screens verify the active signed-in account and module before dispatch and after receiving a suggestion, send the niche assertion to the server, and discard stale responses. Existing Tunes music-only category filtering remains in place.
 

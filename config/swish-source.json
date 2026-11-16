@@ -1,7 +1,7 @@
 {
   "repository": "troonvinyl-ux/SWISH",
   "branch": "main",
-  "commit": "4d620bb6ad7c0d1918286fadce3b13a2c74e4471",
+  "commit": "fab5c890e9186150de221753c5d5d7c232cb39ab",
   "backendUrl": "https://iwgaqieyoahmcjfziwga.backend.onspace.ai",
   "inspectedAt": "2026-11-16",
   "review": {
@@ -19,7 +19,7 @@
     "supabase": "98d63388eb8cc966e36fa81a2dd64ab0ae38dd83",
     "niches": "7144a2de0e7b0ed6f98307b9bbac932576dae7f3",
     "niche-modules.json": "8cd4f122847735d2ce748cc27e86919e19f5579e",
-    ".github": "c766db68474c01fe7a706e15c69fdc5e544b9403",
+    ".github": "7bd2051f4de1b57ba4112a8447880d9a73633ec3",
     "scripts": "d140f95922b2ac0bc04cad73f1772ec3efa98b7d",
     "app.config.js": "999a49c8c2ecd1061531c8d00ca08a507a10e765",
     "package.json": "ce562921a0a3ff518bd6ad1187d94454d7b64a2d",
