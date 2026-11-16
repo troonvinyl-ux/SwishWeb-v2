@@ -1,3 +1,5 @@
+import StorageLocationInput from '@/components/features/StorageLocationInput';
+import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTableRow, useUpdate, useDelete } from '@/hooks/useSupabaseQuery';
@@ -367,7 +369,7 @@ export default function InventoryItem() {
                 <div key={key}>
                   <label className="text-xs text-muted-foreground">{label}</label>
                   {editing ? (
-                    <input value={f(key)} onChange={e => setF(key, e.target.value)} className="input-field mt-0.5 text-xs py-1.5" />
+                    key === 'location' ? <StorageLocationInput value={f(key)} onChange={value => setF(key,value)} className="input-field mt-0.5 text-xs py-1.5" /> : <input value={f(key)} onChange={e => setF(key, e.target.value)} className="input-field mt-0.5 text-xs py-1.5" />
                   ) : (
                     <p className="text-sm mt-0.5">{fieldValue(key) || '—'}</p>
                   )}
@@ -408,6 +410,7 @@ export default function InventoryItem() {
                 </div>
               ))}
             </div>
+            {editing && <RecommendedPriceButton marketValue={f('valuation')} onApply={value => setF('sale_price',value)} />}
             {/* Profit indicator */}
             {!editing && row.cost_price && row.valuation && (
               <div className="mt-3 pt-3 border-t border-border/40">

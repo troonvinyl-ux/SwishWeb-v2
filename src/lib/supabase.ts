@@ -183,6 +183,7 @@ export async function callEdgeFunction<T = unknown>(
   fn: string,
   payload: Record<string, unknown>,
   client?: SupabaseClient | null,
+  options?: {signal?: AbortSignal; headers?: Record<string, string>},
 ): Promise<EdgeFunctionResult<T>> {
   const sb = client || (await getSupabaseClientAsync());
   if (!sb) {
@@ -194,7 +195,7 @@ export async function callEdgeFunction<T = unknown>(
 
   let invocation: Awaited<ReturnType<typeof sb.functions.invoke>>;
   try {
-    invocation = await sb.functions.invoke(fn, { body: payload });
+    invocation = await sb.functions.invoke(fn, { body: payload, ...options });
   } catch (cause) {
     // A rejected fetch (network/CORS/unreachable function) throws before the
     // SDK can return FunctionsHttpError. Convert it to a safe diagnostic result.

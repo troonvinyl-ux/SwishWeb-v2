@@ -530,7 +530,7 @@ export default function Identify() {
         setValuation(data as ValuationData);
       } else if (error) {
         setValuation({ data_unavailable: true });
-        console.warn('[CoinFlipper] Valuation unavailable:', error instanceof EdgeFunctionError ? error.displayMessage : error.message);
+        console.warn('[CoinFlipper] Valuation unavailable:', error.displayMessage);
       }
     } catch (err) {
       setValuation({ data_unavailable: true });
@@ -685,14 +685,14 @@ export default function Identify() {
 
     if (primaryError && needsSpecialist) {
       // Specialist function not deployed — fall back gracefully (REQ-ID-005: no fabrication)
-      const errMsg = primaryError instanceof EdgeFunctionError ? primaryError.displayMessage : primaryError.message;
+      const errMsg = primaryError.displayMessage;
       toast.warning(`Specialist service unavailable (${errMsg}) — using general identification`);
       setProgressMsg('Falling back to general identification…');
 
       const { data: fallback, error: fallbackErr } = await callEdgeFunction<IdentifyResult>('swish-identify', { ...payload, specialist: false });
 
       if (fallbackErr) {
-        const msg = fallbackErr instanceof EdgeFunctionError ? fallbackErr.displayMessage : fallbackErr.message;
+        const msg = fallbackErr.displayMessage;
         setErrorMsg(msg);
         setStep('capture');
         submitGuard.current = false;
@@ -700,7 +700,7 @@ export default function Identify() {
       }
       identResult = fallback;
     } else if (primaryError) {
-      const msg = primaryError instanceof EdgeFunctionError ? primaryError.displayMessage : primaryError.message;
+      const msg = primaryError.displayMessage;
       setErrorMsg(msg);
       setStep('capture');
       submitGuard.current = false;
@@ -1266,7 +1266,7 @@ export default function Identify() {
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={handleConfirm}
-            disabled={!selectionMade || step === 'confirming'}
+            disabled={!selectionMade}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle className="w-4 h-4" />

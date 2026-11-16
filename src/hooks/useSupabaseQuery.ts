@@ -67,7 +67,7 @@ export function useTable(table: string, options?: TableOptions) {
         q = q.order(options.order.column, { ascending: options.order.ascending ?? false });
       }
       if (options?.limit) q = q.limit(options.limit);
-      const { data, error } = await q;
+      const { data, error } = await q.returns<Record<string, unknown>[]>();
       if (error) {
         console.warn(`[SWISH] useTable("${table}") error:`, error.message);
         throw new Error(error.message);
@@ -92,7 +92,7 @@ export function useTableRow(table: string, id: string | null | undefined, select
       const sb = await getClient();
       let query = sb.from(table).select(select).eq('id', id!);
       if (tenantId !== undefined) query = query.eq('tenant_id', tenantId);
-      const { data, error } = await query.single();
+      const { data, error } = await query.returns<Record<string, unknown>[]>().single();
       if (error) throw new Error(error.message);
       return data;
     },

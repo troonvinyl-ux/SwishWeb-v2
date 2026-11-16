@@ -86,8 +86,8 @@ export default function Money() {
 
   const filteredSales   = sales.filter(row => inRange(row, 'sold_at'));
   const filteredOrders  = orders.filter(row => inRange(row));
-  const filteredFees    = fees.filter(inRange);
-  const filteredPayouts = payouts.filter(inRange);
+  const filteredFees    = fees.filter(row => inRange(row));
+  const filteredPayouts = payouts.filter(row => inRange(row));
 
   // Calculations — clearly labelled
   // Prefer canonical sales ledger values. Fall back to legacy orders/fees only

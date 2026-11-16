@@ -48,6 +48,7 @@ const standardActions = (scan: string, item: string, icon: LucideIcon): Action[]
 ];
 
 const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
+  stamps: {id:'stamps',name:'Stamp Flipper',shortName:'Stamps',headline:'Discover the story behind every stamp.',detail:'Stamps · postal history · collections',accent:'#6366F1',artwork:antiqueArtwork,icon:Package,scan:'Scan Stamp',actions:standardActions('Scan Stamp','Stamp',Package),guidance:'Capture the front and reverse, watermark and perforations where visible.'},
   coins: {
     id: 'coins', name: 'SWISH Coins', shortName: 'Coins', headline: 'Know what you hold before you list it.',
     detail: 'Ancient · Islamic silver · world · banknotes · gold', accent: '#F5C842', artwork: coinArtwork, icon: Coins, scan: 'Scan Coin',

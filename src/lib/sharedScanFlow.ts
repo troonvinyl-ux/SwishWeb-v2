@@ -9,6 +9,7 @@ export type ScanProfile = { name: string; evidence: readonly EvidenceSlot[]; bar
 const slot = (id: string, label: string, required = true): EvidenceSlot => ({ id, label, required });
 const standard = [slot('front', 'Front'), slot('back', 'Back')];
 export const SCAN_PROFILES: Record<string, ScanProfile> = {
+  stamps: {name:'Stamp Flipper',barcode:false,evidence:[slot('front','Stamp front'),slot('back','Stamp reverse'),slot('detail','Watermark / perforations',false)]},
   coins: { name: 'Coin Flipper', barcode: false, evidence: [slot('obverse','Obverse'),slot('reverse','Reverse')] },
   motocross: { name: 'MX Flipper', barcode: true, evidence: [slot('item','Machine or part'),slot('model','Model / serial label',false)] },
   bicycles: { name: 'Bike Flipper', barcode: true, evidence: [slot('item','Bicycle or component'),slot('model','Model / frame label',false)] },

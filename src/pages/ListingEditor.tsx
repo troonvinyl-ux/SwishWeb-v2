@@ -1,3 +1,4 @@
+import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
 import { usePublicationAttempt } from '@/hooks/usePublicationAttempt';
 import { listingReadiness, publicationBlock } from '@/lib/listingReadiness';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
@@ -253,6 +254,7 @@ export default function ListingEditor() {
 
       <PublicationStatus reason={publicationReason} externalId={String(form.external_listing_id || '')} refreshing={isFetching} onRefresh={() => void refetch()} />
       <ListingReadiness checks={readiness} />
+      <RecommendedPriceButton marketValue={linkedItem?.valuation_mid || linkedItem?.expected_selling_price} onApply={value => setF('price', value)} />
       <ListingVerification result={verification} />
       <PublishConfirmation open={confirmPublish} onOpenChange={setConfirmPublish} title={String(form.title || '')} price={Number(form.price || 0)} busy={publishing} onConfirm={() => void publish()} />
       <p className="text-sm text-muted-foreground">Save changes, run preflight, review the verdict, then explicitly confirm publication. Changing a field or photo requires a new check.</p>

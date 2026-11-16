@@ -97,8 +97,9 @@ function AppRoutes() {
     <Route path="/identify" element={<Navigate to={`/scan/${safeNiche}`} replace />} />
     <Route path="/capture" element={<Navigate to={`/scan/${safeNiche}`} replace />} />
     <Route path="/antique-capture" element={<Navigate to="/scan/antiques" replace />} />
-    <Route path="/identify/coins" element={<NicheCapture nicheId="coins" />} />
+    <Route path="/identify/coins" element={<Navigate to="/scan/coins" replace />} />
     <Route path="/deep-id-lab" element={<Identify />} />
+    <Route path="/scan/coins" element={<Identify />} />
     <Route path="/scan/:niche" element={<NicheCapture />} />
     <Route path="/acquisitions" element={<Acquisitions />} />
     <Route path="/opportunities" element={<Opportunities />} />

@@ -49,7 +49,7 @@ export default function CommandCentre() {
     setActionResults(p => ({ ...p, [actionId]: { status: 'running' } }));
     const { data, error } = await callEdgeFunction(action.edgeFunction, action.payload);
     if (error) {
-      const msg = error instanceof EdgeFunctionError ? error.displayMessage : error.message;
+      const msg = error.displayMessage;
       setActionResults(p => ({ ...p, [actionId]: { status: 'error', message: msg } }));
       toast.error(msg);
       return;

@@ -1,3 +1,5 @@
+import StorageLocationInput from '@/components/features/StorageLocationInput';
+import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useInsert } from '@/hooks/useSupabaseQuery';
@@ -150,7 +152,7 @@ export default function InventoryNew() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Location</label>
-                <input value={f('location')} onChange={e => setF('location', e.target.value)} className="input-field mt-0.5" placeholder="Storage location" />
+                <StorageLocationInput value={f('location')} onChange={value => setF('location', value)} className="input-field mt-0.5" />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Status</label>
@@ -182,6 +184,7 @@ export default function InventoryNew() {
               <div>
                 <label className="text-xs text-muted-foreground">Sale Price (£)</label>
                 <input type="number" step="0.01" min="0" value={f('sale_price')} onChange={e => setF('sale_price', e.target.value)} className="input-field mt-0.5" placeholder="0.00" />
+                <RecommendedPriceButton marketValue={f('valuation')} onApply={value => setF('sale_price',value)} />
               </div>
             </div>
           </div>

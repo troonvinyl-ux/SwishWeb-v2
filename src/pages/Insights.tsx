@@ -44,7 +44,7 @@ export default function Insights() {
 
   const totalRevenue = orders.reduce((s, o) => s + Number((o.total_amount || o.sale_price) || 0), 0);
   const avgOrderValue = orders.length ? totalRevenue / orders.length : 0;
-  const categories = inventory.reduce((acc: Record<string, number>, i) => {
+  const categories = inventory.reduce<Record<string, number>>((acc, i) => {
     const c = (i.category as string) || 'Uncategorised';
     acc[c] = (acc[c] || 0) + 1;
     return acc;

@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Info, CheckCircle2, Circle, Coins, Bike, Shirt, Wrench, Package, Search, ShieldCheck, Grid3X3, Construction, Gamepad2, Watch, Gem, Palette, Smartphone, Sparkles } from 'lucide-react';
 
 type Niche = {
-  id: string;
+  id: SwishNicheId;
   name: string;
   tagline: string;
   colour: string;
@@ -32,6 +32,7 @@ const NICHES: Niche[] = [
   { id: 'tech', name: 'Tech Flipper', tagline: 'Identify, value and flip technology', colour: '#06B6D4', specialistCount: 1, marketplaces: ['eBay'], acquisitionSources: ['Clearance stock', 'Auctions', 'Local listings'], categories: ['Phones', 'Consoles', 'Gadgets', 'Tested stock'], icon: Smartphone },
   { id: 'surplus_flip', name: 'Surplus Flip', tagline: 'Turn job lots and pallet manifests into eBay listings', colour: '#14B8A6', specialistCount: 1, marketplaces: ['eBay'], acquisitionSources: ['Job lots', 'Pallets', 'Wholesale manifests'], categories: ['Job lots', 'Pallets', 'Wholesale', 'Returns'], icon: Package },
   { id: 'tunes_flip', name: 'Tunes Flip', tagline: 'Identify and sell music media with pressing evidence', colour: '#A855F7', specialistCount: 1, marketplaces: ['eBay'], acquisitionSources: ['Record shops', 'Collections', 'Car boot sales'], categories: ['Vinyl', 'Singles', 'CDs', 'Pressings'], icon: Sparkles },
+  { id: 'stamps', name: 'Stamp Flipper', tagline: 'Identify, catalogue and sell stamps', colour: '#6366F1', specialistCount: 1, marketplaces: ['eBay'], acquisitionSources: ['Collections','Auctions'], categories: ['Stamps','Postal history'], icon: Package },
   { id: 'collectibles', name: 'Collectibles Flipper', tagline: 'Research and list toys, comics, games and memorabilia', colour: '#F97316', specialistCount: 1, marketplaces: ['eBay'], acquisitionSources: ['Collections', 'Clearance stock', 'Car boot sales'], categories: ['Toys', 'Comics', 'Games', 'Memorabilia'], icon: Package },
 ];
 
@@ -64,7 +65,7 @@ export default function NicheEntry() {
   });
   const enabled = useMemo(() => isOwner ? NICHES.map(n => n.id) : NICHES.filter(n => getSpecialistIdsForNiche(n.id as SwishNicheId).some(id => activeSpecialists.includes(id))).map(n => n.id), [isOwner, activeSpecialists]);
   const niches = useMemo(() => NICHES.filter(n => (n.name + ' ' + n.tagline + ' ' + n.categories.join(' ')).toLowerCase().includes(query.toLowerCase())), [query]);
-  useEffect(() => { if (!tenantLoading && !entitlementsLoading && enabled.length && !enabled.includes(activeId)) { const first = enabled[0]; setActiveId(first); localStorage.setItem('swish_active_niche', first); localStorage.setItem('swish_active_niche_name', NICHES.find(n => n.id === first)?.name || first); } }, [tenantLoading, entitlementsLoading, enabled, activeId]);
+  useEffect(() => { if (!tenantLoading && !entitlementsLoading && enabled.length && !enabled.includes(activeId)) { const first = normaliseNicheId(enabled[0])!; setActiveId(first); localStorage.setItem('swish_active_niche', first); localStorage.setItem('swish_active_niche_name', NICHES.find(n => n.id === first)?.name || first); } }, [tenantLoading, entitlementsLoading, enabled, activeId]);
 
   const selectNiche = (niche: Niche) => {
     setActiveId(niche.id);
