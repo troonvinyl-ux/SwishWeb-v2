@@ -1,0 +1,7 @@
+import { AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+interface PublicationStatusProps { reason: string | null; externalId: string; refreshing: boolean; onRefresh: () => void; }
+export default function PublicationStatus({ reason, externalId, refreshing, onRefresh }: PublicationStatusProps) {
+  if (!reason) return null;
+  return <section role="status" className="swish-card space-y-4 border-warning/40 p-5"><h2 className="flex items-center gap-2 text-lg font-semibold"><AlertCircle className="h-5 w-5 text-warning" />Inspect the existing submission</h2><p className="text-base leading-7">{reason}</p><div className="flex flex-wrap gap-3"><button type="button" onClick={onRefresh} disabled={refreshing} className="btn-secondary min-h-11 disabled:opacity-50"><RefreshCw className="h-4 w-4" />{refreshing ? 'Checking…' : 'Check saved status'}</button>{/^\d+$/.test(externalId) && <a href={`https://www.ebay.co.uk/itm/${externalId}`} target="_blank" rel="noreferrer" className="btn-secondary min-h-11"><ExternalLink className="h-4 w-4" />Open existing eBay listing</a>}<Link to="/ebay/logs" className="btn-ghost min-h-11">Review eBay logs</Link></div><p className="text-sm leading-6 text-muted-foreground">Checking only rereads SWISH’s saved record. It does not synchronise with eBay, release a server claim or resend publication. An absent ID is not proof that submission failed.</p></section>;
+}
