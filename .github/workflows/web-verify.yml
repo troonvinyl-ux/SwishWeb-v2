@@ -1,0 +1,37 @@
+name: Web build and lint
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "upgrade/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Shared flow regression tests
+        run: node --test scripts/test/*.test.mjs
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.app.json
+      - name: Build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Niche mapping regression check
+        run: npm run test:niches
+      - name: Build
+        run: npm run build
