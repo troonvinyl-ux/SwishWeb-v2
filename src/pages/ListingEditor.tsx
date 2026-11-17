@@ -3,6 +3,7 @@ import RecommendedPriceButton from '@/components/features/RecommendedPriceButton
 import { usePublicationAttempt } from '@/hooks/usePublicationAttempt';
 import { listingReadiness, publicationBlock } from '@/lib/listingReadiness';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
+import { verifyModuleScope } from '@/lib/moduleScope';
 import ListingReadiness from '@/components/features/ListingReadiness';
 import PublicationStatus from '@/components/features/PublicationStatus';
 import { useState, useEffect, useRef } from 'react';
@@ -195,6 +196,11 @@ export default function ListingEditor() {
       if (!sb) throw new Error('SWISH backend is not connected');
       if (!tenantId) throw new Error('Your SWISH workspace is not ready');
       if (String(form.tenant_id || '') !== tenantId) throw new Error('Listing belongs to a different SWISH workspace.');
+      // Seller operations now require an active member session and the current
+      // tenant/niche module. Check the client-visible module state before
+      // reserving a non-repeatable publication attempt; the Edge Function
+      // remains authoritative for the member's linked eBay binding.
+      await verifyModuleScope(sb, user.id, tenantId, getActiveNicheId());
 
       await publicationAttempt.reserve();
       // Use the canonical eBay listing function used by the native app.

@@ -11,9 +11,10 @@ This is the working parity register for `troonvinyl-ux/SWISH` (Expo main app) an
 - Keep Simple Delivery as the default; do not introduce eBay shipping business policies or calculated shipping.
 - Do not auto-confirm uncertain identifications or auto-publish drafts without an explicit user action.
 
-## Source-of-truth review — 2026-11-14
+## Source-of-truth review — 2026-11-17
 
-- Source candidate pinned to `troonvinyl-ux/SWISH@b5151e5a6f07a25c9016dccbdd18fff15dc5f96f` in `config/swish-source.json`; owner review remains pending.
+- Source candidate pinned to `troonvinyl-ux/SWISH@fab5c890e9186150de221753c5d5d7c232cb39ab` in `config/swish-source.json`; owner review remains pending.
+- The update adds request-local member eBay scope for listing and listing-status operations. Seller calls now require a live member session and verified account binding; public taxonomy remains unbound. Category lookup already verifies the active module, and the listing editor now does the same before it reserves a publish attempt.
 - Native eBay callback source and this web client reference the same backend URL. Deployed runtime identity and this editor's OnSpace Cloud binding are **not yet verified**; no new backend, Stripe account or native repository change was created.
 - Source-derived frontend corrections: shared twelve-product login branding and PIN normalization, tenant-scoped connector onboarding, explicit listing verification/confirmation and canonical publishing tenant, account/niche cache reset, foreground polling and OAuth return recovery metadata.
 - `/ebay/account` now has its own native-equivalent health/capability surface rather than pointing to generic Settings. Live parity acceptance remains pending.
@@ -23,7 +24,7 @@ This is the working parity register for `troonvinyl-ux/SWISH` (Expo main app) an
 
 See `docs/production-readiness/SWISH-WEB-SOURCE-AND-RELEASE.md` for exact source contracts, remaining blockers, review steps and publishing boundaries.
 
-Continuation details are in `docs/production-readiness/2026-11-14-source-continuation.md`: shared component/asset/build roots are now tracked, changes produce workflow impact reports, and the release check verifies actual merged owner review of the source baseline. Local labels do not approve a release. No backend resources or live acceptance results were created.
+Continuation details are in `docs/production-readiness/2026-11-17-source-continuation.md`: shared component/asset/build roots are now tracked, changes produce workflow impact reports, and the release check verifies actual merged owner review of the source baseline. Local labels do not approve a release. No backend resources or live acceptance results were created.
 
 ## Current implementation pass
 
@@ -39,7 +40,7 @@ Continuation details are in `docs/production-readiness/2026-11-14-source-continu
 | Listing preflight and publication inspection | Partial / frontend safety improved | Draft readiness and advisory verification are explicit. Existing eBay IDs/server claims and tab-local uncertain attempts block repeat draft publication; saved-status inspection never resubmits. Live category/condition/specifics checks, photo/options persistence and backend reconciliation remain incomplete or unverified. |
 | Orders and dispatch | Existing | Web pages exist; every native fulfilment state and transition needs verification against the same backend fields. |
 | Repricing, insights, money, tasks, acquisitions, opportunities, review-required, audit | Existing | Pages exist; calculation and niche isolation parity tests remain required. |
-| eBay hub, listings, orders, messages, offers, returns, cases, finances, analytics, import, logs | Existing | Pages exist; verify each route against the current server Edge Functions and native behaviour. |
+| eBay hub, listings, orders, messages, offers, returns, cases, finances, analytics, import, logs | Existing UI / scope alignment added | Pages exist. Seller-side publication verifies the current member module before it reserves an attempt; the backend still verifies session liveness and the linked eBay binding. Verify each route against the current server Edge Functions and native behaviour. |
 | eBay account connection/admin/category admin/CSV tools | Partial / audit needed | Account health/capabilities now have a dedicated source-aligned web page. Subscriber OAuth uses the existing server action; browser return and live connector checks remain unverified. Admin/category/CSV native action parity still needs audit. |
 | Stock check / stock listing workflows | Partial | Added a tenant- and niche-scoped stock check table with checkboxes, editable quantity/unit price, checked-stock summary, and save confirmation. The stock listing detail is routed to existing inventory detail; native-specific workflow parity still needs tests. |
 | Deep ID lab, image enhancement, coin flipper commercial score, MX profit tools, surplus auction bid engine, niche-specific home actions | Gap / audit needed | Need function-by-function review of native screens/services before declaring parity. |

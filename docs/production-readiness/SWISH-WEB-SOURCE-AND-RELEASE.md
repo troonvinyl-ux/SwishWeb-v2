@@ -2,7 +2,7 @@
 
 ## Authority and scope
 
-Native source: https://github.com/troonvinyl-ux/SWISH, inspected at `b5151e5a6f07a25c9016dccbdd18fff15dc5f96f` on 2026-11-14. The web client remains React/Vite; native Expo UI is not copied into this runtime. `config/swish-source.json` pins the source and contract subtree IDs, **not a parity approval**. The initial review is deliberately pending.
+Native source: https://github.com/troonvinyl-ux/SWISH, inspected at `fab5c890e9186150de221753c5d5d7c232cb39ab` on 2026-11-17. The web client remains React/Vite; native Expo UI is not copied into this runtime. `config/swish-source.json` pins the source and contract subtree IDs, **not a parity approval**. The initial review is deliberately pending.
 
 The existing web backend URL matches the literal callback backend in native `app/ebay-account.tsx` and `supabase/functions/swish-ebay-oauth/index.ts`: `https://iwgaqieyoahmcjfziwga.backend.onspace.ai`. The native runtime uses `EXPO_PUBLIC_SUPABASE_URL` in `template/core/config.ts`; therefore this source match does **not** prove deployed runtime identity, ownership, Cloud binding, RLS, or service availability. Verify those against the existing SWISH OnSpace project before live acceptance. Do not initialize a replacement Cloud project or Stripe integration here. Never copy native `.env`, service-role credentials, marketplace tokens or payment secrets to browser code.
 
@@ -53,7 +53,7 @@ This workflow does not deploy to OnSpace, configure DNS or control the OnSpace P
 
 ## Continuation workflow safety
 
-See `2026-11-14-source-continuation.md` for draft readiness, advisory-verification labeling, existing publication/claim guards and persistent tab-local uncertain-attempt protection. Status inspection only rereads the existing saved record. Live eBay reconciliation, photo/order/options/specifics persistence and full marketplace preflight remain separately blocked or unverified; these frontend improvements do not establish full parity.
+See `2026-11-17-source-continuation.md` for the current source-drift review, request-scope alignment, draft readiness, advisory-verification labeling, existing publication/claim guards and persistent tab-local uncertain-attempt protection. Status inspection only rereads the existing saved record. Live eBay reconciliation, photo/order/options/specifics persistence and full marketplace preflight remain separately blocked or unverified; these frontend improvements do not establish full parity.
 
 ## Verification honesty
 
