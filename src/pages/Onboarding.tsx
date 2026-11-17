@@ -15,10 +15,8 @@ const PRODUCTS: Record<string, { name: string; description: string }> = {
   clothing: { name: 'Threads Flip', description: 'Fashion identification, brand research, pricing and selling.' },
   surplus_flip: { name: 'Surplus Flip', description: 'Supplier manifests, job lots, product matching and resale.' },
 };
-const OWNER_EMAIL = 'troonvinyl@gmail.com';
-
 export default function Onboarding() {
-  const { user } = useAuth();
+  const { user, isPlatformOwner } = useAuth();
   const navigate = useNavigate();
   const { tenantId } = useCurrentTenantId();
   const hostProduct = getHostProduct();
@@ -48,7 +46,7 @@ export default function Onboarding() {
     return () => { active = false; };
   }, [storageKey, user, tenantId]);
   const completed = Object.values(steps).filter(Boolean).length;
-  const isOwner = user?.email?.toLowerCase() === OWNER_EMAIL;
+  const isOwner = isPlatformOwner;
 
   const updateStep = (step: string) => {
     const next = { ...steps, [step]: true };
