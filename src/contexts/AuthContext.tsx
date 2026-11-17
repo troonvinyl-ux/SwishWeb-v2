@@ -15,6 +15,10 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   connectionStatus: ConnectionStatus;
+  /** Resolved from the backend; never inferred from a client-side identifier. */
+  isPlatformOwner: boolean;
+  /** True while the backend owner check is still in progress for this user. */
+  isPlatformOwnerLoading: boolean;
   /** Last-resort manual key — only called from LoginPage when auto-init fails */
   setManualKey: (key: string) => void;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -29,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession]         = useState<Session | null>(null);
   const [loading, setLoading]         = useState(true);
   const [connectionStatus, setStatus] = useState<ConnectionStatus>('initialising');
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false);
+  const [isPlatformOwnerLoading, setIsPlatformOwnerLoading] = useState(false);
   const unsubRef = useRef<(() => void) | null>(null);
   const previousUserId = useRef<string | null | undefined>(undefined);
   const qc = useQueryClient();
@@ -48,6 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (previousUserId.current !== nextId) {
         qc.clear();
         previousUserId.current = nextId;
+        // Prevent a previous account's client state from carrying into this one.
+        setIsPlatformOwner(false);
+        setIsPlatformOwnerLoading(Boolean(nextId));
       }
       setSession(next);
       setUser(next?.user ?? null);
@@ -92,6 +101,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
     return () => { cancelled = true; unsubRef.current?.(); unsubRef.current = null; };
   }, [attachAuthListener]);
+
+  // Privileged UI is based on the same backend RPC as the native app. Failure
+  // leaves this false, so a browser-side error can never grant owner access.
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setIsPlatformOwner(false);
+      setIsPlatformOwnerLoading(false);
+      return () => { cancelled = true; };
+    }
+    void (async () => {
+      try {
+        const sb = getSupabaseClient() || await getSupabaseClientAsync();
+        if (!sb) return;
+        const { data, error } = await sb.rpc('swish_is_platform_owner');
+        if (!cancelled && !error) setIsPlatformOwner(data === true);
+      } catch {
+        // Backend authorization remains authoritative; errors grant nothing.
+      } finally {
+        if (!cancelled) setIsPlatformOwnerLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   /** Called only when auto-init fails and user provides key via LoginPage */
   const setManualKey = useCallback((key: string) => {
@@ -142,6 +175,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     qc.clear();
     previousUserId.current = null;
+    setIsPlatformOwner(false);
+    setIsPlatformOwnerLoading(false);
     localStorage.removeItem('swish_active_niche');
     localStorage.removeItem('swish_active_niche_name');
     delete document.documentElement.dataset.niche;
@@ -152,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, connectionStatus, setManualKey, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, connectionStatus, isPlatformOwner, isPlatformOwnerLoading, setManualKey, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
