@@ -243,7 +243,7 @@ function ImageSlot({
 
 export default function Identify() {
   const navigate = useNavigate();
-  const { user, isPlatformOwner, isPlatformOwnerLoading } = useAuth();
+  const { user } = useAuth();
 
   // Duplicate-submit guard (ref — not state — so it doesn't cause re-renders)
   const submitGuard = useRef(false);
@@ -272,7 +272,7 @@ export default function Identify() {
   // Existing inventory search (for REQ-INV-002 — update path)
   const [inventorySearch, setInventorySearch] = useState('');
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const isOwner = isPlatformOwner;
+  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
   const { data: activeSpecialists = [], isLoading: entitlementsLoading } = useQuery({
     queryKey: ['coin_identify_entitlements', tenantId],
     enabled: Boolean(tenantId) && !isOwner,
@@ -880,7 +880,7 @@ export default function Identify() {
   const candidates = result?.candidates ?? (result?.identification ? [result.identification as Candidate] : []);
 
   // ──────────────────────────────────────────────────────────────────────────
-  if (isPlatformOwnerLoading || (!isOwner && (tenantLoading || entitlementsLoading))) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
+  if (!isOwner && (tenantLoading || entitlementsLoading)) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
   if (!coinAllowed) return <Navigate to="/niches" replace />;
 
   // RENDER: Identifying (progress spinner)

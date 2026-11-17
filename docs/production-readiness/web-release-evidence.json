@@ -1,0 +1,15 @@
+{
+  "domain": "swishflip.co.uk",
+  "backendUrl": "https://iwgaqieyoahmcjfziwga.backend.onspace.ai",
+  "nativeCommit": "b5151e5a6f07a25c9016dccbdd18fff15dc5f96f",
+  "webSourceDigest": null,
+  "testedAt": null,
+  "knownGaps": [
+    "Existing OnSpace workspace binding and deployed backend identity require operator verification.",
+    "Stripe checkout success/cancel and billing portal return URLs are native-only in the inspected source.",
+    "Full native workflow, tenant isolation, browser OAuth return and live save/reopen acceptance evidence is pending.",
+    "Listing photo order/options/specifics persistence, live category/condition validation and server publication reconciliation require parity implementation and acceptance.",
+    "Source candidate is pending actual merged GitHub owner review; branch and production environment protections require operator configuration."
+  ],
+  "checks": {}
+}
