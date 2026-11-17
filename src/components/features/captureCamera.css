@@ -1,1 +1,62 @@
-.capture-camera{background:#10141c;color:#fff;border-radius:1rem;overflow:hidden}.capture-camera.is-expanded{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;border-radius:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}.capture-camera-heading,.capture-controls{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem;flex-wrap:wrap}.capture-camera-heading p{font-size:.875rem;color:#b5becd}.capture-viewfinder{position:relative;flex:1;min-height:280px;overflow:hidden}.capture-viewfinder video{width:100%;height:100%;position:absolute;inset:0;object-fit:contain}.capture-permission{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem}.capture-settings{position:absolute;top:1rem;right:1rem;display:flex;gap:.5rem}.capture-icon{padding:.75rem;background:#202a3acc;border-radius:50%}.capture-frame{position:absolute;inset:12%;border:1px solid #ffffff55;pointer-events:none}.capture-frame.is-barcode{inset:35% 12%}.capture-grid{position:absolute;inset:12%;display:grid;grid-template-columns:repeat(3,1fr);pointer-events:none}.capture-grid span{border:1px solid #ffffff22}.capture-shutter{background:#f5c842;color:#10141c;border-radius:2rem;padding:1rem 2rem;font-weight:bold}.capture-controls button{min-height:48px}.capture-controls button:disabled{opacity:.4}.capture-camera-error{padding:1rem;color:#ffb4b4;display:flex;gap:.75rem}.capture-device{padding:1rem}.capture-device select{background:#202a3a;padding:.75rem;max-width:100%}
+/* Native matte camera: clear gold controls and a preview identical to the saved zoom crop. */
+.capture-camera { background:hsl(var(--background)); color:hsl(var(--foreground)); border-radius:20px; overflow:hidden; }
+.capture-camera.is-expanded { position:fixed; inset:0; height:100%; height:100dvh; z-index:100; display:grid; grid-template-rows:auto minmax(120px,1fr) minmax(0,auto) auto; border-radius:0; padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overflow:hidden; }
+.capture-camera.is-expanded .capture-viewfinder { min-height:120px; }
+.capture-options { background:hsl(var(--card)); }
+.capture-camera.is-expanded .capture-options { max-height:36vh; max-height:36dvh; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.capture-sources { padding:8px 16px; background:hsl(var(--card)); border-top:1px solid hsl(var(--border)); }
+.capture-source-actions { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; }
+.capture-device-camera { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:8px 16px; border:1px solid hsl(var(--border)); border-radius:16px; font-size:16px; font-weight:600; background:hsl(var(--secondary)); }
+.capture-source-actions .capture-device { flex:1 1 140px; min-width:0; padding:0; }
+.capture-device label { display:block; margin-bottom:4px; font-size:16px; }
+.capture-source-note { margin-top:8px; color:hsl(var(--muted-foreground)); font-size:16px; line-height:1.6; }
+.capture-quality summary { min-height:44px; padding:8px 0; cursor:pointer; font-size:16px; color:hsl(var(--muted-foreground)); }
+.capture-quality summary:focus-visible { outline:2px solid hsl(var(--primary)); outline-offset:2px; }
+.capture-camera-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; flex:0 0 auto; }
+.capture-camera-heading h2 { font-size:20px; font-weight:700; }
+.capture-camera-heading p { font-size:16px; line-height:1.6; color:hsl(var(--muted-foreground)); margin-top:4px; }
+.capture-viewfinder { position:relative; flex:1 1 auto; min-height:240px; overflow:hidden; background:hsl(var(--background)); }
+.capture-preview-container { position:absolute; inset:0; }
+.capture-preview-plane { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); overflow:hidden; }
+.capture-preview-plane video { display:block; width:100%; height:100%; object-fit:fill; transform-origin:center; }
+.capture-permission { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:16px; text-align:center; }
+.capture-permission > svg { color:hsl(var(--primary)); }
+.capture-settings { position:absolute; top:16px; right:16px; display:flex; gap:8px; }
+.capture-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:44px; height:44px; padding:10px; background:hsl(var(--secondary)/.95); border:1px solid hsl(var(--border)); color:hsl(var(--foreground)); border-radius:16px; }
+.capture-icon svg { width:22px; height:22px; }
+.capture-camera button { transition:transform 160ms, opacity 160ms; }
+.capture-camera button:hover:not(:disabled) { opacity:.85; }
+.capture-camera button:active:not(:disabled) { transform:scale(.97); }
+.capture-camera button:focus-visible, .capture-camera input:focus-visible, .capture-camera select:focus-visible { outline:2px solid hsl(var(--primary)); outline-offset:3px; }
+.capture-camera button:disabled, .capture-camera input:disabled, .capture-camera select:disabled { opacity:.45; cursor:not-allowed; }
+.capture-icon[aria-pressed="true"] { color:hsl(var(--primary)); border-color:hsl(var(--primary)); }
+.capture-frame { position:absolute; inset:12%; border:1px solid hsl(var(--foreground)/.55); pointer-events:none; }
+.capture-frame.is-barcode { inset:35% 12%; }
+.capture-frame.is-coin { inset:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:64%; height:auto; aspect-ratio:1; max-height:80%; border:2px solid hsl(var(--primary)); border-radius:50%; box-shadow:0 0 0 1px hsl(var(--background)/.6); }
+.capture-grid { position:absolute; inset:12%; display:grid; grid-template-columns:repeat(3,1fr); pointer-events:none; }
+.capture-grid span { border:1px solid hsl(var(--foreground)/.18); }
+.capture-zoom { flex:0 0 auto; padding:12px 16px; background:hsl(var(--card)); border-top:1px solid hsl(var(--border)); }
+.capture-zoom-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:16px; }
+.capture-zoom-heading strong { display:inline-block; min-width:48px; margin-left:8px; color:hsl(var(--primary)); font-variant-numeric:tabular-nums; }
+.capture-zoom-heading > span { color:hsl(var(--muted-foreground)); font-size:14px; }
+.capture-zoom-slider { display:flex; align-items:center; gap:16px; margin:8px 0; }
+.capture-zoom-slider input { width:100%; min-width:0; min-height:44px; accent-color:hsl(var(--primary)); cursor:pointer; }
+.capture-zoom-presets { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
+.capture-zoom-presets button { min-width:44px; min-height:44px; padding:8px 12px; border:1px solid hsl(var(--border)); background:hsl(var(--secondary)); border-radius:16px; font-size:16px; }
+.capture-zoom-presets button[aria-pressed="true"] { color:hsl(var(--primary)); border-color:hsl(var(--primary)); }
+.capture-zoom-presets .capture-refocus { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.capture-focus-note { margin-top:8px; font-size:14px; line-height:1.6; color:hsl(var(--muted-foreground)); }
+.capture-controls { border-top:1px solid hsl(var(--border)); display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:12px; padding:12px 16px; flex:0 0 auto; background:hsl(var(--card)); }
+.capture-controls button { display:flex; align-items:center; justify-content:center; gap:8px; min-height:48px; border-radius:16px; font-size:16px; }
+.capture-controls img { border-radius:8px; object-fit:contain; }
+.capture-shutter { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); border:2px solid hsl(var(--primary)); border-radius:24px!important; min-height:56px!important; padding:12px 24px; font-weight:700; }
+.capture-camera-error { padding:12px 16px; color:hsl(var(--destructive)); display:flex; align-items:start; gap:12px; flex:0 0 auto; }
+.capture-camera-error svg { flex:0 0 auto; margin-top:4px; }
+.capture-camera-notice { padding:8px 16px; color:hsl(var(--muted-foreground)); font-size:14px; line-height:1.6; background:hsl(var(--card)); }
+.capture-device { padding:8px 16px; background:hsl(var(--card)); flex:0 0 auto; }
+.capture-device summary { cursor:pointer; min-height:44px; display:list-item; padding:8px 0; }
+.capture-device select { display:block; min-height:48px; width:100%; max-width:100%; background:hsl(var(--secondary)); color:hsl(var(--foreground)); border:1px solid hsl(var(--border)); border-radius:16px; padding:12px; font-size:16px; }
+@media(min-width:1024px) { .capture-camera.is-expanded .capture-options, .capture-camera.is-expanded .capture-controls { width:100%; max-width:960px; justify-self:center; } .capture-options { display:grid; grid-template-columns:1fr 1fr; } .capture-camera-error, .capture-camera-notice { grid-column:1/-1; } }
+@media(max-height:600px) { .capture-camera-heading p { display:none; } .capture-camera-heading { padding:8px 16px; } }
+@media(max-height:560px) and (orientation:landscape) { .capture-camera.is-expanded { grid-template-columns:minmax(0,1fr) minmax(280px,35%); grid-template-rows:auto minmax(0,1fr) auto; } .capture-camera-heading { grid-column:1/-1; } .capture-camera.is-expanded .capture-viewfinder { grid-column:1; grid-row:2/4; min-height:0; } .capture-camera.is-expanded .capture-options { display:block; grid-column:2; grid-row:2; max-height:100%; min-height:0; } .capture-controls { grid-column:2; grid-row:3; } }
+@media(prefers-reduced-motion:reduce) { .capture-camera button { transition:none; } }

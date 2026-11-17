@@ -43,9 +43,10 @@ test('the actual coin scanner uses the shared zoom-enabled camera, not a separat
   assert.match(dialog, /SharedCaptureCamera/); assert.match(dialog, /autoStart/);
 });
 test('shared zoom changes the captured crop, supports continuous focus and serializes hardware settings', async () => {
-  const [camera, preview, settings, zoom, shared] = await Promise.all(['src/hooks/useCaptureCamera.ts', 'src/components/features/CameraPreview.tsx', 'src/hooks/useCameraAdjustments.ts', 'src/components/features/CameraZoomControls.tsx', 'src/components/features/SharedCaptureCamera.tsx'].map(path => readFile(path, 'utf8')));
-  assert.match(camera, /cameraCrop\(element.videoWidth, element.videoHeight, adjustments.digitalZoom\)/);
-  assert.match(camera, /canvas.width = crop.width/); assert.match(camera, /crop.x, crop.y, crop.width, crop.height/);
+  const [camera, preview, settings, zoom, shared, photo, canvas] = await Promise.all(['src/hooks/useCaptureCamera.ts', 'src/components/features/CameraPreview.tsx', 'src/hooks/useCameraAdjustments.ts', 'src/components/features/CameraZoomControls.tsx', 'src/components/features/SharedCaptureCamera.tsx', 'src/lib/captureCameraPhoto.ts', 'src/lib/cameraPhotoCanvas.ts'].map(path => readFile(path, 'utf8')));
+  assert.match(camera, /captureCameraPhoto\(element, track, adjustments.digitalZoom/);
+  assert.match(photo, /cameraCrop\(width, height, zoom\)/); assert.match(photo, /cameraPhotoCrop/);
+  assert.match(canvas, /Math.min\(1, Math.sqrt/); assert.match(canvas, /crop.x, crop.y, crop.width, crop.height/);
   assert.match(preview, /containedCameraSize/); assert.match(preview, /cameraCrop/);
   assert.match(settings, /focusMode: mode/); assert.match(settings, /'continuous'/);
   assert.match(settings, /worker.current === track/); assert.match(settings, /queued.current/);
@@ -53,7 +54,7 @@ test('shared zoom changes the captured crop, supports continuous focus and seria
   assert.match(zoom, /Digital crop/); assert.match(zoom, /Zoom out/); assert.match(zoom, /Zoom in/); assert.match(zoom, /does not add detail/);
 });
 test('camera zoom files have no TypeScript syntax diagnostics', async () => {
-  for (const path of ['src/types/camera.ts', 'src/lib/cameraZoom.ts', 'src/hooks/useCameraAdjustments.ts', 'src/hooks/useCaptureCamera.ts', 'src/components/features/CameraPreview.tsx', 'src/components/features/CameraViewport.tsx', 'src/components/features/CameraControls.tsx', 'src/components/features/CameraZoomControls.tsx', 'src/components/features/CoinCaptureDialog.tsx', 'src/components/features/SharedCaptureCamera.tsx', 'src/pages/Identify.tsx']) {
+  for (const path of ['src/types/camera.ts', 'src/lib/cameraZoom.ts', 'src/lib/cameraStream.ts', 'src/lib/cameraStill.ts', 'src/lib/cameraPhotoCanvas.ts', 'src/lib/captureCameraPhoto.ts', 'src/hooks/useCameraStream.ts', 'src/components/features/CameraSourceControls.tsx', 'src/hooks/useCameraAdjustments.ts', 'src/hooks/useCaptureCamera.ts', 'src/components/features/CameraPreview.tsx', 'src/components/features/CameraViewport.tsx', 'src/components/features/CameraControls.tsx', 'src/components/features/CameraZoomControls.tsx', 'src/components/features/CoinCaptureDialog.tsx', 'src/components/features/SharedCaptureCamera.tsx', 'src/pages/Identify.tsx']) {
     const result = compile(await readFile(path, 'utf8'));
     assert.equal(result.diagnostics?.filter(entry => entry.category === ts.DiagnosticCategory.Error).length ?? 0, 0, path);
   }
