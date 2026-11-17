@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useNicheAccess } from '@/hooks/useNicheAccess';
+import NicheAccessStatus from '@/components/features/NicheAccessStatus';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useInsert } from '@/hooks/useSupabaseQuery';
 import { getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
@@ -7,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { SCAN_PROFILES } from '@/lib/sharedScanFlow';
 import { prepareScanPhotos, scanPhotoStoragePath } from '@/lib/sharedScanPhotos';
-import { getDefaultSpecialistForNiche, getSpecialistIdsForNiche, normaliseNicheId } from '@/lib/niche';
+import { getDefaultSpecialistForNiche, normaliseNicheId } from '@/lib/niche';
 import { ArrowLeft, Save, Package, Shirt, Bike, Coins, Wrench, Gamepad2, Gem, FlaskConical, Monitor, Hammer, Sparkles, Camera, CheckCircle2, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,32 +40,15 @@ const CONFIG: Record<string, Config> = {
 };
 export default function NicheCapture() {
   const { niche: routeNiche = 'coins' } = useParams();
-  // Normalise every supported entry alias before selecting a workflow. A
-  // Threads route must never fall through to the coin scanner just because
-  // its URL uses a product alias rather than the internal specialist ID.
+  // Normalise supported entry aliases before choosing the workflow.
   const niche = normaliseNicheId(routeNiche) || routeNiche;
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const canonicalNicheId = normaliseNicheId(niche);
-  const { data: activeSpecialists = [], isLoading: entitlementsLoading } = useQuery({
-    queryKey: ['capture_niche_entitlements', tenantId],
-    enabled: Boolean(tenantId) && !isOwner,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const sb = getSupabaseClient() || await getSupabaseClientAsync();
-      if (!sb || !tenantId) return [] as string[];
-      const { data, error } = await sb.from('tenants').select('active_specialists').eq('id', tenantId).maybeSingle();
-      if (error) throw error;
-      const raw = data?.active_specialists;
-      if (Array.isArray(raw)) return raw.map(String);
-      if (typeof raw === 'string') { try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed.map(String) : []; } catch { return []; } }
-      return [] as string[];
-    },
-  });
+  const { nicheIds: entitledNiches, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
   const isSupportedNiche = canonicalNicheId !== null;
-  const nicheAllowed = canonicalNicheId !== null && (isOwner || getSpecialistIdsForNiche(canonicalNicheId).some(id => activeSpecialists.includes(id)));
+  const nicheAllowed = canonicalNicheId !== null && entitledNiches.includes(canonicalNicheId);
   useEffect(() => { if (nicheAllowed && canonicalNicheId) { localStorage.setItem('swish_active_niche', canonicalNicheId); document.documentElement.dataset.niche = canonicalNicheId; } }, [nicheAllowed, isSupportedNiche, canonicalNicheId]);
   const insert = useInsert('items', tenantId);
   const config = useMemo(() => CONFIG[niche] || CONFIG[canonicalNicheId === 'trading_cards' ? 'cards' : canonicalNicheId === 'bicycles' ? 'bikes' : canonicalNicheId === 'motocross' ? 'mx' : (canonicalNicheId ?? '')] || CONFIG.generic, [niche, canonicalNicheId]);
@@ -93,9 +77,7 @@ export default function NicheCapture() {
     setIdentifyingEvidence(true);
     setEvidenceAiError('');
     try {
-      const photos = scanProfile.evidence.filter(slot => evidencePhotos[slot.id]).map(slot => ({
-        slotId: slot.id, label: slot.label, file: evidencePhotos[slot.id],
-      }));
+      const photos = scanProfile.evidence.filter(slot => evidencePhotos[slot.id]).map(slot => ({ slotId: slot.id, label: slot.label, file: evidencePhotos[slot.id] }));
       const prepared = await prepareScanPhotos(photos);
       const sb = getSupabaseClient() || await getSupabaseClientAsync();
       if (!sb) throw new Error('SWISH backend is not connected');
@@ -118,16 +100,10 @@ export default function NicheCapture() {
         const title = result.canonicalTitle ?? result.title ?? attributes.canonicalTitle;
         if (typeof title === 'string' && title.trim() && !next.title?.trim()) next.title = title.trim();
         const aliases: Record<string, string[]> = {
-          brand: ['manufacturer', 'maker', 'brandName', 'make'],
-          model: ['modelNumber', 'modelName', 'sku', 'productModel'],
-          category: ['objectType', 'productType', 'itemType', 'deviceType'],
-          condition: ['conditionAssessment', 'itemCondition'],
-          material: ['composition', 'materials'],
-          period: ['era', 'datePeriod'],
-          size: ['taggedSize', 'dimensions'],
-          colour: ['color', 'primaryColor'],
-          issues: ['faults', 'damage', 'defects'],
-          specs: ['specifications', 'technicalSpecifications'],
+          brand: ['manufacturer', 'maker', 'brandName', 'make'], model: ['modelNumber', 'modelName', 'sku', 'productModel'],
+          category: ['objectType', 'productType', 'itemType', 'deviceType'], condition: ['conditionAssessment', 'itemCondition'],
+          material: ['composition', 'materials'], period: ['era', 'datePeriod'], size: ['taggedSize', 'dimensions'],
+          colour: ['color', 'primaryColor'], issues: ['faults', 'damage', 'defects'], specs: ['specifications', 'technicalSpecifications'],
         };
         config.fields.forEach(field => {
           const keys = [field.key, ...(aliases[field.key] ?? [])];
@@ -137,9 +113,7 @@ export default function NicheCapture() {
           );
           if (candidate === undefined) return;
           const value = String(candidate).trim();
-          // Never insert an AI value that the field's fixed options cannot represent.
           if (field.type === 'select' && field.options && !field.options.includes(value)) return;
-          // Preserve details the user has already entered rather than silently overwriting them.
           if (!next[field.key]?.trim()) next[field.key] = value;
         });
         return next;
@@ -190,8 +164,7 @@ export default function NicheCapture() {
           reader.onerror = () => reject(new Error('Could not read the selected photo'));
           reader.readAsDataURL(file);
         });
-        // Match the mobile app's payload discipline: resize to max 1024px and JPEG
-        // quality 0.65 before sending images to the Edge Function.
+        // Match the native image payload size and JPEG quality.
         const image = await new Promise<string>((resolve, reject) => {
           const source = new Image();
           source.onload = () => {
@@ -213,9 +186,7 @@ export default function NicheCapture() {
       if (!sb) throw new Error('SWISH backend is not connected. Please reload and try again.');
       const { data, error } = await sb.functions.invoke('swish-identify', {
         body: {
-          images,
-          imageLabels: selected.map(([, label]) => label),
-          specialistId: 'clothing',
+          images, imageLabels: selected.map(([, label]) => label), specialistId: 'clothing',
           acquisitionContext: 'Threads Flip fashion identification. Read the brand label exactly, identify garment type, care/composition label, tagged size, gender category, era evidence, colour/style, visible condition and authentication risks. Do not guess brand or authenticity from style alone.',
           knownAttributes: { existingAttributes: { niche: 'clothing', photoSlots: selected.map(([, label]) => label) } },
         },
@@ -224,30 +195,14 @@ export default function NicheCapture() {
       const result = (data?.identification || data?.result?.identification || data?.result || data) as Record<string, unknown>;
       if (!result || typeof result !== 'object' || !Object.keys(result).length) throw new Error('The clothing identification engine returned no result.');
       setClothingAiResult(result);
-      // The shared SWISH identification contract returns clothing-specific fields
-      // separately from generic confirmed/inferred attributes. Merge all supported
-      // shapes so Threads Flip gets the same specialist data as the mobile app.
-      const object = (value: unknown): Record<string, unknown> =>
-        value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-      const attrs = {
-        ...object(result.attributesInferred),
-        ...object(result.attributes),
-        ...object(result.attributesConfirmed),
-        ...object(result.clothingFields),
-        ...object(result.garmentFields),
-      };
+      const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+      const attrs = { ...object(result.attributesInferred), ...object(result.attributes), ...object(result.attributesConfirmed), ...object(result.clothingFields), ...object(result.garmentFields) };
       const usable = (value: unknown) => {
         if (value === undefined || value === null) return false;
-        if (typeof value === 'string') {
-          const text = value.trim();
-          return !!text && !/^(not established|not legible|unknown|n\/a|none)$/i.test(text);
-        }
+        if (typeof value === 'string') { const text = value.trim(); return !!text && !/^(not established|not legible|unknown|n\/a|none)$/i.test(text); }
         return typeof value === 'number' || typeof value === 'boolean';
       };
-      const setIfPresent = (formKey: string, ...values: unknown[]) => {
-        const value = values.find(usable);
-        if (value !== undefined) setF(formKey, String(value));
-      };
+      const setIfPresent = (formKey: string, ...values: unknown[]) => { const value = values.find(usable); if (value !== undefined) setF(formKey, String(value)); };
       setIfPresent('title', result.canonicalTitle, result.title, attrs.canonicalTitle);
       setIfPresent('brand', attrs.brand, attrs.brand_label, attrs.labelBrand, result.brand);
       setIfPresent('category', attrs.garmentType, attrs.garment_type, attrs.category, attrs.objectType, result.garmentType);
@@ -279,15 +234,10 @@ export default function NicheCapture() {
       const message = error instanceof Error ? error.message : 'Identification failed. Please try again.';
       setClothingAiError(message);
       toast.error(message);
-    } finally {
-      setIdentifyingClothing(false);
-    }
+    } finally { setIdentifyingClothing(false); }
   };
   const generateClothingCopy = async (kind: 'title' | 'description') => {
-    if (!clothingIdentified || !clothingAiResult) {
-      toast.error('Identify the garment photos first so AI has evidence to work from.');
-      return;
-    }
+    if (!clothingIdentified || !clothingAiResult) { toast.error('Identify the garment photos first so AI has evidence to work from.'); return; }
     setGeneratingClothingCopy(kind);
     setClothingAiError('');
     try {
@@ -322,10 +272,7 @@ export default function NicheCapture() {
       const attributes = Object.fromEntries(config.fields.map(field => [field.key, f(field.key)]).filter((entry) => String(entry[1] ?? '').trim()));
       const { data, error } = await sb.functions.invoke('swish-identify', {
         body: {
-          images,
-          imageLabels: selected.map(([, label]) => label),
-          specialistId: 'clothing',
-          outputMode: 'listing_copy',
+          images, imageLabels: selected.map(([, label]) => label), specialistId: 'clothing', outputMode: 'listing_copy',
           acquisitionContext: kind === 'title'
             ? 'Threads Flip eBay listing-copy mode. Generate a concise, searchable eBay UK title of no more than 80 characters using only the supplied garment photos and attributes. Include brand, garment type, supported gender category, colour and tagged size where known. Do not invent details or claim authenticity. Put the requested output in listingCopy.title.'
             : 'Threads Flip eBay listing-copy mode. Write a ready-to-use factual eBay UK description using the garment photos and supplied attributes. Include garment type, brand, tagged size, colour, material only when evidenced, condition and visible flaws. Omit unknown facts and never claim designer authenticity. Put the requested output in listingCopy.description.',
@@ -334,12 +281,8 @@ export default function NicheCapture() {
       });
       if (error) throw new Error(error.message || 'AI listing copy generation failed');
       const result = (data?.identification || data?.result?.identification || data?.result || data) as Record<string, unknown>;
-      const listingCopy = result.listingCopy && typeof result.listingCopy === 'object'
-        ? result.listingCopy as Record<string, unknown>
-        : {};
-      const textValue = kind === 'title'
-        ? listingCopy.title ?? result.canonicalTitle ?? result.title ?? (result.attributes as Record<string, unknown> | undefined)?.canonicalTitle
-        : listingCopy.description ?? result.description ?? result.listingDescription ?? result.listing_description;
+      const listingCopy = result.listingCopy && typeof result.listingCopy === 'object' ? result.listingCopy as Record<string, unknown> : {};
+      const textValue = kind === 'title' ? listingCopy.title ?? result.canonicalTitle ?? result.title ?? (result.attributes as Record<string, unknown> | undefined)?.canonicalTitle : listingCopy.description ?? result.description ?? result.listingDescription ?? result.listing_description;
       if (typeof textValue === 'string' && textValue.trim()) {
         setF(kind, textValue.trim());
         toast.success(kind === 'title' ? 'AI listing title generated — check and edit it.' : 'AI listing description generated — check and edit it.');
@@ -349,16 +292,7 @@ export default function NicheCapture() {
         setF('title', parts.join(' ').slice(0, 80));
         toast.success('Created a title from the identified garment details. Please review it.');
       } else {
-        const parts = [
-          f('title'),
-          f('brand') ? 'Brand: ' + f('brand') : '',
-          f('category') ? 'Garment: ' + f('category') : '',
-          f('size') ? 'Tagged size: ' + f('size') : '',
-          f('colour') ? 'Colour: ' + f('colour') : '',
-          f('material') ? 'Material: ' + f('material') : '',
-          f('condition') ? 'Condition: ' + f('condition') : '',
-          f('flaws') ? 'Flaws / wear: ' + f('flaws') : '',
-        ].filter(Boolean);
+        const parts = [f('title'), f('brand') ? 'Brand: ' + f('brand') : '', f('category') ? 'Garment: ' + f('category') : '', f('size') ? 'Tagged size: ' + f('size') : '', f('colour') ? 'Colour: ' + f('colour') : '', f('material') ? 'Material: ' + f('material') : '', f('condition') ? 'Condition: ' + f('condition') : '', f('flaws') ? 'Flaws / wear: ' + f('flaws') : ''].filter(Boolean);
         if (parts.length < 2) throw new Error('AI did not return a description. Add or confirm a few details and try again.');
         setF('description', parts.join('\n\n'));
         toast.success('Created a draft from the identified details. Please review it.');
@@ -367,15 +301,12 @@ export default function NicheCapture() {
       const message = error instanceof Error ? error.message : 'Could not generate listing copy.';
       setClothingAiError(message);
       toast.error(message);
-    } finally {
-      setGeneratingClothingCopy(null);
-    }
+    } finally { setGeneratingClothingCopy(null); }
   };
   const save = async () => {
     if (niche === 'coins') { navigate('/identify'); return; }
     if (niche === 'clothing' && !clothingIdentified) { toast.error('Photograph the brand label and run Threads Flip identification before saving'); return; }
-    // Saving a private review draft must not depend on a successful identification.
-    // Publishing is a separate, explicitly approved operation with stricter preflight.
+    // Private review drafts need not depend on successful identification. Publication is separate.
     const draftTitle = f('title').trim() || 'Unidentified item — review required';
     if (!user?.id) { toast.error('Please sign in before creating inventory'); return; }
     if (!tenantId || tenantLoading) { toast.error('Your SWISH workspace is not ready.'); return; }
@@ -384,18 +315,10 @@ export default function NicheCapture() {
     const attributes:Record<string,string> = {};
     config.fields.forEach(field => { if (f(field.key).trim()) attributes[field.key]=f(field.key).trim(); });
     const canonicalNiche = normaliseNicheId(niche);
-    const canonicalSpecialistId = canonicalNiche
-      ? getDefaultSpecialistForNiche(canonicalNiche)
-      : config.specialistId;
+    const canonicalSpecialistId = canonicalNiche ? getDefaultSpecialistForNiche(canonicalNiche) : config.specialistId;
     const row:Record<string,unknown> = {
-      tenant_id:tenantId,
-      canonical_title:draftTitle,
-      description:f('description').trim(),
-      specialist_id: canonicalSpecialistId,
-      status:'review_required',
-      disposition_decision:'pending',
-      condition:f('condition'),
-      attributes,
+      tenant_id:tenantId, canonical_title:draftTitle, description:f('description').trim(), specialist_id: canonicalSpecialistId,
+      status:'review_required', disposition_decision:'pending', condition:f('condition'), attributes,
       acquired_cost:f('cost').trim() ? Number(f('cost')) : null,
       valuation_mid:f('valuation').trim() ? Number(f('valuation')) : null,
       expected_selling_price:f('sale_price').trim() ? Number(f('sale_price')) : null,
@@ -405,10 +328,7 @@ export default function NicheCapture() {
     };
     insert.mutate(row,{onSuccess:async(saved)=>{
       const id=(saved as Record<string,unknown>)?.id as string | undefined;
-      if (!id) {
-        toast.error('Inventory response did not include an item ID. Please check inventory before trying again.');
-        return;
-      }
+      if (!id) { toast.error('Inventory response did not include an item ID. Please check inventory before trying again.'); return; }
       if (niche !== 'clothing') {
         const mediaUrls:string[] = [];
         let uploadFailures = 0;
@@ -446,9 +366,9 @@ export default function NicheCapture() {
       navigate('/inventory/'+id);
     },onError:e=>toast.error(e.message)});
   };
-  if (!isOwner && (tenantLoading || entitlementsLoading)) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
+  if (tenantLoading || entitlementsLoading) return <NicheAccessStatus loading onRetry={() => void refetchEntitlements()} />;
+  if (entitlementsError || !tenantId) return <NicheAccessStatus error={entitlementsError} onRetry={() => void refetchEntitlements()} />;
   if (!nicheAllowed) return <Navigate to="/niches" replace />;
-
   if (niche === 'clothing') {
     const photoSlots = [
       { key: 'brand', title: 'Brand Label', required: true, hint: 'Inside neck or waist label — required' },
@@ -531,4 +451,3 @@ export default function NicheCapture() {
     <div className="flex flex-wrap justify-between gap-3"><Link to="/inventory" className="btn-secondary"><Package className="w-4 h-4"/>Inventory</Link><button className="btn-primary" onClick={save} disabled={insert.isPending || tenantLoading || !tenantId}><Save className="w-4 h-4"/>{insert.isPending?'Saving…':niche==='coins'?'Open coin capture':'Save for review'}</button></div>
   </div>;
 }
-

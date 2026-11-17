@@ -24,6 +24,7 @@ import Audit from '@/pages/Audit';
 import Listings from '@/pages/Listings';
 import ListingNew from '@/pages/ListingNew';
 import ListingEditor from '@/pages/ListingEditor';
+import ListingDetails from '@/pages/ListingDetails';
 import Orders from '@/pages/Orders';
 import Dispatch from '@/pages/Dispatch';
 import Repricing from '@/pages/Repricing';
@@ -107,7 +108,8 @@ function AppRoutes() {
     <Route path="/audit" element={<Audit />} />
     <Route path="/listings" element={<Listings />} />
     <Route path="/listings/new" element={<ListingNew />} />
-    <Route path="/listings/:id" element={<ListingEditor />} />
+    <Route path="/listings/:id" element={<ListingDetails />} />
+    <Route path="/listings/:id/edit" element={<ListingEditor />} />
     <Route path="/orders" element={<Orders />} />
     <Route path="/dispatch" element={<Dispatch />} />
     <Route path="/repricing" element={<Repricing />} />
