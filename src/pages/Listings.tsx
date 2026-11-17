@@ -77,7 +77,8 @@ export default function Listings() {
                     <td className="text-xs text-muted-foreground">{formatDate(l.created_at as string)}</td>
                     <td>
                       <div className="flex gap-1">
-                        <Link to={`/listings/${l.id}`} className="btn-ghost py-1 px-2 text-xs">Edit</Link>
+                        <Link to={`/listings/${l.id}`} className="btn-secondary py-1 px-2 text-xs">View listing</Link>
+                        <Link to={`/listings/${l.id}/edit`} className="btn-ghost py-1 px-2 text-xs">Edit</Link>
                         {l.url && <a href={l.url as string} target="_blank" rel="noopener noreferrer" className="btn-ghost py-1 px-2"><ExternalLink className="w-3 h-3" /></a>}
                       </div>
                     </td>

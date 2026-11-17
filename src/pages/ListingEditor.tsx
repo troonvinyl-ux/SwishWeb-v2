@@ -1,4 +1,5 @@
 import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
+import { availableItemPhotos, itemPhotos } from '@/lib/itemPhotos';
 import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
 import { usePublicationAttempt } from '@/hooks/usePublicationAttempt';
 import { listingReadiness, publicationBlock } from '@/lib/listingReadiness';
@@ -44,6 +45,7 @@ export default function ListingEditor() {
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
+  const galleryInitialised = useRef('');
   const currentInputRef = useRef('');
   currentInputRef.current = JSON.stringify({ form, selectedImages });
   useEffect(() => { setVerification(null); setConfirmPublish(false); }, [form, selectedImages]);
@@ -57,11 +59,19 @@ export default function ListingEditor() {
       const listing = data as Record<string, unknown>;
       setForm(listing);
       setDraftDirty(false);
+      galleryInitialised.current = '';
       // Pre-select existing listing images
       const existingImages = (listing.images as string[]) || [];
       setSelectedImages(existingImages);
     }
   }, [data]);
+
+  useEffect(() => {
+    const key = `${id}:${itemId}`;
+    if (!linkedItem || galleryInitialised.current === key || selectedImages.length) return;
+    const preferred = itemPhotos(linkedItem as Record<string, unknown>).map(photo => photo.presentation);
+    if (preferred.length) { galleryInitialised.current = key; setSelectedImages(preferred); }
+  }, [id, itemId, linkedItem, selectedImages.length]);
 
   const readiness = listingReadiness({listing:form,item:linkedItem as Record<string, unknown> | null,tenantId,specialistIds:getSpecialistIdsForNiche(getActiveNicheId()),photos:selectedImages,dirty:draftDirty});
   const publicationReason = publicationBlock(form) || (publicationAttempt.attempted ? 'A previous submission needs inspection. Check saved status and eBay before trying again.' : null);
@@ -133,7 +143,7 @@ export default function ListingEditor() {
         setDraftDirty(false);
         toast.success('Listing saved');
         const savedId = (saved as Record<string, unknown>)?.id as string;
-        if (savedId && savedId !== id) navigate(`/listings/${savedId}`);
+        if (savedId && savedId !== id) navigate(`/listings/${savedId}/edit`);
       },
       onError: e => toast.error(e.message),
     });
@@ -239,7 +249,7 @@ export default function ListingEditor() {
     <div className="w-full max-w-4xl space-y-4 animate-fade-in">
       <div className="flex items-center gap-3 flex-wrap">
         <Link to="/listings" className="btn-ghost py-1.5 px-2"><ArrowLeft className="w-4 h-4" /></Link>
-        <h1 className="page-title flex-1">Edit Listing</h1>
+        <div className="flex-1"><h1 className="page-title">Edit Listing</h1><Link to={`/listings/${id}`} className="text-sm text-primary underline">Back to listing overview</Link></div>
         <div className="flex gap-2">
           <button onClick={preflight} disabled={preflighting || publishing || upsert.isPending || draftDirty || !form.id} className="btn-ghost">
             <Zap className="w-3.5 h-3.5" />{preflighting ? 'Checking…' : 'Preflight'}
@@ -282,8 +292,11 @@ export default function ListingEditor() {
           ...(Array.isArray(inv.image_urls) ? inv.image_urls : []),
           ...(Array.isArray(inv.photos) ? inv.photos : []),
           ...Object.values(scanImages),
+          ...availableItemPhotos(inv),
         ];
-        const mediaEntries = mediaValues.map((value, i) => ({ side: i === 0 ? 'Obverse / photo 1' : i === 1 ? 'Reverse / photo 2' : `Photo ${i + 1}`, url: asImageUrl(value) })).filter((image): image is {side: string; url: string} => !!image.url);
+        const allowedPhotos = new Set(availableItemPhotos(inv));
+        const preparedPhotos = new Set(itemPhotos(inv).filter(photo => photo.prepared).map(photo => photo.presentation));
+        const mediaEntries = mediaValues.map((value, i) => ({ side: preparedPhotos.has(String(value)) ? 'Prepared cutout' : i === 0 ? 'Original photo 1' : i === 1 ? 'Original photo 2' : `Original photo ${i + 1}`, url: asImageUrl(value) })).filter((image): image is {side: string; url: string} => !!image.url && (allowedPhotos.size === 0 ? !/\/(?:references|studio)\//i.test(image.url) : allowedPhotos.has(image.url)));
         const existingListingImages = (form.images as string[] || []).filter(Boolean);
         const imageEntries = [
           ...mediaEntries,

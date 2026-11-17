@@ -7,7 +7,7 @@ import NicheAccessStatus from '@/components/features/NicheAccessStatus';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useCount, useTable } from '@/hooks/useSupabaseQuery';
 import { getSpecialistIdsForNiche, normaliseNicheId, type SwishNicheId } from '@/lib/niche';
-import coinArtwork from '@/assets/niches/coin-flipper.svg';
+import coinArtwork from '@/assets/niches/coin-flipper.webp';
 import mxArtwork from '@/assets/niches/mx-flipper.svg';
 import bikeArtwork from '@/assets/niches/bike-flipper.svg';
 import threadsArtwork from '@/assets/niches/threads-flip.svg';
