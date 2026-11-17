@@ -37,5 +37,6 @@ export function useCurrentTenantId() {
     tenantId: query.data ?? null,
     isLoading: query.isLoading,
     error: query.error,
+    refetch: query.refetch,
   };
 }

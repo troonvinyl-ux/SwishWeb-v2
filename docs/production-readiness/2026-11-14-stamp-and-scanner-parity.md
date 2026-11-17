@@ -1,0 +1,24 @@
+# Stamp Flip and shared web capture — 14 November 2026
+
+Native source inspected: `troonvinyl-ux/SWISH`, commit `52e7a44af940e6d684b241b914ec470853072791`.
+
+## Implemented frontend corrections
+- Added canonical `stamps` / specialist `stamps` to product routing, the public SWISH home, niche selector, specialist workspace, sidebar name and onboarding. Stamp Flip opens via `/stamps`, `/stamp-flip`, `/stamp-flipper`, `/entry/stamps` and `/philately`. No store link, production hostname, new subscription or backend schema was invented.
+- Replaced the independent clothing and other niche manual scanners with a shared camera-first Quick List workspace. `/identify`, `/capture`, `/scan/:niche`, `/identify/coins` and the Antique capture alias lead to the shared flow. The previous detailed coin research interface remains separately available at `/deep-id-lab`.
+- The short task flow is Photo or permitted Barcode -> required evidence -> Next -> editable listing review -> List continuation or Save for later. There is one main camera, a selectable evidence rail, camera/microscope selection, framing grid and original-file upload. Camera resources stop on unmount. Barcode recognition uses ZXing with validated manual EAN/UPC/ISBN fallback and the existing `swish-ebay-browse` barcode lookup contract.
+- All configured default evidence roles, labels, requirements, specialist fields and modes are read from the pinned mobile `constants/specialists.ts` and `shared/specialistIntelligence.ts` using a restricted literal parser, not guessed per-niche forms or executable source. Browser requests to public GitHub carry no account data or credentials. Configuration loading failures show a retry state rather than selecting another niche. This currently adds a public GitHub availability dependency; reviewed local snapshots are a future resilience improvement.
+- Part mode and multi-disc CD / box-set evidence follow native `nicheCaptureService` / `musicCaptureService`. Stamps disable retail barcode lookup. Stamp review includes issue, usage, gum, catalogue reference claims, perforation/watermark observations, faults, contents and album location; no photo-based MNH, authenticity or catalogue-value certification is claimed.
+- Next reuses `swish-identify`, `swish-list-generate`, existing `items` and `item-images`, and native `swish_create_listing_draft`. Original photos are stored separately from compressed analysis copies. Canonical item identity uses the mobile `swish-capture-v1:tenant:niche:session` hash so an explicit retry on the retained scan does not create another physical-item ID. Completed item/photo/draft checkpoints are retained in the open scanner; originals are never persisted as blob URLs.
+- Backend module identity and sign-in are checked before operations and after Edge responses. No anonymous fallback, entitlement bypass, automatic mutation replay, new backend, Stripe key or AI provider was configured.
+
+## Explicit limits
+The List action saves reviewed title/description/price and continues to the existing listing editor for marketplace checks and explicit publication. It does not perform one-tap automatic publishing, bypass category requirements, or claim full mobile publication parity. Save for later opens draft inventory. Stamp count inside one lot remains distinct from listing quantity (one physical lot).
+
+Mobile Smart Studio automatic coin cleanup, catalogue-only music continuation, full Numista research, capture recovery across closed tabs and all publication-specific controls have not been newly implemented in this pass. Existing services and separate interfaces remain unchanged. Closing this scanner retains successfully saved server records, not unsaved local photo blobs.
+
+## Verification
+Added parser, stamp policy, barcode checksum, mode evidence, routing and no-automatic-publication regressions in `scripts/test/capture-parity.test.mjs`. Added `scripts/check-capture-source.mjs` to CI to validate every default specialist profile against the exact pinned native source; source-impact reports now explicitly include Quick List hooks/services and specialist policy.
+
+The builder has no command execution tool, so tests, typechecking, compilation and live backend workflow acceptance were not executed here. Run `node --test scripts/test/*.test.mjs`, `node scripts/check-capture-source.mjs`, `node scripts/verify-niche-map.mjs`, `node scripts/verify-web-parity.mjs`, `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build`. Verify with an entitled Stamp Flip account and at least Coins, Clothing, Parts and CD / box-set workflows. Exercise denied camera access, stale module identity, failed photo upload, ambiguous barcode lead, interrupted draft readback and original-photo reopening on mobile.
+
+Release approval remains pending; this change neither verifies the workspace Cloud management binding nor authorizes publishing.

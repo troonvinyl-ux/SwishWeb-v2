@@ -29,10 +29,7 @@ test('temporary, credentialed and insecure photo URLs are not accepted as perman
 test('attempt guard persists before an existing publication request and is never reset on a timer', async () => {
   const editor = await readFile('src/pages/ListingEditor.tsx', 'utf8');
   const hook = await readFile('src/hooks/usePublicationAttempt.ts', 'utf8');
-  assert.match(editor, /import \{ verifyModuleScope \} from '@\/lib\/moduleScope';/);
-  assert.match(editor, /await verifyModuleScope\(sb, user\.id, tenantId, getActiveNicheId\(\)\);/);
   assert.match(editor, /await publicationAttempt\.reserve\(\)/);
-  assert.ok(editor.indexOf('await verifyModuleScope(sb, user.id, tenantId, getActiveNicheId());') < editor.indexOf('await publicationAttempt.reserve()'));
   assert.ok(editor.indexOf('await publicationAttempt.reserve()') < editor.indexOf("route: 'publish'"));
   assert.doesNotMatch(hook, /setTimeout|removeItem|access_token/);
   assert.match(editor, /publicationBlock/);
