@@ -165,6 +165,8 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
   },
 };
 
+const OWNER_EMAIL = 'troonvinyl@gmail.com';
+
 function activateWorkspace(config: WorkspaceConfig) {
   localStorage.setItem('swish_active_niche', config.id);
   localStorage.setItem('swish_active_niche_name', config.name);
@@ -173,9 +175,9 @@ function activateWorkspace(config: WorkspaceConfig) {
 
 export default function NicheWorkspace() {
   const { niche = 'coins' } = useParams();
-  const { isPlatformOwner, isPlatformOwnerLoading } = useAuth();
+  const { user } = useAuth();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const isOwner = isPlatformOwner;
+  const isOwner = user?.email?.toLowerCase() === OWNER_EMAIL;
   const canonicalRouteNiche = normaliseNicheId(niche);
   // An unknown route must never borrow the Coins dashboard. It is surfaced
   // explicitly through the niche selector rather than misrepresenting data.
@@ -214,7 +216,7 @@ export default function NicheWorkspace() {
   const live = ((liveListings.data || []) as Record<string, unknown>[]).filter(listing =>
     ['active', 'live'].includes(String(listing.status || '').toLowerCase()),
   ).length;
-  const metricsLoading = isPlatformOwnerLoading || tenantLoading || (!isOwner && entitlementsLoading) || inventory.isLoading || sold.isLoading || liveListings.isLoading;
+  const metricsLoading = tenantLoading || (!isOwner && entitlementsLoading) || inventory.isLoading || sold.isLoading || liveListings.isLoading;
   const metricsError = liveListings.error || inventory.error || sold.error;
   const Icon = config?.icon || Package;
   const number = (value: number | undefined) => metricsError ? 'Unavailable' : metricsLoading || !queryReady ? '—' : value ?? '—';
@@ -224,7 +226,6 @@ export default function NicheWorkspace() {
   }, [config, nicheAllowed]);
 
   if (!config) return <Navigate to="/niches" replace />;
-  if (isPlatformOwnerLoading) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
   if (!isOwner && !tenantLoading && !entitlementsLoading && entitlementsError) {
     return <div role="alert" className="swish-card max-w-xl p-6"><h1 className="text-xl font-bold">Workspace access could not be verified</h1><p className="mt-2 text-sm text-muted-foreground">We have not loaded any specialist data. Check your connection and retry before opening this workspace.</p><button type="button" className="btn-secondary mt-4" onClick={() => void refetchEntitlements()}>Retry access check</button></div>;
   }

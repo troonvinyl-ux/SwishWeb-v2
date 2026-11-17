@@ -79,8 +79,8 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { user, signOut, isPlatformOwner } = useAuth();
-  const isOwner = isPlatformOwner;
+  const { user, signOut } = useAuth();
+  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
   const [ebayOpen, setEbayOpen] = useState(false);
   const location = useLocation();
   const activeNicheId = String(localStorage.getItem('swish_active_niche') || user?.user_metadata?.preferred_niche || 'coins');
