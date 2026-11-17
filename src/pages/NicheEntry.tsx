@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
-import { getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
-import { getSpecialistIdsForNiche, normaliseNicheId, type SwishNicheId } from '@/lib/niche';
+import { useNicheAccess } from '@/hooks/useNicheAccess';
+import NicheAccessStatus from '@/components/features/NicheAccessStatus';
+import { normaliseNicheId, type SwishNicheId } from '@/lib/niche';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Info, CheckCircle2, Circle, Coins, Bike, Shirt, Wrench, Package, Search, ShieldCheck, Grid3X3, Construction, Gamepad2, Watch, Gem, Palette, Smartphone, Sparkles } from 'lucide-react';
@@ -36,57 +36,34 @@ const NICHES: Niche[] = [
 ];
 
 export default function NicheEntry() {
-  const { user, isPlatformOwner, isPlatformOwnerLoading } = useAuth();
-  const isOwner = isPlatformOwner;
+  const { user } = useAuth();
+  const { nicheIds: enabled, isOwner, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
   const navigate = useNavigate();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const [query, setQuery] = useState('');
-  const [opening, setOpening] = useState(false);
-  const [openError, setOpenError] = useState('');
   const [activeId, setActiveId] = useState(() => {
     const stored = normaliseNicheId(localStorage.getItem('swish_active_niche') || String(user?.user_metadata?.preferred_niche || 'coins')) || 'coins';
     return NICHES.some(n => n.id === stored) ? stored : 'coins';
   });
-  const { data: activeSpecialists = [], isLoading: entitlementsLoading } = useQuery({
-    queryKey: ['niche_entry_entitlements', tenantId],
-    enabled: Boolean(tenantId) && !isOwner,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const sb = getSupabaseClient() || await getSupabaseClientAsync();
-      if (!sb || !tenantId) return [] as string[];
-      const { data, error } = await sb.from('tenants').select('active_specialists').eq('id', tenantId).maybeSingle();
-      if (error) throw error;
-      const raw = data?.active_specialists;
-      if (Array.isArray(raw)) return raw.map(String);
-      if (typeof raw === 'string') { try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed.map(String) : []; } catch { return []; } }
-      return [] as string[];
-    },
-  });
-  const enabled = useMemo(() => isOwner ? NICHES.map(n => n.id) : NICHES.filter(n => getSpecialistIdsForNiche(n.id as SwishNicheId).some(id => activeSpecialists.includes(id))).map(n => n.id), [isOwner, activeSpecialists]);
-  const niches = useMemo(() => NICHES.filter(n => (n.name + ' ' + n.tagline + ' ' + n.categories.join(' ')).toLowerCase().includes(query.toLowerCase())), [query]);
-  useEffect(() => { if (!isPlatformOwnerLoading && !tenantLoading && !entitlementsLoading && enabled.length && !enabled.includes(activeId)) { const first = normaliseNicheId(enabled[0])!; setActiveId(first); localStorage.setItem('swish_active_niche', first); localStorage.setItem('swish_active_niche_name', NICHES.find(n => n.id === first)?.name || first); } }, [isPlatformOwnerLoading, tenantLoading, entitlementsLoading, enabled, activeId]);
-
-  const selectNiche = (niche: Niche) => {
-    setActiveId(niche.id);
-    localStorage.setItem('swish_active_niche', niche.id);
-    localStorage.setItem('swish_active_niche_name', niche.name);
-  };
+  const niches = useMemo(() => NICHES.filter(n => enabled.includes(n.id) && (n.name + ' ' + n.tagline + ' ' + n.categories.join(' ')).toLowerCase().includes(query.toLowerCase())), [query, enabled]);
+  useEffect(() => { if (!tenantLoading && !entitlementsLoading && enabled.length && !enabled.includes(activeId)) setActiveId(enabled[0]); }, [tenantLoading, entitlementsLoading, enabled, activeId]);
+  const selectNiche = (niche: Niche) => { if (enabled.includes(niche.id)) setActiveId(niche.id); };
   const toggleEnabled = (id: SwishNicheId) => {
-    // Browser storage must never grant access to an unentitled niche.
+    // Browser preferences never grant niche membership.
     if (enabled.includes(id)) selectNiche(NICHES.find(n => n.id === id) || NICHES[0]);
   };
-  const done = async () => {
-    if (isPlatformOwnerLoading || tenantLoading || entitlementsLoading || opening || !tenantId) return;
+  const done = () => {
+    if (tenantLoading || entitlementsLoading || entitlementsError || !tenantId) return;
     const niche = NICHES.find(n => n.id === activeId && enabled.includes(n.id)) || NICHES.find(n => enabled.includes(n.id));
     if (!niche) return;
     localStorage.setItem('swish_active_niche', niche.id);
     localStorage.setItem('swish_active_niche_name', niche.name);
     document.documentElement.dataset.niche = niche.id;
+    // AuthorizedModule still performs server activation before opening the workspace.
     navigate('/workspace/' + niche.id);
   };
-
-  if (isPlatformOwnerLoading) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
-
+  if (tenantLoading || entitlementsLoading) return <NicheAccessStatus loading onRetry={() => void refetchEntitlements()} />;
+  if (entitlementsError || !tenantId) return <NicheAccessStatus error={entitlementsError} onRetry={() => void refetchEntitlements()} />;
   return (
     <main className="vertical-page -m-4 sm:-m-6 min-h-screen">
       <header className="vertical-header">
@@ -96,9 +73,10 @@ export default function NicheEntry() {
       </header>
       <div className="vertical-info"><Info className="w-4 h-4 shrink-0 mt-0.5" /><span>ONE SWISH ENGINE — switch between the niches included in your subscription. Your eBay connection is shared; inventory and workflows stay niche-scoped.</span></div>
       <section className="vertical-content" aria-label="Trading niches">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="text-muted-foreground">{enabled.length} {enabled.length === 1 ? 'niche' : 'niches'} included in your verified membership</p><button type="button" className="btn-secondary min-h-11 focus-visible:ring-2 focus-visible:ring-primary" onClick={() => void refetchEntitlements()}>Refresh access</button></div>
         <div className="vertical-search"><Search className="w-4 h-4" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search niches…" aria-label="Search niches" /></div>
         <div className="vertical-list">
-          {niches.filter(niche => enabled.includes(niche.id)).map(niche => {
+          {niches.map(niche => {
             const Icon = niche.icon;
             const active = activeId === niche.id;
             const isEnabled = enabled.includes(niche.id);
@@ -115,13 +93,12 @@ export default function NicheEntry() {
               <div className="vertical-card-actions"><button className="vertical-small-btn" onClick={() => toggleEnabled(niche.id)}>{isOwner ? '✓ Available' : '✓ Included'}</button>{active && <span className="vertical-active-tag">ACTIVE</span>}</div>
             </article>;
           })}
-          {niches.length === 0 && <p className="py-8 text-center text-muted-foreground">No niches match that search.</p>}
+          {niches.length === 0 && <p role="status" className="py-8 text-center leading-7 text-muted-foreground">{enabled.length ? 'No included niches match that search.' : 'No niche entitlements were returned for this account. If your membership includes niches, refresh access or check your account settings.'}</p>}
         </div>
         <div className="vertical-coming"><Construction className="w-5 h-5 shrink-0" /><div><strong>More verticals coming</strong><p>Musical instruments · Sports equipment · Golf · Watches · Tools · Homeware</p></div></div>
         <div className="vertical-note"><Grid3X3 className="w-4 h-4 shrink-0" /><div><strong>ONE PLATFORM, MANY NICHES</strong><p>Your inventory, eBay integration, AI engine, valuation and orders share one platform. Switching niche changes the specialist context; existing backend access controls remain authoritative.</p></div></div>
       </section>
-      <footer className="vertical-done">{openError && <p role="alert" className="text-red-400 text-sm p-2">{openError}</p>}<button onClick={() => void done()} disabled={opening || isPlatformOwnerLoading || tenantLoading || entitlementsLoading || enabled.length === 0}><CheckCircle2 className="w-5 h-5" />{opening ? 'Opening authorised workspace…' : `Done — Using ${NICHES.find(n => n.id === activeId)?.name || 'SWISH'}`}</button></footer>
+      <footer className="vertical-done"><button onClick={done} disabled={tenantLoading || entitlementsLoading || Boolean(entitlementsError) || !tenantId || !enabled.includes(activeId)}><CheckCircle2 className="w-5 h-5" />{`Done — Using ${NICHES.find(n => n.id === activeId)?.name || 'SWISH'}`}</button></footer>
     </main>
   );
 }
-

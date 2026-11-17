@@ -8,7 +8,8 @@ import { callEdgeFunction, EdgeFunctionError } from '@/lib/supabase';
 import { formatCurrency, formatDate, formatDateTime, statusVariant } from '@/lib/utils';
 import { ArrowLeft, Edit2, Save, X, Trash2, Zap, RefreshCw, Package, Tag } from 'lucide-react';
 import { toast } from 'sonner';
-import { getSpecialistIdsForNiche } from '@/lib/niche';
+import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
+import ItemDetailWorkspace from '@/components/features/ItemDetailWorkspace';
 import { captureNumistaReference } from '@/lib/numistaCapture';
 import NumistaCaptureReview from '@/components/features/NumistaCaptureReview';
 
@@ -258,6 +259,9 @@ export default function InventoryItem() {
       </div>
     );
   }
+
+  if (!getSpecialistIdsForNiche(getActiveNicheId()).includes(String(row.specialist_id))) return <section role="alert" className="swish-card p-6 space-y-4"><h1 className="text-xl font-semibold">Open this item's specialist workspace</h1><p className="text-muted-foreground">This item is not part of the currently selected niche.</p><Link to="/niches" className="btn-secondary">Choose workspace</Link></section>;
+  if (!editing) return <ItemDetailWorkspace item={row} onEditItem={startEdit} />;
 
   const f = (key: string) => editing ? (form[key] == null ? '' : String(form[key])) : fieldValue(key);
   const setF = (key: string, val: unknown) => setForm(p => ({ ...p, [key]: val }));

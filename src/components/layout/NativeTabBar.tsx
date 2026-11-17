@@ -1,9 +1,9 @@
-import { Home, Menu, Package, ScanLine, Tag } from 'lucide-react';
+import { Home, Menu, Package, Camera, Tag } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { getActiveNicheId } from '@/lib/niche';
 import type { ProductContext } from '@/lib/productContext';
 import { cn } from '@/lib/utils';
-import './nativeAppShell.css';
+import '@/components/layout/nativeAppShell.css';
 
 type NativeTabBarProps = {
   product?: ProductContext | null;
@@ -21,7 +21,7 @@ export default function NativeTabBar({ product }: NativeTabBarProps) {
   const tabs = [
     { label: 'Home', to: home, icon: Home, active: location.pathname === home || location.pathname === '/' },
     { label: 'Inventory', to: '/inventory', icon: Package, active: location.pathname.startsWith('/inventory') },
-    { label: 'Scan', to: '/identify', icon: ScanLine, active: location.pathname === '/identify' || location.pathname.startsWith('/identify/') || location.pathname.startsWith('/scan/') },
+    { label: 'Scan', to: '/identify', icon: Camera, active: location.pathname === '/identify' || location.pathname === '/deep-id-lab' || location.pathname.startsWith('/identify/') || location.pathname.startsWith('/scan/') },
     { label: 'Listings', to: '/listings', icon: Tag, active: location.pathname.startsWith('/listings') },
     { label: 'More', to: '/settings', icon: Menu, active: location.pathname.startsWith('/settings') || location.pathname.startsWith('/ebay') || location.pathname.startsWith('/orders') },
   ];

@@ -6,35 +6,35 @@
 
 @layer base {
   :root {
-    --background: 300 20% 4%;
-    --foreground: 300 20% 95%;
-    --card: 300 23% 7%;
-    --card-foreground: 300 20% 95%;
-    --popover: 300 24% 9%;
-    --popover-foreground: 300 20% 95%;
-    --primary: 43 96% 56%;
-    --primary-foreground: 222 47% 6%;
-    --secondary: 300 20% 12%;
-    --secondary-foreground: 300 20% 95%;
-    --muted: 300 20% 12%;
-    --muted-foreground: 300 12% 56%;
-    --accent: 300 20% 16%;
-    --accent-foreground: 300 20% 95%;
-    --destructive: 0 72% 51%;
+    --background: 240 14% 4%;
+    --foreground: 220 14% 95%;
+    --card: 230 16% 9%;
+    --card-foreground: 220 14% 95%;
+    --popover: 230 16% 12%;
+    --popover-foreground: 220 14% 95%;
+    --primary: 46 90% 62%;
+    --primary-foreground: 240 14% 4%;
+    --secondary: 225 16% 16%;
+    --secondary-foreground: 220 14% 95%;
+    --muted: 225 16% 16%;
+    --muted-foreground: 220 11% 70%;
+    --accent: 225 16% 20%;
+    --accent-foreground: 220 14% 95%;
+    --destructive: 0 85% 65%;
     --destructive-foreground: 210 40% 98%;
-    --border: 300 18% 15%;
-    --input: 300 18% 15%;
-    --ring: 43 96% 56%;
-    --radius: 0.625rem;
-    --sidebar-background: 300 22% 4%;
-    --sidebar-foreground: 300 12% 65%;
-    --sidebar-primary: 43 96% 56%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 300 20% 10%;
-    --sidebar-accent-foreground: 300 20% 95%;
-    --sidebar-border: 300 18% 13%;
-    --sidebar-ring: 43 96% 56%;
-    --swish-gold: 43 96% 56%;
+    --border: 230 11% 23%;
+    --input: 230 11% 23%;
+    --ring: 46 90% 62%;
+    --radius: 1.25rem;
+    --sidebar-background: 240 14% 4%;
+    --sidebar-foreground: 220 11% 70%;
+    --sidebar-primary: 46 90% 62%;
+    --sidebar-primary-foreground: 240 14% 4%;
+    --sidebar-accent: 230 16% 9%;
+    --sidebar-accent-foreground: 220 14% 95%;
+    --sidebar-border: 230 11% 23%;
+    --sidebar-ring: 46 90% 62%;
+    --swish-gold: 46 90% 62%;
     --swish-success: 142 70% 45%;
     --swish-warning: 38 92% 50%;
     --swish-error: 0 72% 51%;
@@ -47,11 +47,11 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.6;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600;
     line-height: 1.3;
   }

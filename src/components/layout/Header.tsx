@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Menu, Search, Bell, X } from 'lucide-react';
+import { Menu, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -51,7 +51,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
   return (
     <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-3 shrink-0">
-      <button onClick={onMenuClick} className="lg:hidden p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+      <button onClick={onMenuClick} aria-label="Open navigation" className="lg:hidden flex min-h-11 min-w-11 items-center justify-center rounded-2xl hover:bg-secondary text-muted-foreground hover:text-foreground">
         <Menu className="w-5 h-5" />
       </button>
 
@@ -76,12 +76,10 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-1">
-        <button onClick={() => setSearchOpen(!searchOpen)} className="p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={() => setSearchOpen(!searchOpen)} aria-label={searchOpen ? 'Close inventory search' : 'Search inventory'} className="flex min-h-11 min-w-11 items-center justify-center rounded-2xl hover:bg-secondary text-muted-foreground hover:text-foreground">
           <Search className="w-4 h-4" />
         </button>
-        <button className="p-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-          <Bell className="w-4 h-4" />
-        </button>
+
       </div>
     </header>
   );
