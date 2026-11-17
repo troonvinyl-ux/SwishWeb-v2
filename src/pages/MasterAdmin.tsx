@@ -13,6 +13,7 @@ type Subscription = {
   niche_entitlements?: string[];
 };
 
+const OWNER_EMAIL = 'troonvinyl@gmail.com';
 const NICHES = [
   { id: 'coins', name: 'SWISH Coins', tagline: 'Identify, value and flip coins & collectibles', colour: '#F5C842', icon: Coins },
   { id: 'motocross', name: 'SWISH MX', tagline: 'Buy, prep and flip motocross & off-road bikes', colour: '#EF4444', icon: Wrench },
@@ -22,9 +23,9 @@ const NICHES = [
 ];
 
 export default function MasterAdmin() {
-  const { isPlatformOwner } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const isOwner = isPlatformOwner;
+  const isOwner = user?.email?.toLowerCase() === OWNER_EMAIL;
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkedAt, setCheckedAt] = useState<string | null>(null);

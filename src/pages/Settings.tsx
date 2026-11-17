@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 const LOCAL_VECTOR_PAIRING_URL = 'http://127.0.0.1:8788/v1/pair';
 
 export default function Settings() {
-  const { user, session, signOut, isPlatformOwner } = useAuth();
+  const { user, session, signOut } = useAuth();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const [profile, setProfile] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
@@ -89,7 +89,7 @@ export default function Settings() {
           <Link to="/inventory" className="rounded-lg border border-border p-3">Inventory</Link>
           <Link to="/listings" className="rounded-lg border border-border p-3">Listings</Link>
         </div>
-        {isPlatformOwner && <Link to="/master-admin" className="block rounded-lg border border-border p-3 text-sm">Master Admin</Link>}
+        {user?.email?.toLowerCase() === 'troonvinyl@gmail.com' && <Link to="/master-admin" className="block rounded-lg border border-border p-3 text-sm">Master Admin</Link>}
         <button type="button" onClick={() => void signOut()} className="w-full rounded-lg border border-border p-3 text-left text-sm">Sign out</button>
       </nav>
       <div className="page-header">

@@ -8,11 +8,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export default function EbayAnalytics() {
-  const { user, isPlatformOwner } = useAuth();
+  const { user } = useAuth();
   const qc = useQueryClient();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const preferredNiche = String(user?.user_metadata?.preferred_niche || localStorage.getItem('swish_active_niche') || 'coins').toLowerCase();
-  const isOwner = isPlatformOwner;
+  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
   const activeNiche = String((isOwner ? localStorage.getItem('swish_active_niche') : preferredNiche) || preferredNiche).toLowerCase();
   const specialistIds: string[] =
     ['clothing', 'fashion', 'threads', 'threads_flip', 'trainers', 'trainers_sneakers'].includes(activeNiche)
