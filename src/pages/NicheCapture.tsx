@@ -44,8 +44,8 @@ export default function NicheCapture() {
   // its URL uses a product alias rather than the internal specialist ID.
   const niche = normaliseNicheId(routeNiche) || routeNiche;
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
+  const { user, isPlatformOwner, isPlatformOwnerLoading } = useAuth();
+  const isOwner = isPlatformOwner;
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const canonicalNicheId = normaliseNicheId(niche);
   const { data: activeSpecialists = [], isLoading: entitlementsLoading } = useQuery({
@@ -446,7 +446,7 @@ export default function NicheCapture() {
       navigate('/inventory/'+id);
     },onError:e=>toast.error(e.message)});
   };
-  if (!isOwner && (tenantLoading || entitlementsLoading)) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
+  if (isPlatformOwnerLoading || (!isOwner && (tenantLoading || entitlementsLoading))) return <div className="p-8 text-center text-muted-foreground">Checking your SWISH niche access…</div>;
   if (!nicheAllowed) return <Navigate to="/niches" replace />;
 
   if (niche === 'clothing') {
