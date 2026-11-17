@@ -7,6 +7,8 @@ import { callEdgeFunction, getSupabaseClientAsync } from '@/lib/supabase';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
 import { verifyModuleScope } from '@/lib/moduleScope';
 import { asRecord, itemPhotos } from '@/lib/itemPhotos';
+import { identificationCandidates } from '@/lib/identificationResult';
+import { identificationItemPatch } from '@/lib/identificationItemPatch';
 export function useItemIntelligence(item: Record<string, unknown> | null) {
   const { user } = useAuth(), { tenantId } = useCurrentTenantId(), qc = useQueryClient();
   const [candidate, setCandidate] = useState<Record<string, unknown> | null>(null), [market, setMarket] = useState<Record<string, unknown> | null>(null);
@@ -28,7 +30,7 @@ export function useItemIntelligence(item: Record<string, unknown> | null) {
     const timer = setTimeout(() => flight.abort(), 60_000);
     const endpoint = kind === 'identify' ? 'swish-identify' : 'swish-market-value';
     const body = kind === 'identify'
-      ? { tenantId, nicheId, specialistId: item.specialist_id, existingImageUrls: photos, knownAttributes: attrs }
+      ? { tenantId, nicheId, specialistId: item.specialist_id, existingImageUrls: photos, knownAttributes: { existingAttributes: attrs, weight_g: item.weight_grams, diameter_mm: item.diameter_mm ?? asRecord(item.dimensions_mm).diameter } }
       : { tenantId, itemId: item.id, title, specialistId: item.specialist_id, attributes: attrs, condition: item.condition, identificationConfidence: item.identification_confidence, imageUrls: photos, applyToItem: true };
     console.log('[SWISH Item] Requested research', { kind, itemId: item.id });
     const response = await callEdgeFunction<Record<string, unknown>>(endpoint, body, client, { signal: flight.signal }).finally(() => clearTimeout(timer));
@@ -40,8 +42,8 @@ export function useItemIntelligence(item: Record<string, unknown> | null) {
       if (response.data?.success !== true || !Object.keys(asRecord(response.data.valuation)).length) throw new Error('No verified valuation was returned. No price was inferred.');
       return response.data;
     }
-    const result = asRecord(response.data?.identification ?? (Array.isArray(response.data?.candidates) ? response.data.candidates[0] : null));
-    if (!Object.keys(result).length) throw new Error('No reviewable identification candidate was returned. Your item is unchanged.');
+    const result = identificationCandidates(response.data)[0];
+    if (!result) throw new Error('No reviewable identification candidate was returned. Your item is unchanged.');
     return { ...result, _itemUpdatedAt: item.updated_at };
   };
   const run = (kind: 'identify' | 'value') => { if (locked.current) return Promise.reject(new Error('Research is already in progress.')); locked.current = true; return request(kind).finally(() => { locked.current = false; }); };
@@ -49,13 +51,15 @@ export function useItemIntelligence(item: Record<string, unknown> | null) {
   const value = useMutation({ mutationFn: () => run('value'), onSuccess: result => { if (!live()) return; setMarket(result); void qc.invalidateQueries({ queryKey: ['items'] }); toast.success('SWISH market research refreshed. eBay price is unchanged.'); }, onError: (error: Error) => { if (live()) toast.error(error.message); } });
   const apply = useMutation({
     mutationFn: async () => {
-      const client = await getSupabaseClientAsync(), title = String(candidate?.canonicalTitle || candidate?.title || candidate?.name || '').trim();
+      const client = await getSupabaseClientAsync(), title = String(candidate?.title || '').trim();
       if (!client || !user || !tenantId || !item || !title || !candidate?._itemUpdatedAt || current.current !== scope) throw new Error('Reopen the current item and review its suggestion again.');
       await verifyModuleScope(client, user.id, tenantId, nicheId);
       if (!live()) throw new Error('The active item changed before saving. Reopen and review it again.');
-      const saved = await client.from('items').update({ canonical_title: title }).eq('id', item.id).eq('tenant_id', tenantId).in('specialist_id', getSpecialistIdsForNiche(nicheId)).eq('updated_at', candidate._itemUpdatedAt).select('id').maybeSingle();
+      const updates = identificationItemPatch(item, candidate, new Date().toISOString());
+      console.log('[SWISH Item] Applying reviewed identification', { itemId: item.id, fields: Object.keys(updates) });
+      const saved = await client.from('items').update(updates).eq('id', item.id).eq('tenant_id', tenantId).in('specialist_id', getSpecialistIdsForNiche(nicheId)).eq('updated_at', candidate._itemUpdatedAt).select('id').maybeSingle();
       if (saved.error || !saved.data) throw new Error(saved.error?.message || 'The item changed. Reload and review again; no automatic overwrite was made.');
-    }, onSuccess: () => { if (!live()) return; setCandidate(null); void qc.invalidateQueries({ queryKey: ['items'] }); toast.success('Reviewed title saved to inventory. eBay listing is unchanged.'); }, onError: (error: Error) => { if (live()) toast.error(error.message); },
+    }, onSuccess: () => { if (!live()) return; setCandidate(null); void qc.invalidateQueries({ queryKey: ['items'] }); toast.success('Reviewed identification details saved. Measurements, prices and eBay are unchanged.'); }, onError: (error: Error) => { if (live()) toast.error(error.message); },
   });
   return { candidate, market, identify, value, apply, dismiss: () => setCandidate(null) };
 }

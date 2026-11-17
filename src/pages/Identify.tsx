@@ -24,7 +24,13 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNicheAccess } from '@/hooks/useNicheAccess';
+import { useCoinPhotoPreparation } from '@/hooks/useCoinPhotoPreparation';
 import NicheAccessStatus from '@/components/features/NicheAccessStatus';
+import CoinCaptureDialog from '@/components/features/CoinCaptureDialog';
+import IdentificationDetails from '@/components/features/IdentificationDetails';
+import { identificationCandidates, identificationLines } from '@/lib/identificationResult';
+import { identificationItemPatch } from '@/lib/identificationItemPatch';
+import { asRecord } from '@/lib/itemPhotos';
 import { callEdgeFunction, getSupabaseClientAsync, EdgeFunctionError } from '@/lib/supabase';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -243,6 +249,7 @@ function ImageSlot({
 // ---------------------------------------------------------------------------
 
 export default function Identify() {
+  const prepareCoinPhotos = useCoinPhotoPreparation();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -262,11 +269,6 @@ export default function Identify() {
   const [errorMsg, setErrorMsg] = useState('');
   const [showOptional, setShowOptional] = useState(false);
   const [cameraSide, setCameraSide] = useState<CoinSide | null>(null);
-  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
-  const [cameraDeviceId, setCameraDeviceId] = useState('');
-  const [cameraError, setCameraError] = useState('');
-  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
   const [showUpdatePanel, setShowUpdatePanel] = useState(false);
   const [updateTargetId, setUpdateTargetId] = useState('');
 
@@ -310,73 +312,7 @@ export default function Identify() {
     setImages(p => { const n = new Map(p); n.set(side, { side, file, preview }); return n; });
   }, []);
 
-  const stopCamera = useCallback(() => {
-    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
-    cameraStreamRef.current = null;
-    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
-    setCameraSide(null);
-    setCameraError('');
-  }, []);
-
-  const startCamera = useCallback(async (deviceId?: string) => {
-    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
-    cameraStreamRef.current = null;
-    setCameraError('');
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Camera access is unavailable. Use Chrome or Edge over HTTPS, or upload a microscope image.');
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-          : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
-      cameraStreamRef.current = stream;
-      const videoDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-      setCameraDevices(videoDevices);
-      const activeId = stream.getVideoTracks()[0]?.getSettings().deviceId || deviceId || '';
-      setCameraDeviceId(activeId);
-      if (cameraVideoRef.current) {
-        cameraVideoRef.current.srcObject = stream;
-        await cameraVideoRef.current.play().catch(() => undefined);
-      }
-    } catch (err) {
-      setCameraError(err instanceof Error && err.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Allow camera access in your browser settings and try again.'
-        : 'Could not open the microscope. Close other camera apps and retry, or upload an image.');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (cameraSide) void startCamera(cameraDeviceId || undefined);
-    return () => {
-      cameraStreamRef.current?.getTracks().forEach(track => track.stop());
-      cameraStreamRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraSide]);
-
-  const captureCameraImage = useCallback(() => {
-    const video = cameraVideoRef.current;
-    if (!video || !cameraSide || !video.videoWidth || !video.videoHeight) {
-      setCameraError('Live preview is not ready yet. Wait for the image, then capture.');
-      return;
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) { setCameraError('Could not capture this frame. Please try again.'); return; }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(blob => {
-      if (!blob) { setCameraError('Could not create the image. Please try again.'); return; }
-      addImage(cameraSide, new File([blob], `coin-${cameraSide}-${Date.now()}.jpg`, { type: 'image/jpeg' }));
-      stopCamera();
-      toast.success('Coin image captured');
-    }, 'image/jpeg', 0.95);
-  }, [cameraSide, addImage, stopCamera]);
+  const stopCamera = useCallback(() => setCameraSide(null), []);
 
   const removeImage = useCallback((side: CoinSide) => {
     setImages(p => {
@@ -695,6 +631,9 @@ export default function Identify() {
       identResult = primaryData;
     }
 
+    const normalizedCandidates = identificationCandidates(identResult) as Candidate[];
+    identResult = { ...(identResult ?? {}), candidates: normalizedCandidates };
+    console.log('[CoinFlipper] Identification fields received', normalizedCandidates.map(candidate => ({ title: candidate.title, fields: Object.keys(candidate) })));
     setProgressMsg('');
     setResult(identResult);
     setSelectedIdx(0);
@@ -764,7 +703,9 @@ export default function Identify() {
     }
     const tenantId = membership.tenant_id as string;
     const media = Array.from(images.values()).map(i => i.storedUrl).filter((url): url is string => !!url && /^https:\/\//i.test(url));
+    const reviewedIdentification = identificationItemPatch({}, candidate, new Date().toISOString());
     const attributes = {
+      ...asRecord(reviewedIdentification.attributes),
       ...candidate,
       source_scan: identificationData,
       supplied_weight_g: metadata.weight ? Number(metadata.weight) : undefined,
@@ -792,9 +733,7 @@ export default function Identify() {
       expected_net: 0,
       expected_profit: 0,
       sale_prob_30d: 0,
-      attributes,
       media,
-      warnings: confidence < 0.5 ? ['Identification confidence is low; manual review required before listing.'] : [],
       tags: ['coin-flipper'],
       acquired_cost: 0,
       weight_grams: metadata.weight ? Number(metadata.weight) : null,
@@ -803,6 +742,12 @@ export default function Identify() {
       country_of_origin: String(candidate.country ?? ''),
       denomination: String(candidate.denomination ?? ''),
       catalogue_number: String(candidate.reference ?? ''),
+      ...reviewedIdentification,
+      attributes,
+      warnings: [...new Set([
+        ...(confidence < 0.5 ? ['Identification confidence is low; manual review required before listing.'] : []),
+        ...identificationLines(candidate.warnings), ...identificationLines(candidate.contradictions),
+      ])],
     };
 
     // REQ-INV-002 — if user selected an existing coin to update, use upsert instead
@@ -824,6 +769,7 @@ export default function Identify() {
       toast.success('Inventory record updated');
       setSavedInventoryId(updateTargetId);
       setStep('confirmed');
+      prepareCoinPhotos(user.id, tenantId, updateTargetId, permanentMedia);
       return;
     }
 
@@ -844,6 +790,7 @@ export default function Identify() {
     setSavedInventoryId(savedItem.id as string);
     toast.success('Coin saved to SWISH inventory');
     setStep('confirmed');
+    prepareCoinPhotos(user.id, tenantId, String(savedItem.id), permanentMedia);
   };
 
   const handleReset = () => {
@@ -1086,9 +1033,8 @@ export default function Identify() {
                   </div>
                 )}
 
-                {c.description && (
-                  <p className="text-xs text-muted-foreground leading-relaxed">{c.description}</p>
-                )}
+                <IdentificationDetails candidate={c} />
+                {identificationLines(c.missingInformation).length > 0 && <div className="space-y-2"><h3 className="font-semibold text-sm">Still needed for attribution</h3><ul className="space-y-2 text-muted-foreground">{identificationLines(c.missingInformation).map((detail, index) => <li key={index}>{detail}</li>)}</ul></div>}
 
                 {/* Catalogue links */}
                 <div className="flex flex-wrap gap-3 pt-0.5">
@@ -1286,7 +1232,7 @@ export default function Identify() {
   // RENDER: Capture (default — step === 'capture')
   // ──────────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 animate-fade-in max-w-3xl">
+    <div className="swish-coin-scan space-y-5 animate-fade-in">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -1318,8 +1264,8 @@ export default function Identify() {
           <span className="text-xs text-destructive font-medium">* Both required</span>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <ImageSlot side="obverse" label="Obverse (Front)" required image={obverse} onAdd={addImage} onRemove={removeImage} onCamera={side => { setCameraError(''); setCameraSide(side); }} />
-          <ImageSlot side="reverse" label="Reverse (Back)"  required image={reverse} onAdd={addImage} onRemove={removeImage} onCamera={side => { setCameraError(''); setCameraSide(side); }} />
+          <ImageSlot side="obverse" label="Obverse (Front)" required image={obverse} onAdd={addImage} onRemove={removeImage} onCamera={setCameraSide} />
+          <ImageSlot side="reverse" label="Reverse (Back)"  required image={reverse} onAdd={addImage} onRemove={removeImage} onCamera={setCameraSide} />
         </div>
         {!canSubmit && (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -1348,10 +1294,10 @@ export default function Identify() {
         {showOptional && (
           <div className="px-4 pb-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <ImageSlot side="edge"      label="Edge"      required={false} image={images.get('edge')}      onAdd={addImage} onRemove={removeImage} onCamera={side => { setCameraError(''); setCameraSide(side); }} />
-              <ImageSlot side="detail"    label="Detail"    required={false} image={images.get('detail')}    onAdd={addImage} onRemove={removeImage} onCamera={side => { setCameraError(''); setCameraSide(side); }} />
-              <ImageSlot side="reference" label="Reference" required={false} image={images.get('reference')} onAdd={addImage} onRemove={removeImage} onCamera={side => { setCameraError(''); setCameraSide(side); }} />
-              <ImageSlot side="extra"     label="Extra"     required={false} image={images.get('extra')}     onAdd={addImage} onRemove={removeImage} onCamera={side => { setCameraError(''); setCameraSide(side); }} />
+              <ImageSlot side="edge"      label="Edge"      required={false} image={images.get('edge')}      onAdd={addImage} onRemove={removeImage} onCamera={setCameraSide} />
+              <ImageSlot side="detail"    label="Detail"    required={false} image={images.get('detail')}    onAdd={addImage} onRemove={removeImage} onCamera={setCameraSide} />
+              <ImageSlot side="reference" label="Reference" required={false} image={images.get('reference')} onAdd={addImage} onRemove={removeImage} onCamera={setCameraSide} />
+              <ImageSlot side="extra"     label="Extra"     required={false} image={images.get('extra')}     onAdd={addImage} onRemove={removeImage} onCamera={setCameraSide} />
             </div>
           </div>
         )}
@@ -1504,26 +1450,7 @@ export default function Identify() {
         )}
       </div>
 
-      {cameraSide && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-label="Microscope camera capture">
-          <div className="w-full max-w-3xl rounded-2xl border border-border bg-background p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div><h2 className="font-semibold">Capture {cameraSide === 'obverse' ? 'obverse (front)' : cameraSide === 'reverse' ? 'reverse (back)' : cameraSide}</h2><p className="text-xs text-muted-foreground">Select your USB microscope if multiple cameras are available.</p></div>
-              <button type="button" onClick={stopCamera} className="rounded-lg p-2 hover:bg-secondary" aria-label="Close camera"><X className="w-5 h-5" /></button>
-            </div>
-            {cameraDevices.length > 1 && <select value={cameraDeviceId} onChange={e => { setCameraDeviceId(e.target.value); void startCamera(e.target.value); }} className="input-field w-full text-sm" aria-label="Select camera">
-              {cameraDevices.map((device, i) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Camera ${i + 1}`}</option>)}
-            </select>}
-            <video ref={cameraVideoRef} autoPlay playsInline muted className="w-full max-h-[65vh] rounded-xl bg-black object-contain" />
-            {cameraError && <p role="alert" className="text-sm text-destructive">{cameraError}</p>}
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={captureCameraImage} className="btn-primary"><Camera className="w-4 h-4" /> Capture image</button>
-              <button type="button" onClick={() => void startCamera(cameraDeviceId || undefined)} className="rounded-lg border border-border px-3 py-2 text-sm">Reconnect camera</button>
-              <button type="button" onClick={stopCamera} className="rounded-lg border border-border px-3 py-2 text-sm">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {cameraSide && <CoinCaptureDialog side={cameraSide} onClose={stopCamera} onPhoto={file => { addImage(cameraSide, file); toast.success('Coin image captured'); }} />}
 
       {/* Tip */}
       <div className="swish-card p-4 flex gap-3 items-start">
