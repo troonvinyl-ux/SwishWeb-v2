@@ -1,0 +1,7 @@
+import { z } from 'zod';
+import { MUSIC_DEFAULTS } from '@/constants/music';
+import { normalizeProductBarcode } from '@/lib/productBarcode';
+export const musicFormSchema=z.object({
+ artist:z.string().max(500),release_title:z.string().max(500),format:z.string().max(500),barcode:z.string().refine(value=>!value||Boolean(normalizeProductBarcode(value)),'Check the printed UPC / EAN and its check digit.'),catalogue_number:z.string().max(500),label:z.string().max(500),year:z.string().max(40),country:z.string().max(500),matrix_runout:z.string().max(2000),media_grade:z.string(),sleeve_grade:z.string(),condition_notes:z.string().max(3000),edition:z.string().max(500),record_size:z.string().max(100),speed:z.string().max(100),observed_disc_count:z.string().refine(value=>!value||(/^\d+$/.test(value)&&Number(value)>0&&Number(value)<=999),'Enter the number of discs physically present.'),genre:z.string().max(500),style:z.string().max(500),rights_society:z.string().max(500),label_code:z.string().max(500),features:z.string().max(2000),title:z.string().max(80,'Use an eBay title of at most 80 characters.'),description:z.string().max(40000),price:z.string().refine(value=>!value||(Number.isFinite(Number(value))&&Number(value)>0),'Enter a positive price or leave it blank.'),location:z.string().max(500),play_tested:z.boolean(),reviewed:z.boolean(),pressing_reviewed:z.boolean(),
+});
+export { MUSIC_DEFAULTS };
