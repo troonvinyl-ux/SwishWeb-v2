@@ -1,0 +1,8 @@
+<resources>
+  <style name="Theme.SwishWebV2" parent="android:style/Theme.Material.NoActionBar">
+    <item name="android:colorAccent">#F5C842</item>
+    <item name="android:statusBarColor">#09080C</item>
+    <item name="android:navigationBarColor">#09080C</item>
+    <item name="android:windowLightStatusBar">false</item>
+  </style>
+</resources>
