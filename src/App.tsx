@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -57,6 +58,8 @@ import { getHostProduct, getRouteProduct } from '@/lib/productContext';
 import { normaliseNicheId } from '@/lib/niche';
 import { isSwishHomeRoute } from '@/lib/homeRouting';
 
+const TunesCapture = lazy(() => import('@/pages/TunesCapture'));
+
 const currentHostname = window.location.hostname.toLowerCase().replace(/^www\./, '').split(':')[0];
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false }, mutations: { retry: 0 } } });
 const ENTRY_PATHS = ['/stamps', '/stamp-flip', '/stamp-flipper', '/entry/stamps', '/philately', '/coins', '/mx', '/bikes', '/threads', '/clothes', '/surplus', '/cards', '/games', '/antiques', '/home', '/fossils', '/beauty', '/tech', '/electronics', '/tunes', '/tunes-flip', '/tunes_flip', '/music', '/vinyl_records', '/collectibles', '/collectibles-flipper', '/collectibles_flipper'];
@@ -101,6 +104,7 @@ function AppRoutes() {
     <Route path="/identify/coins" element={<Navigate to="/scan/coins" replace />} />
     <Route path="/deep-id-lab" element={<Identify />} />
     <Route path="/scan/coins" element={<Identify />} />
+    <Route path="/scan/tunes_flip" element={<Suspense fallback={<div role="status" className="swish-card p-6">Loading Tunes Flip…</div>}><TunesCapture /></Suspense>} />
     <Route path="/scan/:niche" element={<NicheCapture />} />
     <Route path="/acquisitions" element={<Acquisitions />} />
     <Route path="/opportunities" element={<Opportunities />} />

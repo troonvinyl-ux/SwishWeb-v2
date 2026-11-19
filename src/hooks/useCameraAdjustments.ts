@@ -17,7 +17,11 @@ export function useCameraAdjustments(track: MediaStreamTrack | null) {
     setFocusBusy(true);
     try {
       await track.applyConstraints({ advanced: [{ focusMode: mode } as MediaTrackConstraintSet] });
-      if (current.current === track) { setFocusMode(mode); setNotice(''); }
+      if (current.current === track) {
+        const applied = (track.getSettings() as CaptureCameraSettings).focusMode;
+        setFocusMode(applied === mode ? mode : applied ? 'device' : 'requested');
+        setNotice(applied && applied !== mode ? 'Autofocus was not applied. Move farther away or use the device camera for its own focus controls.' : '');
+      }
     } catch { if (current.current === track) { setFocusMode('device'); setNotice('Browser focus control unavailable. Move farther away and use zoom if the coin is blurred.'); } }
     finally { if (current.current === track) setFocusBusy(false); }
   }, [track, capabilities]);
@@ -39,10 +43,14 @@ export function useCameraAdjustments(track: MediaStreamTrack | null) {
       while (queued.current !== null && current.current === track && track.readyState === 'live') {
         const target = queued.current; queued.current = null;
         await track.applyConstraints({ advanced: [{ zoom: target } as MediaTrackConstraintSet] });
-        if (current.current === track) setZoom(boundedCameraZoom((track.getSettings() as CaptureCameraSettings).zoom ?? target, range));
+        if (current.current === track) {
+          const applied = (track.getSettings() as CaptureCameraSettings).zoom;
+          if (typeof applied !== 'number' || !Number.isFinite(applied) || Math.abs(applied - target) > Math.max(range.step, 0.05)) throw new Error('Camera zoom was not confirmed.');
+          setZoom(boundedCameraZoom(applied, range));
+        }
       }
     } catch {
-      if (current.current === track) { queued.current = null; setDigital(true); setZoom(1); setNotice('Hardware zoom was refused by this browser. Digital crop zoom is available instead.'); }
+      if (current.current === track) { queued.current = null; setDigital(true); setZoom(1); setNotice('Camera zoom could not be confirmed. Digital crop now applies to the current camera view; use the device camera for its own zoom controls.'); }
     } finally {
       if (worker.current === track) worker.current = null;
       if (current.current === track) setZoomBusy(false);
@@ -54,7 +62,7 @@ export function useCameraAdjustments(track: MediaStreamTrack | null) {
     try {
       await track.applyConstraints({ advanced: [{ torch: value.torch } as MediaTrackConstraintSet] });
       if (current.current === track) setTorch(value.torch);
-    } catch { if (current.current === track) setNotice('Flash is unavailable. Use even lighting without glare.'); }
+    } catch { if (current.current === track) setNotice('Camera light is unavailable. Use even lighting without glare.'); }
   }, [track, capabilities, setCameraZoom]);
   return { capabilities, zoom, digitalZoom: digital ? zoom : 1, zoomRange: range, zoomKind: digital ? 'digital' as const : 'hardware' as const, zoomBusy, torch, focusBusy, focusMode, focusSupported, notice, adjust, focus };
 }

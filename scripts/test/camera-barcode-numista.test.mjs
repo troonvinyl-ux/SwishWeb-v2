@@ -24,11 +24,11 @@ test('Numista references validate IDs and do not certify the physical item', () 
   assert.equal(numistaVisualCandidates({ candidates: [{ typeId: 77, title: 'Candidate', rank: 1, url: 'javascript:alert(1)' }] })[0].url, 'https://en.numista.com/catalogue/pieces77.html');
 });
 test('barcode read starts exactly one scoped lookup and decoding uses the existing video snapshots', async () => {
-  const [ui, scanner, lookup, camera] = await Promise.all(['src/components/features/BarcodeCapture.tsx', 'src/hooks/useBarcodeScanner.ts', 'src/hooks/useBarcodeLookup.ts', 'src/hooks/useCaptureCamera.ts'].map(path => readFile(path, 'utf8')));
+  const [ui, scanner, lookup, camera, lifecycle] = await Promise.all(['src/components/features/BarcodeCapture.tsx', 'src/hooks/useBarcodeScanner.ts', 'src/hooks/useBarcodeLookup.ts', 'src/hooks/useCameraStream.ts', 'src/lib/cameraStream.ts'].map(path => readFile(path, 'utf8')));
   assert.match(ui, /lookup\.lookup\(reading\)/);
-  assert.match(scanner, /decodeBarcodeImage\(frame/); assert.doesNotMatch(scanner, /getUserMedia|decodeFromVideoDevice/);
+  assert.match(scanner, /decodeBarcodeImage\(video.current/); assert.doesNotMatch(scanner, /getUserMedia|decodeFromVideoDevice/);
   assert.match(lookup, /flight\.current/); assert.match(lookup, /barcode_lookup/); assert.match(lookup, /captured\.isCurrent/);
-  assert.match(camera, /attachVideo/); assert.match(camera, /visibilitychange/); assert.match(camera, /getTracks\(\).*track\.stop/);
+  assert.match(camera, /attachVideo/); assert.match(camera, /visibilitychange/); assert.match(lifecycle, /getTracks\(\).*track\.stop/);
 });
 test('Numista uses original bounded coin faces and carries a reference, not a catalogue clone, into draft review', async () => {
   const [pipeline, persistence, review] = await Promise.all(['src/lib/quickCaptureFlow.ts', 'src/lib/capturePersistence.ts', 'src/components/features/CaptureDraftReview.tsx'].map(path => readFile(path, 'utf8')));
@@ -42,5 +42,5 @@ test('camera is one accessible full-screen stream with native Library, shutter a
   assert.match(controls, /Take photograph/); assert.match(controls, /Library/); assert.match(controls, /Review/);
 });
 test('camera and scanner changes have no TypeScript syntax diagnostics', async () => {
-  for (const path of ['src/hooks/useCaptureCamera.ts', 'src/hooks/useCameraDialog.ts', 'src/hooks/useBarcodeScanner.ts', 'src/hooks/useBarcodeLookup.ts', 'src/hooks/useCaptureEvidence.ts', 'src/lib/barcodeDecoder.ts', 'src/lib/numistaCapture.ts', 'src/components/features/SharedCaptureCamera.tsx', 'src/components/features/CameraViewport.tsx', 'src/components/features/CameraControls.tsx', 'src/components/features/BarcodeCapture.tsx', 'src/components/features/CaptureCamera.tsx', 'src/components/features/NumistaCaptureReview.tsx', 'src/components/features/NumistaReferenceEntry.tsx', 'src/components/features/QuickCaptureWorkspace.tsx', 'src/lib/quickCaptureFlow.ts', 'src/lib/capturePersistence.ts', 'src/components/features/CaptureDraftReview.tsx']) assert.equal(compile(await readFile(path, 'utf8')).diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length ?? 0, 0, path);
+  for (const path of ['src/hooks/useCaptureCamera.ts', 'src/hooks/useCameraStream.ts', 'src/hooks/useCameraDialog.ts', 'src/hooks/useBarcodeScanner.ts', 'src/hooks/useBarcodeLookup.ts', 'src/hooks/useCaptureEvidence.ts', 'src/lib/barcodeDecoder.ts', 'src/lib/numistaCapture.ts', 'src/components/features/SharedCaptureCamera.tsx', 'src/components/features/CameraViewport.tsx', 'src/components/features/CameraControls.tsx', 'src/components/features/BarcodeCapture.tsx', 'src/components/features/CaptureCamera.tsx', 'src/components/features/NumistaCaptureReview.tsx', 'src/components/features/NumistaReferenceEntry.tsx', 'src/components/features/QuickCaptureWorkspace.tsx', 'src/lib/quickCaptureFlow.ts', 'src/lib/capturePersistence.ts', 'src/components/features/CaptureDraftReview.tsx']) assert.equal(compile(await readFile(path, 'utf8')).diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length ?? 0, 0, path);
 });

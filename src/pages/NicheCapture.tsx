@@ -369,6 +369,7 @@ export default function NicheCapture() {
   if (tenantLoading || entitlementsLoading) return <NicheAccessStatus loading onRetry={() => void refetchEntitlements()} />;
   if (entitlementsError || !tenantId) return <NicheAccessStatus error={entitlementsError} onRetry={() => void refetchEntitlements()} />;
   if (!nicheAllowed) return <Navigate to="/niches" replace />;
+  if (canonicalNicheId === 'tunes_flip') return <Navigate to="/scan/tunes_flip" replace />;
   if (niche === 'clothing') {
     const photoSlots = [
       { key: 'brand', title: 'Brand Label', required: true, hint: 'Inside neck or waist label — required' },
