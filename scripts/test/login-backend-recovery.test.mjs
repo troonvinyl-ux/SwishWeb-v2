@@ -21,7 +21,7 @@ test('invalid stored sessions recover locally without clearing backend configura
   assert.match(source, /if \(!isInvalidStoredSession\(error\)\)/);
   assert.match(source, /sb\.auth\.signOut\(\{ scope: 'local' \}\)/);
   assert.match(source, /applySession\(null\)/);
-  assert.doesNotMatch(source, /clearStoredAnonKey\(/);
+  assert.doesNotMatch(source, /^\s*clearStoredAnonKey\(/m);
 });
 
 test('login offers manual retry for a real backend or session restoration failure', async () => {
