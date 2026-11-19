@@ -1,6 +1,8 @@
 import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
 import { availableItemPhotos, itemPhotos } from '@/lib/itemPhotos';
 import RecommendedPriceButton from '@/components/features/RecommendedPriceButton';
+import MusicListingPrice from '@/components/features/MusicListingPrice';
+import MusicItemSpecifics from '@/components/features/MusicItemSpecifics';
 import { usePublicationAttempt } from '@/hooks/usePublicationAttempt';
 import { listingReadiness, publicationBlock } from '@/lib/listingReadiness';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
@@ -72,6 +74,8 @@ export default function ListingEditor() {
     const preferred = itemPhotos(linkedItem as Record<string, unknown>).map(photo => photo.presentation);
     if (preferred.length) { galleryInitialised.current = key; setSelectedImages(preferred); }
   }, [id, itemId, linkedItem, selectedImages.length]);
+
+  useEffect(() => { setVerification(null); setConfirmPublish(false); }, [linkedItem]);
 
   const readiness = listingReadiness({listing:form,item:linkedItem as Record<string, unknown> | null,tenantId,specialistIds:getSpecialistIdsForNiche(getActiveNicheId()),photos:selectedImages,dirty:draftDirty});
   const publicationReason = publicationBlock(form) || (publicationAttempt.attempted ? 'A previous submission needs inspection. Check saved status and eBay before trying again.' : null);
@@ -265,7 +269,7 @@ export default function ListingEditor() {
 
       <PublicationStatus reason={publicationReason} externalId={String(form.external_listing_id || '')} refreshing={isFetching} onRefresh={() => void refetch()} />
       <ListingReadiness checks={readiness} />
-      <RecommendedPriceButton marketValue={linkedItem?.valuation_mid || linkedItem?.expected_selling_price} onApply={value => setF('price', value)} />
+      {linkedItem?.specialist_id !== 'vinyl_records' && <RecommendedPriceButton marketValue={linkedItem?.valuation_mid || linkedItem?.expected_selling_price} onApply={value => setF('price', value)} />}
       <ListingVerification result={verification} />
       <PublishConfirmation open={confirmPublish} onOpenChange={setConfirmPublish} title={String(form.title || '')} price={Number(form.price || 0)} busy={publishing} onConfirm={() => void publish()} />
       <p className="text-sm text-muted-foreground">Save changes, run preflight, review the verdict, then explicitly confirm publication. Changing a field or photo requires a new check.</p>
@@ -505,7 +509,7 @@ export default function ListingEditor() {
       <section className="swish-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2 text-sm font-semibold"><span className="rounded-lg bg-primary/15 p-2 text-primary"><Tag className="w-4 h-4" /></span>Price &amp; Inventory</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price (£) *</label><input type="number" step="0.01" min="0" value={f('price')} onChange={e => setF('price', e.target.value === '' ? '' : Number(e.target.value))} className="input-field mt-1" placeholder="0.00" /></div>
+          <div><label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price (£) *</label><input type="number" step="0.01" min="0" value={f('price')} onChange={e => setF('price', e.target.value === '' ? '' : Number(e.target.value))} className="input-field mt-1" placeholder="0.00" /><MusicListingPrice item={linkedItem || null} disabled={Boolean(publicationReason) || publishing || preflighting || upsert.isPending} onApply={value => setF('price', value)} /></div>
           <div><label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</label><input type="number" min="1" step="1" value={f('quantity') || '1'} onChange={e => setF('quantity', Number(e.target.value))} className="input-field mt-1" /></div>
           <div><label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SKU / SWISH ID</label><input value={f('sku')} onChange={e => setF('sku', e.target.value)} className="input-field mt-1" placeholder="Optional internal reference" /></div>
           <div><label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inventory item ID</label><input value={f('item_id')} onChange={e => setF('item_id', e.target.value)} className="input-field mt-1 font-mono text-xs" placeholder="Linked inventory UUID" /></div>
@@ -529,6 +533,8 @@ export default function ListingEditor() {
           <p className="mt-1 text-xs text-muted-foreground">Business days to dispatch.</p>
         </div>
       </section>
+
+      <MusicItemSpecifics item={linkedItem || null} disabled={Boolean(publicationReason) || publishing || preflighting || upsert.isPending} onChanged={() => { setVerification(null); setConfirmPublish(false); }} />
 
       {/* Category and condition */}
       <section className="swish-card p-4 sm:p-5 space-y-4">
