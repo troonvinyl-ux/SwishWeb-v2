@@ -29,7 +29,12 @@ jobs:
           echo "Android SDK: ${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           test -x "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" || command -v sdkmanager
       - name: Install Android SDK 35
-        run: sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
+        run: |
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -d "${ANDROID_HOME}/platforms/android-35" ] || [ ! -d "${ANDROID_HOME}/build-tools/35.0.0" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
+          fi
       - name: Setup Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
