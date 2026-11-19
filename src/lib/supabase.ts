@@ -112,9 +112,23 @@ export async function getSupabaseClientAsync(): Promise<SupabaseClient | null> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    // 1. Any statically available key
-    const stored = envKey() || localKey() || COMPILED_ANON_KEY;
-    if (stored) return _buildClient(stored);
+    // 1. Prefer the verified SWISH public configuration over cached browser
+    // values. An old key in localStorage must never override this deployment.
+    const candidates = [
+      { source: 'build', key: envKey() },
+      { source: 'SWISH fallback', key: COMPILED_ANON_KEY },
+      { source: 'browser cache', key: localKey() },
+    ];
+    for (const { source, key } of candidates) {
+      if (!key) continue;
+      try {
+        return _buildClient(key);
+      } catch {
+        // Bad public configuration should not prevent the existing backend's
+        // verified key from being used. Never log the key itself.
+        console.warn(`[SWISH] Invalid ${source} public backend key ignored`);
+      }
+    }
 
     // 2. Auto-fetch from public backend endpoint
     const fetched = await fetchAnonKey();
