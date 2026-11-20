@@ -7,6 +7,7 @@ import { mergeMusicFields } from '@/lib/musicExtraction';
 import { musicPhotoSlots } from '@/constants/music';
 import { useMusicScope } from '@/hooks/useMusicScope';
 import { startMusicTiming } from '@/lib/musicTiming';
+import { beginScanToLive } from '@/lib/scanToLiveTiming';
 import type { MusicFields, MusicValues, MusicPhoto } from '@/types/music';
 export function useMusicSession() {
  const [sessionId]=useState(()=>crypto.randomUUID());
@@ -33,7 +34,7 @@ export function useMusicSession() {
    next=[...next.filter(photo=>photo.slotId!==slot.id),{slotId:slot.id,label:slot.label,file,preview:URL.createObjectURL(file)}];changed=true;
   }
   if(!changed)return;
-  const current=scopeRef.current;if(current?.isCurrent())startMusicTiming(`${current.userId}:${current.tenantId}:${current.sessionId}`);
+  const current=scopeRef.current;if(current?.isCurrent()){const timingKey=`${current.userId}:${current.tenantId}:${current.sessionId}`;startMusicTiming(timingKey);beginScanToLive(timingKey);}
   photoRef.current=next;setPhotos(next);unreview();
  },[slots,unreview]);
  const setAnalysisCopy=useCallback((slotId:string,file:File,note:string)=>{
