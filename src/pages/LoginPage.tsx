@@ -25,11 +25,7 @@ function ConnectionBanner({ status }: { status: ConnectionStatus }) {
     return <div className="mb-5 flex h-7 items-center justify-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Connecting to SWISH backend…</div>;
   }
   if (status === 'error') {
-    return <div role="alert" className="mb-5 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-      <WifiOff className="h-3.5 w-3.5 shrink-0" />
-      <span className="flex-1">Could not restore your SWISH session. Check your connection or try again.</span>
-      <button type="button" onClick={() => window.location.reload()} className="shrink-0 rounded border border-current px-2 py-1 font-semibold hover:opacity-80">Retry</button>
-    </div>;
+    return <div className="mb-5 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"><WifiOff className="h-3.5 w-3.5 shrink-0" />Backend connection error. Check your network and try again.</div>;
   }
   return <div className="mb-5 h-7" />;
 }

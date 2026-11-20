@@ -27,11 +27,13 @@ test('temporary, credentialed and insecure photo URLs are not accepted as perman
   for (const url of ['blob:photo', 'data:image/png;base64,x', 'http://images.example.com/a.jpg', 'https://user:pass@images.example.com/a.jpg', 'https://images.example.com/a.jpg?token=secret']) assert.equal(permanentListingPhoto(url), false);
 });
 test('attempt guard persists before an existing publication request and is never reset on a timer', async () => {
-  const editor = await readFile('src/pages/ListingEditor.tsx', 'utf8');
+  const editor = await readFile('src/hooks/useListingEditorActions.ts', 'utf8');
   const hook = await readFile('src/hooks/usePublicationAttempt.ts', 'utf8');
-  assert.match(editor, /await publicationAttempt\.reserve\(\)/);
-  assert.ok(editor.indexOf('await publicationAttempt.reserve()') < editor.indexOf("route: 'publish'"));
-  assert.doesNotMatch(hook, /setTimeout|removeItem|access_token/);
+  assert.match(editor, /await attempt\.reserve\(\)/);
+  assert.ok(editor.indexOf('await attempt.reserve()') < editor.indexOf("route: 'publish'"));
+  assert.doesNotMatch(hook, /setTimeout|access_token/);
+  assert.match(hook, /rejectedAttemptCanRetry/);
+  assert.match(hook, /reconcileRejected/);
   assert.match(editor, /publicationBlock/);
-  assert.match(editor, /ListingReadiness/);
+  assert.match(await readFile('src/pages/ListingEditor.tsx', 'utf8'), /ListingReadiness/);
 });
