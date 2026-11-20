@@ -26,17 +26,6 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-// A revoked/expired browser refresh token is a local sign-in problem, not
-// evidence that the shared SWISH OnSpace Cloud backend is offline.
-function isInvalidStoredSession(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const authError = error as { code?: unknown; message?: unknown };
-  const code = String(authError.code || '').toLowerCase();
-  const message = String(authError.message || '').toLowerCase();
-  return ['refresh_token_not_found', 'refresh_token_already_used', 'invalid_refresh_token', 'invalid_grant'].includes(code)
-    || (/refresh[ _-]?token/.test(message) && /(invalid|expired|missing|not found|already used)/.test(message));
-}
-
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -80,37 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       applySession(next);
     });
     const revision = authRevision;
-    const recoverSession = (error: unknown) => {
-      if (!active || revision !== authRevision) return;
-      if (!isInvalidStoredSession(error)) {
-        // The backend or authentication gateway may be unreachable. Keep
-        // existing credentials intact so a retry can restore the session.
-        console.warn('[SWISH] Session restoration failed; existing session preserved');
-        setStatus('error');
-        setLoading(false);
-        return;
-      }
-      // Only a confirmed invalid refresh token should clear local auth state.
-      // Do not delete the public backend key or erase inventory/niche settings.
-      void sb.auth.signOut({ scope: 'local' }).then(({ error: signOutError }) => {
-        if (!active) return;
-        if (signOutError) {
-          setStatus('error');
-          setLoading(false);
-          return;
-        }
-        applySession(null);
-      }).catch(() => {
-        if (!active) return;
-        setStatus('error');
-        setLoading(false);
-      });
-    };
     void sb.auth.getSession().then(({ data, error }) => {
       if (!active || revision !== authRevision) return;
-      if (error) { recoverSession(error); return; }
+      if (error) { setStatus('error'); setLoading(false); return; }
       applySession(data.session);
-    }).catch(recoverSession);
+    });
     unsubRef.current = () => { active = false; subscription.unsubscribe(); };
   }, [qc]);
 

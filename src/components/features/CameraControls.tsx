@@ -1,3 +1,9 @@
 import type { useCaptureCamera } from '@/hooks/useCaptureCamera';
-interface Props {camera:ReturnType<typeof useCaptureCamera>;disabled:boolean;taking:boolean;barcode:boolean;thumbnail?:string;canReview:boolean;onTake:()=>void;onGallery:()=>void;onReview:()=>void;}
-export default function CameraControls({camera,disabled,taking,barcode,thumbnail,canReview,onTake,onGallery,onReview}:Props){return <div className="capture-controls"><button type="button" disabled={disabled} onClick={onGallery}>Choose photo</button><button type="button" className="capture-shutter" disabled={disabled || taking || !camera.ready} onClick={onTake} aria-label={barcode?'Read barcode':'Take photo'}>{taking?'Working…':barcode?'Scan':'Capture'}</button><button type="button" disabled={!canReview} onClick={onReview}>{thumbnail && <img src={thumbnail} alt="Last captured photo" width="36" height="36"/>}Review</button>{camera.capabilities.zoom && <label>Zoom<input type="range" min={camera.capabilities.zoom.min} max={camera.capabilities.zoom.max} step={camera.capabilities.zoom.step || 0.1} value={camera.zoom} onChange={event=>void camera.adjust({zoom:Number(event.target.value)})}/></label>}</div>;}
+interface CameraControlsProps { camera: ReturnType<typeof useCaptureCamera>; disabled: boolean; taking: boolean; barcode: boolean; thumbnail?: string; canReview: boolean; onTake: () => void; onGallery: () => void; onReview: () => void; }
+export default function CameraControls({ camera, disabled, taking, barcode, thumbnail, canReview, onTake, onGallery, onReview }: CameraControlsProps) {
+  return <div className="capture-controls">
+    <button type="button" disabled={disabled || taking} onClick={onGallery}>Library</button>
+    <button type="button" className="capture-shutter" disabled={disabled || taking || !camera.active || !camera.ready || camera.starting || camera.zoomBusy || camera.focusBusy} onClick={onTake} aria-label={barcode ? 'Read barcode' : 'Take photograph'}>{taking ? 'Hold still…' : barcode ? 'Scan' : 'Capture'}</button>
+    <button type="button" disabled={disabled || taking || !canReview} onClick={onReview}>{thumbnail && <img src={thumbnail} alt="Last captured photo" width="36" height="36" />}Review</button>
+  </div>;
+}

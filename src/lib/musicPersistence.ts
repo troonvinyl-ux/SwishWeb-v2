@@ -4,6 +4,7 @@ import { musicRequest } from '@/lib/musicApi';
 import { musicInventoryAttributes, musicListingDescription, musicListingTitle, musicSpecifics } from '@/lib/musicListing';
 import { isFreshMusicRelease } from '@/lib/musicRelease';
 import { recordMusicTiming } from '@/lib/musicTiming';
+import { linkScanToLive } from '@/lib/scanToLiveTiming';
 import type { MusicSaveInput } from '@/types/music';
 export async function saveMusicCapture({scope,snapshot,checkpoint,draft,progress}:MusicSaveInput):Promise<{itemId:string;listingId?:string}> {
  await assertCaptureScope(scope);const v=snapshot.values;
@@ -36,6 +37,7 @@ export async function saveMusicCapture({scope,snapshot,checkpoint,draft,progress
  await assertCaptureScope(scope);const verified=await scope.client.from('listings').select('id,item_id,tenant_id,status,external_listing_id,publish_claim_id').eq('id',checkpoint.listingId).eq('tenant_id',scope.tenantId).single();
  if(verified.error||!verified.data||verified.data.item_id!==checkpoint.itemId)throw new Error('Saved draft readback failed. Inspect this item; no publication was requested.');
  if(verified.data.external_listing_id||verified.data.publish_claim_id)throw new Error('This listing has an existing submission. Inspect it instead of publishing again.');
+ linkScanToLive(`${scope.userId}:${scope.tenantId}:${scope.sessionId}`,`${scope.userId}:${scope.tenantId}:${checkpoint.listingId}`);
  recordMusicTiming(`${scope.userId}:${scope.tenantId}:${scope.sessionId}`,'draft_saved');
  return {itemId:checkpoint.itemId,listingId:checkpoint.listingId};
 }

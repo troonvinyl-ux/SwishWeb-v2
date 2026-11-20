@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { activateModuleScope } from '@/lib/moduleScope';
-import { getActiveNicheId } from '@/lib/niche';
+import { listingNicheId } from '@/lib/listingSubmission';
 import { availableItemPhotos, itemPhotos, asRecord } from '@/lib/itemPhotos';
 import { permanentListingPhoto, publicationBlock } from '@/lib/listingReadiness';
 import { listingSpecifics, type ConfirmedMusicDetails, type ListingEditorSaveResult } from '@/lib/listingEditorData';
@@ -11,12 +11,12 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   if (!form.id || form.tenant_id !== tenantId || item.tenant_id !== tenantId || item.id !== form.item_id) throw new Error('Open a saved listing and its stock item in this workspace.');
   if (publicationBlock(form)) throw new Error('Inspect the existing submission before editing this draft.');
   const title = String(form.title || '').trim(), price = Number(form.price), quantity = Number(form.quantity || 1);
-  if (title.length < 10 || title.length > 80 || !Number.isFinite(price) || price <= 0 || !Number.isInteger(quantity) || quantity < 1) throw new Error('Use a 10–80 character title, a positive selling price and a whole quantity.');
+  if (!title || title.length > 80 || !Number.isFinite(price) || price < 0 || !Number.isInteger(quantity) || quantity < 1) throw new Error('Enter a title of up to 80 characters, a non-negative price and a whole quantity.');
   const shipping = Number(form.shipping_cost || 0), floor = Number(form.floor_price || 0), ceiling = Number(form.ceiling_price || 0);
   if ([shipping, floor, ceiling].some(value => !Number.isFinite(value) || value < 0)) throw new Error('Enter valid non-negative shipping and price limits.');
   const allowed = new Set([...availableItemPhotos(item), ...uploads]);
-  if (!photos.length || photos.length > 12 || photos.some(url => !permanentListingPhoto(url) || !allowed.has(url))) throw new Error('Select 1–12 saved item photos. Uploaded photos will be attached to this same item.');
-  await activateModuleScope(client, userId, tenantId, getActiveNicheId());
+  if (photos.length > 12 || photos.some(url => !permanentListingPhoto(url) || !allowed.has(url))) throw new Error('Use up to 12 saved item photos. Uploaded photos will be attached to this same item.');
+  await activateModuleScope(client, userId, tenantId, listingNicheId(item));
   const attrs = asRecord(item.attributes);
   const music = confirmedMusic || {};
   if (Object.keys(music).length && item.specialist_id !== 'vinyl_records') throw new Error('Music corrections require the original Tunes Flip stock item.');

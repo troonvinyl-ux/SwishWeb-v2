@@ -10,8 +10,16 @@ const paths = [
   'src/hooks/useListingEditorSave.ts',
   'src/hooks/useListingCategorySuggestion.ts',
   'src/hooks/useListingPhotoUploads.ts',
-  'src/hooks/usePublicationAttempt.ts',
+  'src/lib/listingSubmission.ts',
   'src/lib/listingEditorSave.ts',
+  'src/lib/listingEditorData.ts',
+  'src/lib/listingEditorMetadata.ts',
+  'src/lib/listingConflicts.ts',
+  'src/lib/amendListingConflict.ts',
+  'src/lib/scanToLiveTiming.ts',
+  'src/components/features/ListingConflictReview.tsx',
+  'src/components/features/ListingConflictQuestion.tsx',
+  'src/components/features/ListingWorkflowProgress.tsx',
   'src/lib/listingVerification.ts',
   'src/lib/listingStatusRecovery.ts',
   'src/lib/publicationRecovery.ts',
@@ -39,6 +47,8 @@ test('save/refetch preserves dirty edits and reloads the native photo and option
   const draft = await readFile('src/hooks/useListingEditorDraft.ts', 'utf8');
   assert.match(draft, /if \(!changed && dirtyRef\.current\) return/);
   assert.match(draft, /attrs\.ebay_listing_media/);
-  assert.match(draft, /attrs\.ebay_listing_options/);
-  assert.match(draft, /itemVersion: item\.data\?\.updated_at/);
+  assert.match(await readFile('src/lib/listingEditorData.ts', 'utf8'), /attrs\.ebay_listing_options/);
+  assert.match(draft, /itemVersion: itemRef\.current\?\.updated_at/);
+  assert.match(draft, /hydrateListingEditor\(listing\.data, item\)/);
+  assert.match(await readFile('src/hooks/useListingEditorSave.ts', 'utf8'), /setQueriesData/);
 });

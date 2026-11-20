@@ -8,9 +8,10 @@ assert.equal(compiled.diagnostics?.filter(diagnostic => diagnostic.category === 
 const { publicationBlock, permanentListingPhoto, listingReadiness } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputText).toString('base64')}`);
 const listing = { id: 'listing-1', item_id: 'item-1', tenant_id: 'tenant-1', title: 'Verified example item', description: 'Visible condition and actual item details.', price: 10, category_id: '123', status: 'draft' };
 const input = { listing, item: { id: 'item-1', tenant_id: 'tenant-1', specialist_id: 'coins', status: 'available' }, tenantId: 'tenant-1', specialistIds: ['coins'], photos: ['https://images.example.com/photo.jpg'], dirty: false };
-test('existing IDs, claims and terminal states block repeat publication', () => {
+test('recorded listings remain protected; unrecorded operations are delegated to the shared server', () => {
   assert.equal(publicationBlock(listing), null);
-  for (const patch of [{ external_listing_id: '1234567890' }, { external_listing_id: 'unexpected' }, { publish_claim_id: 'claim' }, ...['active', 'live', 'published', 'sold', 'ended', 'publishing', 'submitted'].map(status => ({ status }))]) assert.ok(publicationBlock({ ...listing, ...patch }));
+  for (const patch of [{ external_listing_id: '1234567890' }, { external_listing_id: 'unexpected' }, ...['active', 'live', 'published', 'sold', 'ended'].map(status => ({ status }))]) assert.ok(publicationBlock({ ...listing, ...patch }));
+  for (const patch of [{ publish_claim_id: 'claim' }, ...['verified', 'publishing', 'submitted'].map(status => ({ status }))]) assert.equal(publicationBlock({ ...listing, ...patch }), null);
 });
 test('local checks never claim category validation or marketplace acceptance', () => {
   assert.equal(listingReadiness(input).filter(check => check.status === 'fail').length, 0);
@@ -26,14 +27,13 @@ test('temporary, credentialed and insecure photo URLs are not accepted as perman
   assert.equal(permanentListingPhoto(input.photos[0]), true);
   for (const url of ['blob:photo', 'data:image/png;base64,x', 'http://images.example.com/a.jpg', 'https://user:pass@images.example.com/a.jpg', 'https://images.example.com/a.jpg?token=secret']) assert.equal(permanentListingPhoto(url), false);
 });
-test('attempt guard persists before an existing publication request and is never reset on a timer', async () => {
+test('submit has an in-flight click guard but no persistent browser lock or AI verification gate', async () => {
   const editor = await readFile('src/hooks/useListingEditorActions.ts', 'utf8');
-  const hook = await readFile('src/hooks/usePublicationAttempt.ts', 'utf8');
-  assert.match(editor, /await attempt\.reserve\(\)/);
-  assert.ok(editor.indexOf('await attempt.reserve()') < editor.indexOf("route: 'publish'"));
-  assert.doesNotMatch(hook, /setTimeout|access_token/);
-  assert.match(hook, /rejectedAttemptCanRetry/);
-  assert.match(hook, /reconcileRejected/);
+  assert.match(editor, /working\.current = true/);
+  assert.doesNotMatch(editor, /sessionStorage|usePublicationAttempt|swish-verify|human_override|verification\?\.passed|setTimeout/);
+  assert.match(editor, /prepareSharedSubmission/);
   assert.match(editor, /publicationBlock/);
-  assert.match(await readFile('src/pages/ListingEditor.tsx', 'utf8'), /ListingReadiness/);
+  const page = await readFile('src/pages/ListingEditor.tsx', 'utf8');
+  assert.match(page, /Submit to eBay/);
+  assert.doesNotMatch(page, /ListingReadiness|SellerListingReview|PublishConfirmation|ListingConflictReview/);
 });

@@ -2,41 +2,66 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url), ts = require('typescript');
+const require = createRequire(import.meta.url), ts = require('typescript'), cache = new Map();
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const stubs = {
   '@/lib/moduleScope': { activateModuleScope: async () => ({}) },
   '@/lib/niche': { getActiveNicheId: () => 'tunes_flip' },
+  '@/lib/listingSubmission': { listingNicheId: () => 'tunes_flip' },
   '@/lib/itemPhotos': { asRecord: object, availableItemPhotos: item => item.media, itemPhotos: item => item.media.map(original => ({ original })) },
-  '@/lib/listingReadiness': { permanentListingPhoto: value => value.startsWith('https://'), publicationBlock: row => row.external_listing_id || row.publish_claim_id || row.status === 'active' },
+  '@/lib/listingReadiness': { permanentListingPhoto: value => value.startsWith('https://'), publicationBlock: row => row.external_listing_id || ['active', 'live', 'published', 'sold', 'ended'].includes(row.status) },
 };
-const compiled = ts.transpileModule(readFileSync('src/lib/listingEditorSave.ts', 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS }, reportDiagnostics: true });
-assert.equal(compiled.diagnostics?.filter(value => value.category === ts.DiagnosticCategory.Error).length || 0, 0);
-const module = { exports: {} }; new Function('require', 'module', 'exports', compiled.outputText)(name => stubs[name], module, module.exports);
-const { saveSharedListingEditor } = module.exports;
-function fixture() {
-  const calls = [], form = { id: 'listing', item_id: 'item', tenant_id: 'tenant', title: 'Artist Album Vinyl Record', description: 'Media: VG\nSleeve: VG+', price: 18, status: 'draft', category_id: '176985', category: 'Vinyl Records', condition: 'Used - Good', condition_description: 'Media VG, sleeve VG+', quantity: 1, sku: 'R-12', dispatch_days: 3 };
-  const client = { rpc: async (name, body) => { calls.push({ name, body }); return { data: true, error: null }; }, from: table => { const query = { select() { return this; }, eq() { return this; }, single: async () => ({ data: form, error: null }) }; return query; } };
-  return { calls, input: { client, userId: 'user', tenantId: 'tenant', form, item: { id: 'item', tenant_id: 'tenant', specialist_id: 'vinyl_records', media: ['https://fixture.invalid/front.jpg'], attributes: { ebay_item_specifics: { Artist: 'Artist', 'Record Grading': 'VG' } } }, photos: ['https://fixture.invalid/front.jpg'], uploads: [] } };
+function load(path) {
+  if (cache.has(path)) return cache.get(path);
+  const compiled = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS }, reportDiagnostics: true });
+  assert.equal(compiled.diagnostics?.filter(value => value.category === ts.DiagnosticCategory.Error).length || 0, 0);
+  const module = { exports: {} }; new Function('require', 'module', 'exports', compiled.outputText)(name => stubs[name] || (name.startsWith('@/') ? load(`src/${name.slice(2)}.ts`) : require(name)), module, module.exports); cache.set(path, module.exports); return module.exports;
 }
-test('native RPC saves shared condition, stock, specifics and photo selection; no parallel schema', async () => {
-  const { calls, input } = fixture(); await saveSharedListingEditor(input);
+const { saveSharedListingEditor } = load('src/lib/listingEditorSave.ts');
+const { hydrateListingEditor, listingSpecifics } = load('src/lib/listingEditorData.ts');
+function fixture() {
+  const calls = [], form = { id: 'listing', item_id: 'item', tenant_id: 'tenant', title: 'Artist Album Vinyl Record', description: 'Media: VG\nSleeve: VG+', price: 18, status: 'draft', category_id: '176985', category: 'Vinyl Records', condition: 'Used - Good', condition_id: '5000', condition_description: 'Media VG, sleeve VG+', quantity: 1, sku: 'R-12', dispatch_days: 3 };
+  let listing = { ...form }, stock = { id: 'item', tenant_id: 'tenant', specialist_id: 'vinyl_records', updated_at: 'version-1', media: ['https://fixture.invalid/front.jpg'], attributes: { ebay_item_specifics: [{ name: 'Artist', value: 'Artist' }, { name: 'Record Grading', value: 'VG' }] } };
+  const client = { rpc: async (name, body) => { calls.push({ name, body }); listing = { ...listing, ...body.p_listing_patch }; stock = { ...stock, condition: body.p_item_patch.condition, condition_grade: body.p_item_patch.condition_grade, quantity: body.p_item_patch.quantity, sku: body.p_item_patch.sku, updated_at: 'version-2', attributes: { ...stock.attributes, ebay_category_id: body.p_item_patch.ebay_category_id, ebay_category_name: body.p_item_patch.ebay_category_name, ebay_item_specifics: body.p_specifics } }; return { data: 'listing', error: null }; }, from: table => { let patch = null; return { select() { return this; }, eq() { return this; }, update(value) { patch = value; return this; }, single: async () => ({ data: table === 'items' ? stock : listing, error: null }), maybeSingle: async () => { stock = { ...stock, ...patch, updated_at: 'version-3' }; return { data: stock, error: null }; } }; } };
+  return { calls, input: { client, userId: 'user', tenantId: 'tenant', form, item: stock, photos: ['https://fixture.invalid/front.jpg'], uploads: [] } };
+}
+test('native RPC saves condition, category, stock and array specifics; legacy ignored metadata is retained', async () => {
+  const { calls, input } = fixture(), result = await saveSharedListingEditor(input), body = calls[0].body;
   assert.equal(calls.length, 1); assert.equal(calls[0].name, 'swish_save_listing_editor');
-  const body = calls[0].body;
   assert.equal(body.p_item_patch.condition, 'Used - Good'); assert.equal(body.p_item_patch.quantity, 1); assert.equal(body.p_item_patch.sku, 'R-12');
   assert.deepEqual(body.p_item_patch.ebay_listing_media, input.photos); assert.equal(body.p_item_patch.ebay_listing_options.dispatchDays, 3);
   assert.deepEqual(body.p_specifics, [{ name: 'Artist', value: 'Artist' }, { name: 'Record Grading', value: 'VG' }]);
-  assert.equal(body.p_listing_patch.category_id, '176985'); assert.equal(body.p_listing_patch.images, undefined); assert.equal(body.p_listing_patch.condition, undefined);
+  const reopened = hydrateListingEditor(result.listing, result.item);
+  assert.equal(reopened.category, 'Vinyl Records'); assert.equal(reopened.category_id, '176985'); assert.equal(reopened.condition, 'Used - Good'); assert.equal(reopened.condition_id, '5000'); assert.equal(reopened.condition_description, input.form.condition_description);
+  assert.deepEqual(result.item.attributes.ebay_listing_media, input.photos); assert.equal(body.p_listing_patch.images, undefined);
+});
+test('array and legacy map specifics survive a second save', async () => {
+  assert.deepEqual(listingSpecifics([{ name: 'Artist', value: 'Artist' }]), { Artist: 'Artist' });
+  assert.deepEqual(listingSpecifics({ Artist: 'Artist' }), { Artist: 'Artist' });
+  const { input } = fixture(), first = await saveSharedListingEditor(input);
+  const second = await saveSharedListingEditor({ ...input, form: hydrateListingEditor(first.listing, first.item), item: first.item });
+  assert.deepEqual(listingSpecifics(second.item.attributes.ebay_item_specifics), { Artist: 'Artist', 'Record Grading': 'VG' });
+});
+test('confirmed corrections persist to canonical music evidence as well as eBay specifics', async () => {
+  const { input } = fixture(), result = await saveSharedListingEditor({ ...input, confirmedMusic: { media_grade: 'VG+', play_tested: false } });
+  assert.equal(result.item.attributes.media_grade, 'VG+'); assert.equal(result.item.attributes.play_tested, false);
+  assert.equal(listingSpecifics(result.item.attributes.ebay_item_specifics)['Record Grading'], 'VG+'); assert.equal(result.item.attributes._music_evidence.media_grade.source, 'user');
 });
 test('wrong workspace, invalid values, unsupported photos and existing submissions never save', async () => {
-  for (const patch of [{ price: 0 }, { price: Infinity }, { title: 'Short' }, { quantity: 1.5 }, { tenant_id: 'other' }, { external_listing_id: '123' }, { publish_claim_id: 'claim' }]) {
-    const { calls, input } = fixture(); input.form = { ...input.form, ...patch }; await assert.rejects(() => saveSharedListingEditor(input)); assert.equal(calls.length, 0);
-  }
+  for (const patch of [{ price: -1 }, { price: Infinity }, { title: '' }, { quantity: 1.5 }, { tenant_id: 'other' }, { external_listing_id: '123' }]) { const { calls, input } = fixture(); input.form = { ...input.form, ...patch }; await assert.rejects(() => saveSharedListingEditor(input)); assert.equal(calls.length, 0); }
   const { calls, input } = fixture(); input.photos = ['https://fixture.invalid/unrelated.jpg']; await assert.rejects(() => saveSharedListingEditor(input)); assert.equal(calls.length, 0);
 });
-test('long specifics are surfaced, not silently truncated or sent', async () => {
-  const { calls, input } = fixture(); input.item.attributes.ebay_item_specifics.Artist = 'x'.repeat(66); await assert.rejects(() => saveSharedListingEditor(input), /no more than 65/); assert.equal(calls.length, 0);
+test('short titles and incomplete category/condition can be saved without a web-only publication gate', async () => {
+  const { input } = fixture(); input.form = { ...input.form, title: 'LP', price: 0, category: '', category_id: '', condition: '', condition_id: '' };
+  const result = await saveSharedListingEditor(input); assert.equal(result.listing.title, 'LP'); assert.equal(result.listing.price, 0);
 });
-test('save has no marketplace publication or new listing creation side effects', () => {
+test('long specifics are reported, not silently truncated', async () => {
+  const { calls, input } = fixture(); input.item.attributes.ebay_item_specifics[0].value = 'x'.repeat(66); await assert.rejects(() => saveSharedListingEditor(input), /no more than 65/); assert.equal(calls.length, 0);
+});
+test('metadata readback mismatch or denied compatibility update is never a successful save', async () => {
+  const { input } = fixture(); input.client.from = table => ({ select() { return this; }, eq() { return this; }, single: async () => ({ data: table === 'items' ? { ...input.item, condition: 'Wrong' } : input.form, error: null }) });
+  await assert.rejects(() => saveSharedListingEditor(input), /did not retain/);
+});
+test('save has no marketplace publication or parallel listing creation', () => {
   assert.doesNotMatch(readFileSync('src/lib/listingEditorSave.ts', 'utf8'), /route: 'publish'|swish_create_listing_draft|createClient|service_role/);
 });

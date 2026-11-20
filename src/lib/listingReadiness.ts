@@ -1,6 +1,8 @@
 import type { ReadinessCheck } from '@/types/listingReadiness';
 export function publicationBlock(listing: Record<string, unknown>): string | null {
-  return listing.external_listing_id || listing.publish_claim_id || ['active','live','published','sold','ended','publishing','submitted'].includes(String(listing.status).toLowerCase()) ? 'This listing has an existing submission. Check its saved status before taking further action.' : null;
+  // Only recorded listings and terminal states disable the web submit button.
+  // Pending operation claims are adjudicated atomically by swish-ebay-list.
+  return listing.external_listing_id || ['active','live','published','sold','ended'].includes(String(listing.status).toLowerCase()) ? 'This listing already has a recorded eBay submission or is closed. Open it below or refresh its status.' : null;
 }
 export function permanentListingPhoto(value: unknown): boolean {
   if (typeof value !== 'string') return false;
@@ -17,6 +19,6 @@ export function listingReadiness({ listing, item, tenantId, specialistIds, photo
     check('price','Selling price',Number.isFinite(Number(listing.price)) && Number(listing.price) > 0,'Set a finite selling price above zero.'),
     check('photos','Original photos',photos.length > 0 && photos.every(permanentListingPhoto),'Use permanent HTTPS photo URLs.'),
     check('publication','Submission status',!publicationBlock(listing),'An existing submission must be inspected before another attempt.'),
-    { id:'category', label:'eBay category and specifics',status: listing.category_id ? 'review' : 'fail',detail:'Confirm the leaf category, condition and required item specifics with eBay.' },
+    { id:'category', label:'eBay category and specifics',status: 'review',detail:'The shared eBay service resolves and validates the category, condition and required specifics during submission.' },
   ];
 }
