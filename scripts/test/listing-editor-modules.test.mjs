@@ -11,6 +11,8 @@ const paths = [
   'src/hooks/useListingCategorySuggestion.ts',
   'src/hooks/useListingPhotoUploads.ts',
   'src/lib/listingSubmission.ts',
+  'src/lib/ebayMusicContract.ts',
+  'src/hooks/useEbayCategoryMetadata.ts',
   'src/lib/listingEditorSave.ts',
   'src/lib/listingEditorData.ts',
   'src/lib/listingEditorMetadata.ts',
