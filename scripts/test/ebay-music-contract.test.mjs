@@ -43,3 +43,41 @@ test('one editor save persists category, condition, media and sleeve grades with
   assert.equal(specifics['Record Grading'], 'Very Good Plus (VG+)'); assert.equal(specifics['Sleeve Grading'], 'Near Mint (NM or M-)'); assert.equal(specifics['Seller Feature'], 'Poster included'); assert.equal(saved.item.attributes.media_grade, 'VG+'); assert.equal(saved.item.attributes.sleeve_grade, 'NM'); assert.match(saved.listing.description, /Media: VG\+\nSleeve: NM/); assert.match(saved.listing.description, /A1 Song/);
 });
 test('music edits use the parent draft rather than a competing direct stock save', () => { const source = readFileSync('src/components/features/MusicItemSpecifics.tsx', 'utf8'); assert.doesNotMatch(source, /\.from\('items'\)|save\.mutate|run preflight/); assert.match(source, /onChanged\(form.getValues\(\)\)/); });
+
+
+test('vinyl category 176985 uses only its live New/Used policy, not generic Very Good condition', () => {
+  const policy = contract.normalizeEbayConditionPolicy({
+    categoryId: '176985', itemConditionRequired: true,
+    itemConditions: [{ conditionId: 1000, conditionDescription: 'New' }, { conditionId: 3000, conditionDescription: 'Used' }],
+  }, '176985');
+  assert.deepEqual(policy, { required: true, conditions: [{ id: '1000', label: 'New' }, { id: '3000', label: 'Used' }] });
+  assert.equal(contract.supportedEbayCondition('4000', policy.conditions, policy.required), false);
+  assert.equal(contract.supportedEbayCondition('3000', policy.conditions, policy.required), true);
+  assert.equal(contract.supportedEbayCondition('1000', policy.conditions, policy.required), true);
+  assert.equal(contract.supportedEbayCondition('', policy.conditions, policy.required), false);
+  assert.equal(contract.ebayMusicGrade('VG+'), 'Very Good Plus (VG+)');
+});
+test('condition lookup rejects a mismatched category or absent required choices', () => {
+  assert.throws(() => contract.normalizeEbayConditionPolicy({
+    categoryId: '176985', itemConditionRequired: true, itemConditions: [{ conditionId: '3000', conditionDescription: 'Used' }],
+  }, '12345'), /policy for this category/);
+  assert.throws(() => contract.normalizeEbayConditionPolicy({
+    categoryId: '176985', itemConditionRequired: true, itemConditions: [],
+  }, '176985'), /no choices/);
+  assert.deepEqual(contract.normalizeEbayConditionPolicy({
+    categoryId: '176985', itemConditionRequired: false, itemConditions: [],
+  }, '176985'), { conditions: [], required: false });
+});
+test('web condition UI gets the current server policy and never offers unsupported saved grades as choices', () => {
+  const metadata = readFileSync('src/hooks/useEbayCategoryMetadata.ts', 'utf8');
+  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
+  assert.match(metadata, /route: 'get_condition_policies'/);
+  assert.match(metadata, /'swish-ebay-list'/);
+  assert.match(metadata, /normalizeEbayConditionPolicy/);
+  assert.match(picker, /music \? \(conditions \?\? \[\]\)/);
+  assert.match(picker, /invalidSavedCondition/);
+  assert.match(picker, /Retry eBay condition lookup/);
+  assert.match(editor, /supportedEbayCondition/);
+  assert.match(editor, /!conditionReady/);
+});
