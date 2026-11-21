@@ -1,11 +1,13 @@
 import type { MusicFields, MusicSnapshot, MusicValues } from '@/types/music';
+import { ebayMusicGrade, musicGradeAspects } from '@/lib/ebayMusicContract';
 export function musicListingTitle(values:MusicValues):string {
  const parts=[values.artist,values.release_title,values.format,values.year,values.label,values.catalogue_number,values.edition].filter(Boolean),words=parts.join(' ').replace(/\s+/g,' ').trim();
  if(words.length<=80)return words;const trimmed=words.slice(0,81);return trimmed.slice(0,trimmed.lastIndexOf(' ')).trim()||words.slice(0,80);
 }
 export function musicSpecifics(values:MusicValues):Record<string,string> {
- const map:Record<string,string>={artist:'Artist',release_title:'Release Title',label:'Record Label',format:'Format',genre:'Genre',style:'Style',year:'Release Year',speed:'Speed',record_size:'Record Size',edition:'Edition',features:'Features',catalogue_number:'Catalog Number',barcode:'EAN',media_grade:'Record Grading',sleeve_grade:'Sleeve Grading'};
- return Object.fromEntries(Object.entries(map).flatMap(([key,label])=>{const value=String(values[key as keyof MusicValues]||'').trim();return value&&value.length<=65?[[key==='barcode'&&value.length===12?'UPC':label,value]]:[];}));
+ const grades = musicGradeAspects(values.format);
+ const map:Record<string,string>={artist:'Artist',release_title:'Release Title',label:'Record Label',format:'Format',genre:'Genre',style:'Style',year:'Release Year',speed:'Speed',record_size:'Record Size',edition:'Edition',features:'Features',catalogue_number:'Catalog Number',barcode:'EAN',media_grade:grades.media,sleeve_grade:grades.sleeve};
+ return Object.fromEntries(Object.entries(map).flatMap(([key,label])=>{const raw=String(values[key as keyof MusicValues]||'').trim(),value=key==='media_grade'||key==='sleeve_grade'?ebayMusicGrade(raw):raw;return value&&value.length<=65?[[key==='barcode'&&value.length===12?'UPC':label,value]]:[];}));
 }
 export function musicListingDescription(snapshot:MusicSnapshot):string {
  const {values:v,release}=snapshot,lines=[`${v.artist}${v.artist&&v.release_title?' — ':''}${v.release_title}`,'','Release details'];

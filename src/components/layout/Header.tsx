@@ -8,6 +8,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/command-centre': 'Command Centre',
   '/inventory': 'Inventory',
   '/identify': 'Coin Flipper',
+  '/scan/tunes_flip': 'Tunes Flip · Identify Music',
   '/acquisitions': 'Acquisitions',
   '/opportunities': 'Opportunities',
   '/review-required': 'Review Required',

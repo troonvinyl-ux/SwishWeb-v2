@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import { saveSharedListingEditor } from '@/lib/listingEditorSave';
 import type { ConfirmedMusicDetails } from '@/lib/listingEditorData';
-interface EditorSave { form: Record<string, unknown>; item: Record<string, unknown> | null; photos: string[]; uploads: string[]; confirmedMusic?: ConfirmedMusicDetails; }
+import type { EbayAspect } from '@/lib/ebayMusicContract';
+interface EditorSave { form: Record<string, unknown>; item: Record<string, unknown> | null; photos: string[]; uploads: string[]; confirmedMusic?: ConfirmedMusicDetails; aspects?: EbayAspect[]; }
 export function useListingEditorSave(userId: string | undefined, tenantId: string | null) {
   const queries = useQueryClient();
   return useMutation({

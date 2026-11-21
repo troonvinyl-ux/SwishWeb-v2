@@ -12,8 +12,8 @@ import CameraZoomControls from '@/components/features/CameraZoomControls';
 import CameraSourceControls from '@/components/features/CameraSourceControls';
 import { toast } from 'sonner';
 import '@/components/features/captureCamera.css';
-interface SharedCaptureCameraProps { label: string; detail: string; disabled: boolean; barcode?: boolean; coin?: boolean; autoStart?: boolean; scanning?: boolean; resolved?: boolean; thumbnail?: string; canReview?: boolean; onClose?: () => void; onPhoto?: (file: File) => void; onBarcode?: (reading: BarcodeReading) => void; }
-export default function SharedCaptureCamera({ label, detail, disabled, barcode = false, coin = false, autoStart = false, scanning = false, resolved = false, thumbnail, canReview = true, onClose, onPhoto, onBarcode }: SharedCaptureCameraProps) {
+interface SharedCaptureCameraProps { label: string; detail: string; disabled: boolean; barcode?: boolean; coin?: boolean; record?: boolean; autoStart?: boolean; scanning?: boolean; resolved?: boolean; thumbnail?: string; canReview?: boolean; onClose?: () => void; onPhoto?: (file: File) => void; onBarcode?: (reading: BarcodeReading) => void; }
+export default function SharedCaptureCamera({ label, detail, disabled, barcode = false, coin = false, record = false, autoStart = false, scanning = false, resolved = false, thumbnail, canReview = true, onClose, onPhoto, onBarcode }: SharedCaptureCameraProps) {
   const camera = useCaptureCamera(), [expanded, setExpanded] = useState(true), [grid, setGrid] = useState(true), [taking, setTaking] = useState(false), [fileError, setFileError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null), deviceCameraInput = useRef<HTMLInputElement>(null), mounted = useRef(true), takeLock = useRef(false);
   const close = useCallback(() => { camera.stop(); setExpanded(false); onClose?.(); }, [camera.stop, onClose]);
@@ -37,15 +37,15 @@ export default function SharedCaptureCamera({ label, detail, disabled, barcode =
   };
   // Open pickers synchronously from a user gesture; do not unmount the coin dialog before a result.
   const picker = (native: boolean) => { if (disabled || taking) return; camera.stop(); setFileError(''); (native ? deviceCameraInput : fileInput).current?.click(); };
-  const view = <div ref={expanded ? dialogRef : undefined} className={expanded ? 'capture-camera is-expanded' : 'capture-camera'} role={expanded ? 'dialog' : undefined} aria-modal={expanded || undefined} aria-label={expanded ? 'Full-screen camera' : 'Camera'}>
+  const view = <div ref={expanded ? dialogRef : undefined} className={`${expanded ? 'capture-camera is-expanded' : 'capture-camera'}${record && !barcode ? ' is-record' : ''}`} role={expanded ? 'dialog' : undefined} aria-modal={expanded || undefined} aria-label={expanded ? 'Full-screen camera' : 'Camera'}>
     <header className="capture-camera-heading"><div><h2>{label}</h2><p>{detail}</p></div><button type="button" className="capture-icon" aria-label={expanded ? 'Close full-screen camera' : 'Open full-screen camera'} onClick={() => expanded ? close() : setExpanded(true)}>{expanded ? <Minimize /> : <Maximize />}</button></header>
-    <CameraViewport camera={camera} barcode={barcode} coin={coin} grid={grid} disabled={disabled || taking} onGrid={() => setGrid(value => !value)} />
-    <div className="capture-options">
+    <CameraViewport camera={camera} barcode={barcode} coin={coin} record={record} grid={grid} disabled={disabled || taking} onGrid={() => setGrid(value => !value)} />
+    <details className="capture-camera-options" open={record && !barcode ? undefined : true}><summary>Zoom &amp; camera options</summary><div className="capture-options">
       <CameraSourceControls camera={camera} disabled={disabled || taking} coin={coin} onDeviceCamera={() => picker(true)} />
       <CameraZoomControls camera={camera} disabled={disabled || taking} coin={coin} />
       {camera.notice && <p role="status" className="capture-camera-notice">{camera.notice}</p>}
       {(camera.error || scanner.error || fileError) && <p role="alert" className="capture-camera-error"><AlertCircle size={20} />{fileError || scanner.error || camera.error}</p>}
-    </div>
+    </div></details>
     <CameraControls camera={camera} disabled={disabled} taking={taking} barcode={barcode} thumbnail={thumbnail} canReview={canReview} onTake={() => void take()} onGallery={() => picker(false)} onReview={close} />
   </div>;
   // Keep both inputs mounted while an OS picker is open, including on iOS. Native files pass through untouched.

@@ -30,9 +30,9 @@ test('native RPC saves condition, category, stock and array specifics; legacy ig
   assert.equal(calls.length, 1); assert.equal(calls[0].name, 'swish_save_listing_editor');
   assert.equal(body.p_item_patch.condition, 'Used - Good'); assert.equal(body.p_item_patch.quantity, 1); assert.equal(body.p_item_patch.sku, 'R-12');
   assert.deepEqual(body.p_item_patch.ebay_listing_media, input.photos); assert.equal(body.p_item_patch.ebay_listing_options.dispatchDays, 3);
-  assert.deepEqual(body.p_specifics, [{ name: 'Artist', value: 'Artist' }, { name: 'Record Grading', value: 'VG' }]);
+  assert.deepEqual(body.p_specifics, [{ name: 'Artist', value: 'Artist' }, { name: 'Record Grading', value: 'Very Good (VG)' }]);
   const reopened = hydrateListingEditor(result.listing, result.item);
-  assert.equal(reopened.category, 'Vinyl Records'); assert.equal(reopened.category_id, '176985'); assert.equal(reopened.condition, 'Used - Good'); assert.equal(reopened.condition_id, '5000'); assert.equal(reopened.condition_description, input.form.condition_description);
+  assert.equal(reopened.category, 'Vinyl Records'); assert.equal(reopened.category_id, '176985'); assert.equal(reopened.condition, 'Good'); assert.equal(reopened.condition_id, '5000'); assert.equal(reopened.condition_description, input.form.condition_description);
   assert.deepEqual(result.item.attributes.ebay_listing_media, input.photos); assert.equal(body.p_listing_patch.images, undefined);
 });
 test('array and legacy map specifics survive a second save', async () => {
@@ -40,12 +40,12 @@ test('array and legacy map specifics survive a second save', async () => {
   assert.deepEqual(listingSpecifics({ Artist: 'Artist' }), { Artist: 'Artist' });
   const { input } = fixture(), first = await saveSharedListingEditor(input);
   const second = await saveSharedListingEditor({ ...input, form: hydrateListingEditor(first.listing, first.item), item: first.item });
-  assert.deepEqual(listingSpecifics(second.item.attributes.ebay_item_specifics), { Artist: 'Artist', 'Record Grading': 'VG' });
+  assert.deepEqual(listingSpecifics(second.item.attributes.ebay_item_specifics), { Artist: 'Artist', 'Record Grading': 'Very Good (VG)' });
 });
 test('confirmed corrections persist to canonical music evidence as well as eBay specifics', async () => {
   const { input } = fixture(), result = await saveSharedListingEditor({ ...input, confirmedMusic: { media_grade: 'VG+', play_tested: false } });
   assert.equal(result.item.attributes.media_grade, 'VG+'); assert.equal(result.item.attributes.play_tested, false);
-  assert.equal(listingSpecifics(result.item.attributes.ebay_item_specifics)['Record Grading'], 'VG+'); assert.equal(result.item.attributes._music_evidence.media_grade.source, 'user');
+  assert.equal(listingSpecifics(result.item.attributes.ebay_item_specifics)['Record Grading'], 'Very Good Plus (VG+)'); assert.equal(result.item.attributes._music_evidence.media_grade.source, 'user');
 });
 test('wrong workspace, invalid values, unsupported photos and existing submissions never save', async () => {
   for (const patch of [{ price: -1 }, { price: Infinity }, { title: '' }, { quantity: 1.5 }, { tenant_id: 'other' }, { external_listing_id: '123' }]) { const { calls, input } = fixture(); input.form = { ...input.form, ...patch }; await assert.rejects(() => saveSharedListingEditor(input)); assert.equal(calls.length, 0); }

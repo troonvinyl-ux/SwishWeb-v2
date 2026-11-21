@@ -1,7 +1,7 @@
 import type { CaptureSlot } from '@/types/capture';
 import type { MusicValues } from '@/types/music';
 export const MUSIC_SOURCE_COMMIT = '08af3947840d119f4813965784953fd77ce2a53a';
-export const MUSIC_GRADES = [['M','Mint'],['NM','Near Mint'],['VG+','VG+'],['VG','VG'],['G+','G+'],['G','Good'],['P','Poor']] as const;
+export const MUSIC_GRADES = [['M','Mint (M)'],['NM','Near Mint (NM or M-)'],['EX','Excellent (EX)'],['VG+','Very Good Plus (VG+)'],['VG','Very Good (VG)'],['G+','Good Plus (G+)'],['G','Good (G)'],['F','Fair (F)'],['W','Worn (W)'],['P','Poor (P) — sent to eBay as Worn (W)']] as const;
 export const MUSIC_DEFAULTS: MusicValues = { artist:'',release_title:'',format:'Vinyl',barcode:'',catalogue_number:'',label:'',year:'',country:'',matrix_runout:'',media_grade:'',sleeve_grade:'',condition_notes:'',edition:'',record_size:'',speed:'',observed_disc_count:'',genre:'',style:'',rights_society:'',label_code:'',features:'',title:'',description:'',price:'',location:'',play_tested:false,reviewed:false,pressing_reviewed:false };
 export const MUSIC_EDIT_FIELDS = [
  ['artist','Artist'],['release_title','Release title'],['format','Format'],['barcode','UPC / EAN barcode'],['catalogue_number','Catalogue number'],['label','Record label'],['year','Release year'],['country','Release country'],['matrix_runout','Visible matrices / runouts'],['edition','Pressing / edition'],['record_size','Record size'],['speed','Speed'],['observed_disc_count','Discs physically present'],['genre','Genre'],['style','Style'],['rights_society','Rights society'],['label_code','Label code'],['features','Special features / inserts'],['condition_notes','Visible condition / missing parts'],['location','Storage location'],
