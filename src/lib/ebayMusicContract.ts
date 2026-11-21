@@ -29,6 +29,21 @@ export function supportedEbayCondition(selected: unknown, choices: EbayCondition
   const id = String(selected ?? '').trim();
   return !required && !id ? true : choices.some(choice => choice.id === id);
 }
+/** Recovery for one category with a directly observed server-owned 422
+ * conditionPolicy response (eBay GB Vinyl Records 176985: New / Used).
+ * This is NOT a live lookup or a generic marketplace condition mapping.
+ * Show only after the live lookup fails; do not automatically select either.
+ * swish-ebay-list rechecks the actual current category policy before publish. */
+export function vinylConditionRecovery(
+  categoryId: string, specialistId: string, lookupFailed: boolean,
+): { conditions: EbayCondition[]; conditionRequired: boolean; source: 'observed-recovery' } | null {
+  if (!lookupFailed || categoryId !== '176985' || specialistId !== 'vinyl_records') return null;
+  return {
+    conditions: [{ id: '1000', label: 'New' }, { id: '3000', label: 'Used' }],
+    conditionRequired: true,
+    source: 'observed-recovery',
+  };
+}
 export function musicGradeCode(value: unknown): string {
   const text = String(value ?? '').trim();
   const found = EBAY_MUSIC_GRADES.find(([code, label]) => code === text.toUpperCase() || label.toLowerCase() === text.toLowerCase());
