@@ -31,7 +31,7 @@ export default function ListingEditor() {
   const category = useListingCategorySuggestion(draft, user?.id, tenant.tenantId);
   const music = draft.item?.specialist_id === 'vinyl_records';
   const recoveryPolicy = vinylConditionRecovery(
-    String(draft.form.category_id || ''), String(draft.item?.specialist_id || ''), metadata.isError,
+    String(draft.form.category_id || ''), String(draft.item?.specialist_id || ''), metadata.isError && !metadata.data,
   );
   const conditionPolicy = metadata.data || recoveryPolicy;
   const needsMusicConditionCheck = music && Boolean(draft.form.category_id);
