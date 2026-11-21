@@ -62,7 +62,7 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       // Only edited drafts need a write. Reopened, unchanged drafts keep their
       // saved category/condition and must not fail due to a redundant RPC save.
       // The server still validates all eBay requirements and owns publish claims.
-      const form = draft.dirtyRef.current || uploads.length ? await saveCurrent() : await readCleanSavedDraft(client, before);
+      const form = draft.dirtyRef.current ? await saveCurrent() : await readCleanSavedDraft(client, before);
       // No AI check, seller override, browser reservation or automatic retry.
       const current = await prepareSharedSubmission(client, tenantId, id);
       const result = await callEdgeFunction<Record<string, unknown>>('swish-ebay-list', { route: 'publish', tenantId, nicheId, listingId: id, listingType: form.listing_type || 'FixedPriceItem', auctionDays: Number(form.auction_duration || 7), startPrice: Number(form.start_price || form.price), reservePrice: Number(form.reserve_price || 0) || undefined, categoryId: String(current.category_id || form.category_id || ''), conditionId: String(form.condition_id || ''), mediaUrls: draft.photos }, client);
