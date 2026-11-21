@@ -6,7 +6,8 @@ export const EBAY_MUSIC_GRADES = [
   ['VG+', 'Very Good Plus (VG+)'], ['VG', 'Very Good (VG)'], ['G+', 'Good Plus (G+)'],
   ['G', 'Good (G)'], ['F', 'Fair (F)'], ['W', 'Worn (W)'],
 ] as const;
-export const EBAY_MUSIC_CONDITIONS: EbayCondition[] = [{ id: '1000', label: 'Brand New' }, { id: '2750', label: 'Like New' }, { id: '4000', label: 'Very Good' }, { id: '5000', label: 'Good' }, { id: '6000', label: 'Acceptable' }];
+/** Legacy labels for displaying already-saved IDs only; these are NOT category permission rules. */
+export const EBAY_MUSIC_CONDITIONS: EbayCondition[] = [{ id: '1000', label: 'Brand New' }, { id: '3000', label: 'Used' }, { id: '2750', label: 'Like New' }, { id: '4000', label: 'Very Good' }, { id: '5000', label: 'Good' }, { id: '6000', label: 'Acceptable' }];
 /** Never assume a grade such as VG is a valid eBay item condition.
  * The live Sell Metadata condition policy is authoritative for each leaf category. */
 export function normalizeEbayConditionPolicy(input: unknown, categoryId: string): { conditions: EbayCondition[]; required: boolean } {
