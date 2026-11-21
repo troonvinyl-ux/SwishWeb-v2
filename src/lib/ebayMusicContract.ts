@@ -29,15 +29,15 @@ export function supportedEbayCondition(selected: unknown, choices: EbayCondition
   const id = String(selected ?? '').trim();
   return !required && !id ? true : choices.some(choice => choice.id === id);
 }
-/** Recovery for one category with a directly observed server-owned 422
- * conditionPolicy response (eBay GB Vinyl Records 176985: New / Used).
- * This is NOT a live lookup or a generic marketplace condition mapping.
- * Show only after the live lookup fails; do not automatically select either.
- * swish-ebay-list rechecks the actual current category policy before publish. */
+/** Fallback for the ONE category whose live backend response was observed
+ * rejecting Very Good and naming New / Used (EBAY_GB Vinyl Records 176985).
+ * Not a fresh policy lookup. May display while metadata is pending, disabled,
+ * or failed, and must never automatically select a condition. The backend
+ * validates the true current policy again before any marketplace publication. */
 export function vinylConditionRecovery(
-  categoryId: string, specialistId: string, lookupFailed: boolean,
+  categoryId: string, specialistId: string, livePolicyUnavailable: boolean,
 ): { conditions: EbayCondition[]; conditionRequired: boolean; source: 'observed-recovery' } | null {
-  if (!lookupFailed || categoryId !== '176985' || specialistId !== 'vinyl_records') return null;
+  if (!livePolicyUnavailable || categoryId !== '176985' || specialistId !== 'vinyl_records') return null;
   return {
     conditions: [{ id: '1000', label: 'New' }, { id: '3000', label: 'Used' }],
     conditionRequired: true,
