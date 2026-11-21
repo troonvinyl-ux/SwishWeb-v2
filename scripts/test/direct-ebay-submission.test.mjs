@@ -7,14 +7,14 @@ const base = { id: 'listing', item_id: 'stock', tenant_id: 'tenant', marketplace
 function harness(patch = {}) {
   let row = { ...base, ...patch }, onUpdate = null, providerError = null;
   const events = [], sends = [], updates = [], commits = [], feedback = [];
-  const client = { from: () => { let mutation = null; const filters = []; return {
+  const client = { from: table => { let mutation = null; const filters = []; return {
     select() { return this; }, eq(key, value) { filters.push(valueRow => valueRow[key] === value); return this; }, is(key, value) { filters.push(valueRow => value === null ? valueRow[key] == null : valueRow[key] === value); return this; },
     update(value) { mutation = value; return this; },
-    single: async () => ({ data: filters.every(filter => filter(row)) ? { ...row } : null, error: null }),
+    single: async () => { const target = table === 'items' ? item : row; return { data: filters.every(filter => filter(target)) ? { ...target } : null, error: null }; },
     maybeSingle: async () => { onUpdate?.(); if (!filters.every(filter => filter(row))) return { data: null, error: null }; if (mutation) { updates.push(mutation); row = { ...row, ...mutation }; } return { data: { ...row }, error: null }; },
   }; } };
   class EdgeFunctionError extends Error { get displayMessage() { return this.message; } }
-  const item = { id: 'stock', tenant_id: 'tenant', specialist_id: 'vinyl_records' }, draft = { form: { ...row }, formRef: { current: { ...row } }, item, photos: ['https://fixture.invalid/front.jpg'], editRef: { current: 0 }, dirtyRef: { current: false }, commit: value => { commits.push(value); draft.formRef.current = { ...draft.formRef.current, ...value }; }, refresh: async () => {} };
+  const item = { id: 'stock', tenant_id: 'tenant', specialist_id: 'vinyl_records', updated_at: 'v1', condition: '', attributes: {} }, draft = { form: { ...row }, formRef: { current: { ...row } }, item, photos: ['https://fixture.invalid/front.jpg'], editRef: { current: 0 }, dirtyRef: { current: false }, commit: value => { commits.push(value); draft.formRef.current = { ...draft.formRef.current, ...value }; }, refresh: async () => {} };
   const stubs = {
     react: { useRef: value => ({ current: value }), useState: value => [value, () => {}] }, sonner: { toast: { success: value => feedback.push(value), warning: value => feedback.push(value), error: value => feedback.push(value) } },
     '@/lib/supabase': { EdgeFunctionError, getSupabaseClientAsync: async () => client, callEdgeFunction: async (name, body) => { events.push('publish'); sends.push({ name, body }); return providerError ? { data: null, error: new EdgeFunctionError(providerError) } : { data: { success: true, externalListingId: '1234567890' }, error: null }; } },
@@ -34,8 +34,8 @@ test('submit saves dirty fields then invokes only the existing eBay publish func
 test('old verified status is restored to a claimable draft, without touching operation claims', async () => {
   const h = harness({ status: 'verified' }); await h.actions.publish(); assert.deepEqual(h.updates, [{ status: 'draft' }]); assert.equal(h.sends.length, 1);
 });
-test('an existing claim is delegated to the shared service, never cleared by the browser', async () => {
-  const h = harness({ status: 'verified', publish_claim_id: 'server-claim' }); h.setError('Listing cannot be claimed'); await h.actions.publish(); assert.equal(h.actions.canPublish, true); assert.equal(h.sends.length, 1); assert.deepEqual(h.updates, []);
+test('an existing publish claim blocks another request and remains untouched', async () => {
+  const h = harness({ status: 'verified', publish_claim_id: 'server-claim' }); await h.actions.publish(); assert.equal(h.sends.length, 0); assert.deepEqual(h.updates, []); assert.match(h.feedback.join(' '), /Refresh status/);
 });
 test('recorded listings cannot be submitted again even when the browser started with stale draft data', async () => {
   const h = harness({ external_listing_id: '9876543210', status: 'active' }); await h.actions.publish(); assert.equal(h.sends.length, 0); assert.equal(h.actions.canPublish, false);
@@ -43,7 +43,9 @@ test('recorded listings cannot be submitted again even when the browser started 
 test('an explicit retry after rejection is not blocked by a persistent browser reservation', async () => {
   const h = harness(); h.setError('Complete required item specific: Artist'); await h.actions.publish(); await h.actions.publish(); assert.equal(h.sends.length, 2); assert.deepEqual(h.updates, []);
 });
-test('unchanged legacy draft is saved before publication so abbreviated grading can be migrated', async () => { const h = harness(); await h.actions.publish(); assert.deepEqual(h.events, ['save', 'publish']); });
+test('unchanged reopened draft publishes without a redundant save or false retention warning', async () => { const h = harness(); await h.actions.publish(); assert.deepEqual(h.events, ['publish']); assert.equal(h.sends.length, 1); });
+test('stale stock version fails closed before any marketplace request', async () => { const h = harness(); h.draft.item.updated_at = 'older-stock-version'; await h.actions.publish(); assert.deepEqual(h.events, []); assert.equal(h.sends.length, 0); assert.match(h.feedback.join(' '), /changed since it was opened/); });
+test('a stale listing version fails closed before eBay', async () => { const h = harness(); h.draft.formRef.current.updated_at = 'old-listing-version'; await h.actions.publish(); assert.deepEqual(h.events, []); assert.equal(h.sends.length, 0); });
 test('review states are restored to draft without clearing claims or creating another listing', async () => { for (const status of ['review', 'review_required']) { const h = harness({ status }); await h.actions.publish(); assert.deepEqual(h.updates, [{ status: 'draft' }]); assert.equal(h.sends.length, 1); } });
 test('rapid double click makes one provider call', async () => {
   const h = harness(); await Promise.all([h.actions.publish(), h.actions.publish()]); assert.equal(h.sends.length, 1);
