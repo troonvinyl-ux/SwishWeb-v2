@@ -20,7 +20,7 @@ import ListingTitleFields from '@/components/features/ListingTitleFields';
 import ListingSaleFields from '@/components/features/ListingSaleFields';
 import ListingCategoryFields from '@/components/features/ListingCategoryFields';
 import MusicItemSpecifics from '@/components/features/MusicItemSpecifics';
-import { supportedEbayCondition } from '@/lib/ebayMusicContract';
+import { supportedEbayCondition, vinylConditionRecovery } from '@/lib/ebayMusicContract';
 
 export default function ListingEditor() {
   const { id } = useParams<{ id: string }>(), { user } = useAuth(), tenant = useCurrentTenantId();
@@ -30,9 +30,13 @@ export default function ListingEditor() {
   const actions = useListingEditorActions(draft, user?.id, tenant.tenantId, upload.photos.map(photo => photo.url), metadata.data?.aspects);
   const category = useListingCategorySuggestion(draft, user?.id, tenant.tenantId);
   const music = draft.item?.specialist_id === 'vinyl_records';
+  const recoveryPolicy = vinylConditionRecovery(
+    String(draft.form.category_id || ''), String(draft.item?.specialist_id || ''), metadata.isError,
+  );
+  const conditionPolicy = metadata.data || recoveryPolicy;
   const needsMusicConditionCheck = music && Boolean(draft.form.category_id);
   const conditionReady = !needsMusicConditionCheck ||
-    Boolean(metadata.data && supportedEbayCondition(draft.form.condition_id, metadata.data.conditions, metadata.data.conditionRequired));
+    Boolean(conditionPolicy && supportedEbayCondition(draft.form.condition_id, conditionPolicy.conditions, conditionPolicy.conditionRequired));
   const disabled = actions.busy || upload.busy || category.busy || Boolean(publicationBlock(draft.form));
   if (tenant.isLoading || draft.loading) return <div role="status" className="swish-card p-6 text-muted-foreground">Loading the shared SWISH listing…</div>;
   if (tenant.error || draft.error) return <section role="alert" className="swish-card space-y-4 p-5"><h1 className="text-xl font-semibold">Listing unavailable</h1><p>{tenant.error?.message || draft.error?.message}</p><Link to="/listings" className="btn-secondary">Back to listings</Link></section>;
@@ -51,6 +55,6 @@ export default function ListingEditor() {
     <ListingTitleFields form={draft.form} onChange={draft.change} disabled={disabled} />
     <ListingSaleFields form={draft.form} item={draft.item} onChange={draft.change} disabled={disabled} />
     <MusicItemSpecifics item={draft.item} values={draft.form.music_values as MusicValues | undefined} aspects={metadata.data?.aspects} disabled={disabled} onChanged={values => { draft.change('music_values', values); const description = syncMusicConditionText(String(draft.formRef.current.description || ''), values); if (description !== draft.formRef.current.description) draft.change('description', description); }} />
-    <ListingCategoryFields form={draft.form} music={music} conditions={metadata.data?.conditions} conditionRequired={metadata.data?.conditionRequired} metadataLoading={metadata.isLoading || metadata.isFetching} metadataError={metadata.error?.message} onRetryConditions={() => void metadata.refetch()} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
+    <ListingCategoryFields form={draft.form} music={music} conditions={conditionPolicy?.conditions} conditionRequired={conditionPolicy?.conditionRequired} recoveryPolicy={Boolean(recoveryPolicy)} metadataLoading={metadata.isLoading || metadata.isFetching} metadataError={metadata.error?.message} onRetryConditions={() => void metadata.refetch()} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
   </div>;
 }
