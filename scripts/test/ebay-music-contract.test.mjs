@@ -81,3 +81,34 @@ test('web condition UI gets the current server policy and never offers unsupport
   assert.match(editor, /supportedEbayCondition/);
   assert.match(editor, /!conditionReady/);
 });
+
+
+test('New/Used recovery is limited to the observed UK vinyl category and never auto-selects', () => {
+  const recovery = contract.vinylConditionRecovery('176985', 'vinyl_records', true);
+  assert.deepEqual(recovery, {
+    conditions: [{ id: '1000', label: 'New' }, { id: '3000', label: 'Used' }],
+    conditionRequired: true,
+    source: 'observed-recovery',
+  });
+  assert.equal(contract.supportedEbayCondition('', recovery.conditions, recovery.conditionRequired), false);
+  assert.equal(contract.supportedEbayCondition('4000', recovery.conditions, recovery.conditionRequired), false);
+  assert.equal(contract.supportedEbayCondition('3000', recovery.conditions, recovery.conditionRequired), true);
+  for (const [category, specialist, failed] of [
+    ['176985', 'vinyl_records', false], ['176985', 'coins', true],
+    ['176986', 'vinyl_records', true], ['', 'vinyl_records', true],
+  ]) {
+    assert.equal(contract.vinylConditionRecovery(category, specialist, failed), null);
+  }
+});
+test('web uses the recovery only following a failed live lookup and keeps marketplace verification', () => {
+  const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
+  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  const source = readFileSync('src/hooks/useListingEditorActions.ts', 'utf8');
+  assert.match(editor, /vinylConditionRecovery\(/);
+  assert.match(editor, /metadata\.isError/);
+  assert.match(editor, /supportedEbayCondition/);
+  assert.match(picker, /recoveryPolicy/);
+  assert.match(picker, /not a fresh policy verification/);
+  assert.match(source, /'swish-ebay-list'/);
+  assert.match(source, /route: 'publish'/);
+});
