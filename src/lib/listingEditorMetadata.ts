@@ -3,6 +3,7 @@ import { asRecord, itemPhotos } from '@/lib/itemPhotos';
 import { listingSpecifics, type ConfirmedMusicDetails } from '@/lib/listingEditorData';
 import { MUSIC_EDIT_FIELDS } from '@/constants/music';
 import { ebayMusicGrade, musicGradeAspects } from '@/lib/ebayMusicContract';
+import { jsonEqual } from '@/lib/jsonEquality';
 interface MetadataInput { client: SupabaseClient; item: Record<string, unknown>; form: Record<string, unknown>; photos: string[]; uploads: string[]; options: Record<string, unknown>; confirmedMusic?: ConfirmedMusicDetails; }
 /** Compatibility for existing RPC versions that ignore newer p_item_patch keys. No schema changes. */
 export async function retainListingEditorMetadata({ client, item, form, photos, uploads, options, confirmedMusic }: MetadataInput): Promise<Record<string, unknown>> {
@@ -20,7 +21,7 @@ export async function retainListingEditorMetadata({ client, item, form, photos, 
   const next = { ...attrs, ...music, ebay_category_id: String(form.category_id || ''), ebay_category_name: String(form.category || ''), ebay_condition_id: String(form.condition_id || ''), ebay_listing_media: photos, ebay_listing_options: options, ...(Object.keys(music).length ? { ...(confirmedMusic ? { ebay_item_specifics: Object.entries(specifics).map(([name, value]) => ({ name, value })) } : {}), _music_evidence: evidence, ...(Object.entries(music).some(([key, value]) => attrs[key] !== value) ? { _music_quick_sale: null } : {}) } : {}) };
   const notes = String(form.condition_description ?? ''), media = [...new Set([...itemPhotos(item).map(photo => photo.original), ...uploads])];
   const originals = new Set(itemPhotos(item).map(photo => photo.original));
-  const needsWrite = JSON.stringify(next) !== JSON.stringify(attrs) || String(item.condition_notes || '') !== notes || uploads.some(url => !originals.has(url));
+  const needsWrite = !jsonEqual(next, attrs) || String(item.condition_notes || '') !== notes || uploads.some(url => !originals.has(url));
   if (!needsWrite) return item;
   if (!item.updated_at) throw new Error('Saved stock version is unavailable. Your edits remain on screen; reload before retrying.');
   const result = await client.from('items').update({ attributes: next, condition_notes: notes, ...(uploads.length ? { media } : {}) }).eq('id', item.id).eq('tenant_id', item.tenant_id).eq('updated_at', item.updated_at).select('*').maybeSingle();

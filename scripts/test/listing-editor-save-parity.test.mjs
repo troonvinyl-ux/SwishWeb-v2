@@ -19,12 +19,12 @@ function load(path) {
 }
 const { saveSharedListingEditor } = load('src/lib/listingEditorSave.ts');
 const { hydrateListingEditor, listingSpecifics } = load('src/lib/listingEditorData.ts');
-function fixture() {
+function fixture({ jsonbOptionOrder = false } = {}) {
   const calls = [], form = { id: 'listing', item_id: 'item', tenant_id: 'tenant', title: 'Artist Album Vinyl Record', description: 'Media: VG\nSleeve: VG+', price: 18, status: 'draft', category_id: '176985', category: 'Vinyl Records', condition: 'Used', condition_id: '3000', condition_description: 'Media VG, sleeve VG+', quantity: 1, sku: 'R-12', dispatch_days: 3 };
   let listing = { ...form }, stock = { id: 'item', tenant_id: 'tenant', specialist_id: 'vinyl_records', updated_at: 'version-1', media: ['https://fixture.invalid/front.jpg'], condition_grade: 'legacy grade stays untouched', attributes: { ebay_item_specifics: [{ name: 'Artist', value: 'Artist' }, { name: 'Record Grading', value: 'VG' }] } };
   // Match the deployed shared RPC: it writes premium-editor notes to
   // condition_notes and deliberately preserves the legacy condition_grade.
-  const client = { rpc: async (name, body) => { calls.push({ name, body }); listing = { ...listing, ...body.p_listing_patch }; stock = { ...stock, condition: body.p_item_patch.condition, condition_notes: body.p_item_patch.condition_notes, quantity: body.p_item_patch.quantity, sku: body.p_item_patch.sku, updated_at: 'version-2', attributes: { ...stock.attributes, ebay_category_id: body.p_item_patch.ebay_category_id, ebay_category_name: body.p_item_patch.ebay_category_name, ebay_item_specifics: body.p_specifics } }; return { data: 'listing', error: null }; }, from: table => { let patch = null; return { select() { return this; }, eq() { return this; }, update(value) { patch = value; return this; }, single: async () => ({ data: table === 'items' ? stock : listing, error: null }), maybeSingle: async () => { stock = { ...stock, ...patch, updated_at: 'version-3' }; return { data: stock, error: null }; } }; } };
+  const client = { rpc: async (name, body) => { calls.push({ name, body }); listing = { ...listing, ...body.p_listing_patch }; stock = { ...stock, condition: body.p_item_patch.condition, condition_notes: body.p_item_patch.condition_notes, quantity: body.p_item_patch.quantity, sku: body.p_item_patch.sku, updated_at: 'version-2', attributes: { ...stock.attributes, ebay_category_id: body.p_item_patch.ebay_category_id, ebay_category_name: body.p_item_patch.ebay_category_name, ebay_item_specifics: body.p_specifics } }; return { data: 'listing', error: null }; }, from: table => { let patch = null; return { select() { return this; }, eq() { return this; }, update(value) { patch = value; return this; }, single: async () => ({ data: table === 'items' ? stock : listing, error: null }), maybeSingle: async () => { const attributes = { ...patch.attributes }; if (jsonbOptionOrder) attributes.ebay_listing_options = Object.fromEntries(Object.entries(attributes.ebay_listing_options).reverse()); stock = { ...stock, ...patch, attributes, updated_at: 'version-3' }; return { data: stock, error: null }; } }; } };
   return { calls, input: { client, userId: 'user', tenantId: 'tenant', form, item: stock, photos: ['https://fixture.invalid/front.jpg'], uploads: [] } };
 }
 test('native RPC saves condition, category, stock and array specifics; legacy ignored metadata is retained', async () => {
@@ -60,6 +60,11 @@ test('vinyl shared-RPC notes, selected eight photos and reopen all retain their 
   assert.equal(second.item.condition_notes, 'Freshly saved condition note');
   assert.equal(second.item.condition_grade, 'legacy grade stays untouched');
   assert.deepEqual(second.item.attributes.ebay_listing_media, photos);
+});
+test('JSONB option key order is not treated as a lost listing option', async () => {
+  const { input } = fixture({ jsonbOptionOrder: true });
+  const saved = await saveSharedListingEditor(input);
+  assert.deepEqual(saved.item.attributes.ebay_listing_options, { dispatchDays: 3, bestOfferEnabled: false, reservePrice: '', startPrice: '18', auctionDays: 7, listingType: 'FixedPriceItem' });
 });
 test('confirmed corrections persist to canonical music evidence as well as eBay specifics', async () => {
   const { input } = fixture(), result = await saveSharedListingEditor({ ...input, confirmedMusic: { media_grade: 'VG+', play_tested: false } });

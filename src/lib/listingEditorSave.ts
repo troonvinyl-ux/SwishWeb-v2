@@ -9,9 +9,10 @@ import { ebayConditionId, ebayMusicGrade, musicGradeAspects, normalizeMusicSpeci
 import { musicSpecifics } from '@/lib/musicListing';
 import { musicFormSchema } from '@/lib/musicValidation';
 import { syncMusicConditionText } from '@/lib/musicConditionText';
+import { jsonEqual } from '@/lib/jsonEquality';
 interface EditorSaveInput { client: SupabaseClient; userId: string; tenantId: string; form: Record<string, unknown>; item: Record<string, unknown>; photos: string[]; uploads: string[]; confirmedMusic?: ConfirmedMusicDetails; aspects?: EbayAspect[]; }
 interface ReadbackMismatch { field: string; expected: unknown; actual: unknown; }
-const sameValue = (expected: unknown, actual: unknown) => JSON.stringify(expected) === JSON.stringify(actual);
+const sameValue = (expected: unknown, actual: unknown) => jsonEqual(expected, actual);
 const mismatch = (field: string, expected: unknown, actual: unknown): ReadbackMismatch | null => sameValue(expected, actual) ? null : { field, expected, actual };
 const numericMismatch = (field: string, expected: number, actual: unknown): ReadbackMismatch | null => actual === null || actual === undefined ? mismatch(field, expected, actual) : mismatch(field, expected, Number(actual));
 const normalizedSpecifics = (value: unknown) => Object.entries(listingSpecifics(value)).sort(([left], [right]) => left.localeCompare(right));
