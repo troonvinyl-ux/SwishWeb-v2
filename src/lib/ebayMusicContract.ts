@@ -7,6 +7,27 @@ export const EBAY_MUSIC_GRADES = [
   ['G', 'Good (G)'], ['F', 'Fair (F)'], ['W', 'Worn (W)'],
 ] as const;
 export const EBAY_MUSIC_CONDITIONS: EbayCondition[] = [{ id: '1000', label: 'Brand New' }, { id: '2750', label: 'Like New' }, { id: '4000', label: 'Very Good' }, { id: '5000', label: 'Good' }, { id: '6000', label: 'Acceptable' }];
+/** Never assume a grade such as VG is a valid eBay item condition.
+ * The live Sell Metadata condition policy is authoritative for each leaf category. */
+export function normalizeEbayConditionPolicy(input: unknown, categoryId: string): { conditions: EbayCondition[]; required: boolean } {
+  const policy = asRecord(input);
+  if (String(policy.categoryId ?? '') !== categoryId || typeof policy.itemConditionRequired !== 'boolean' || !Array.isArray(policy.itemConditions)) {
+    throw new Error('eBay did not return a valid condition policy for this category. Retry the lookup.');
+  }
+  const seen = new Set<string>();
+  const conditions: EbayCondition[] = [];
+  for (const value of policy.itemConditions) {
+    const row = asRecord(value), id = String(row.conditionId ?? ''), label = String(row.conditionDescription ?? '').trim();
+    if (!/^\d+$/.test(id) || !label || seen.has(id)) continue;
+    seen.add(id); conditions.push({ id, label });
+  }
+  if (policy.itemConditionRequired && !conditions.length) throw new Error('eBay requires a condition but returned no choices. Retry the lookup.');
+  return { conditions, required: policy.itemConditionRequired };
+}
+export function supportedEbayCondition(selected: unknown, choices: EbayCondition[], required: boolean): boolean {
+  const id = String(selected ?? '').trim();
+  return !required && !id ? true : choices.some(choice => choice.id === id);
+}
 export function musicGradeCode(value: unknown): string {
   const text = String(value ?? '').trim();
   const found = EBAY_MUSIC_GRADES.find(([code, label]) => code === text.toUpperCase() || label.toLowerCase() === text.toLowerCase());
