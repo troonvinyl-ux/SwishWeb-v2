@@ -13,7 +13,7 @@ import type { EbayAspect } from '@/lib/ebayMusicContract';
 
 export function useListingEditorActions(draft: ReturnType<typeof useListingEditorDraft>, userId: string | undefined, tenantId: string | null, uploads: string[], aspects: EbayAspect[] = []) {
   const saveMutation = useListingEditorSave(userId, tenantId), working = useRef(false);
-  const [publishing, setPublishing] = useState(false), [checking, setChecking] = useState(false), [error, setError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false), [checking, setChecking] = useState(false), [error, setError] = useState<string | null>(null), [pendingExternalId, setPendingExternalId] = useState<string | null>(null);
   const busy = publishing || checking || saveMutation.isPending;
   const message = (cause: unknown) => cause instanceof EdgeFunctionError ? cause.displayMessage : cause instanceof Error ? cause.message : 'SWISH could not complete the request.';
   const saveCurrent = async () => {
@@ -52,6 +52,7 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
   const publish = async () => {
     if (working.current || busy || !userId || !tenantId || !draft.item || !draft.formRef.current.id) return;
     const id = String(draft.formRef.current.id), nicheId = listingNicheId(draft.item);
+    let acceptedExternalId = '';
     working.current = true; setPublishing(true); setError(null);
     try {
       const client = await getSupabaseClientAsync(); if (!client) throw new Error('SWISH backend is not connected.');
@@ -69,13 +70,20 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       if (result.error) throw result.error;
       const externalId = String(result.data?.externalListingId || result.data?.external_listing_id || '');
       if (result.data?.success !== true || !/^\d+$/.test(externalId)) throw new Error(String(result.data?.error || 'eBay did not confirm a listing ID. Check status before trying again.'));
-      draft.commit({ status: 'active', external_listing_id: externalId }); toast.success('Listing accepted by eBay');
-      void checkSharedListingStatus({ client, userId, tenantId, nicheId, listingId: id }).then(fresh => {
-        if (fresh.status === 'active' && String(fresh.external_listing_id) === externalId) completeScanToLive(`${userId}:${tenantId}:${id}`, externalId);
-        void draft.refresh();
-      }).catch(() => toast.warning('eBay accepted the listing; saved status is still updating.'));
+      // eBay has accepted an ID, but that is not yet proof that the saved listing
+      // and its canonical stock item have both left Draft. Keep the editor locked
+      // until the existing status-only reconciliation confirms the full handoff.
+      acceptedExternalId = externalId; setPendingExternalId(externalId);
+      const fresh = await checkSharedListingStatus({ client, userId, tenantId, nicheId, listingId: id });
+      if (fresh.status !== 'active' || String(fresh.external_listing_id) !== externalId) throw new Error('eBay accepted this listing, but SWISH did not retain the same live listing identity. Do not submit again; refresh status to reconcile it.');
+      draft.commit(fresh); setPendingExternalId(null); completeScanToLive(`${userId}:${tenantId}:${id}`, externalId);
+      toast.success('Listing is live on eBay and SWISH inventory is updated');
+      void draft.refresh().catch(() => undefined);
     } catch (cause) {
-      setError(message(cause)); toast.error(message(cause));
+      const detail = message(cause), safeError = acceptedExternalId
+        ? `eBay accepted listing ${acceptedExternalId}, but SWISH has not confirmed its listing and stock state. ${detail} Do not submit again; use Refresh status to reconcile the existing listing.`
+        : detail;
+      setError(safeError); toast.error(safeError);
       // Read-only refresh after failure; never resend the marketplace request.
       void draft.refresh().catch(() => undefined);
     } finally { working.current = false; setPublishing(false); }
@@ -87,11 +95,15 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
     try {
       const client = await getSupabaseClientAsync(); if (!client) throw new Error('SWISH backend is not connected.');
       const fresh = await checkSharedListingStatus({ client, userId, tenantId, nicheId, listingId: id });
+      if (pendingExternalId && (fresh.status !== 'active' || String(fresh.external_listing_id) !== pendingExternalId)) {
+        throw new Error(`eBay accepted listing ${pendingExternalId}, but SWISH has not yet retained its live identity and inventory state. Do not submit again; refresh status shortly.`);
+      }
       if (!draft.dirtyRef.current) draft.commit(fresh); await draft.refresh(); setError(null);
-      if (fresh.status === 'active' && fresh.external_listing_id) completeScanToLive(`${userId}:${tenantId}:${id}`, String(fresh.external_listing_id));
+      if (fresh.status === 'active' && fresh.external_listing_id) { setPendingExternalId(null); completeScanToLive(`${userId}:${tenantId}:${id}`, String(fresh.external_listing_id)); }
       toast.success(fresh.external_listing_id ? 'Existing eBay listing checked' : fresh.publish_claim_id ? 'SWISH still has a pending submission' : 'Saved status checked. Submit when ready.');
     } catch (cause) { setError(message(cause)); toast.error(message(cause)); }
     finally { working.current = false; setChecking(false); }
   };
-  return { publishing, checking, busy, saving: saveMutation.isPending, reason: publicationBlock(draft.form), error, save, publish, checkStatus, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !publicationBlock(draft.form)) };
+  const pendingReason = pendingExternalId ? `eBay accepted listing ${pendingExternalId}, but SWISH is still reconciling the saved listing and stock state. Do not submit again; use Refresh status.` : null;
+  return { publishing, checking, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form), publicationExternalId: pendingExternalId || String(draft.form.external_listing_id || ''), error, save, publish, checkStatus, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !pendingExternalId && !publicationBlock(draft.form)) };
 }
