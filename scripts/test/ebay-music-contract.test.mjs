@@ -100,15 +100,35 @@ test('New/Used recovery is limited to the observed UK vinyl category and never a
     assert.equal(contract.vinylConditionRecovery(category, specialist, failed), null);
   }
 });
-test('web uses the recovery only following a failed live lookup and keeps marketplace verification', () => {
+test('vinyl recovery works without metadata.isError and keeps the server as final verifier', () => {
   const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
   const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
   const source = readFileSync('src/hooks/useListingEditorActions.ts', 'utf8');
-  assert.match(editor, /vinylConditionRecovery\(/);
-  assert.match(editor, /metadata\.isError/);
+  const metadata = readFileSync('src/hooks/useEbayCategoryMetadata.ts', 'utf8');
+  assert.match(metadata, /enabled: Boolean\(userId && tenantId && categoryId\)/);
+  assert.match(editor, /vinylConditionRecovery\(categoryId/);
+  assert.match(editor, /!metadata\.data/);
+  assert.doesNotMatch(editor, /vinylConditionRecovery\([\s\S]*metadata\.isError/);
+  assert.match(editor, /metadata\.data \?\? recoveryPolicy/);
+  assert.match(editor, /const needsMusicConditionCheck = music/);
+  assert.match(editor, /Boolean\(categoryId && conditionPolicy/);
   assert.match(editor, /supportedEbayCondition/);
   assert.match(picker, /recoveryPolicy/);
-  assert.match(picker, /not a fresh policy verification/);
+  assert.match(picker, /not freshly verified/);
+  assert.match(picker, /No saved eBay category ID/);
+  assert.doesNotMatch(picker, /eBay condition choices could not be verified\. Retry before submitting/);
   assert.match(source, /'swish-ebay-list'/);
   assert.match(source, /route: 'publish'/);
+});
+
+test('Vinyl Records category 176985 is usable while metadata is loading, disabled or failed', () => {
+  for (const missingLiveData of [true]) {
+    const recovery = contract.vinylConditionRecovery('176985', 'vinyl_records', missingLiveData);
+    assert.deepEqual(recovery.conditions.map(row => row.id), ['1000', '3000']);
+    assert.equal(contract.supportedEbayCondition('', recovery.conditions, recovery.conditionRequired), false);
+    assert.equal(contract.supportedEbayCondition('4000', recovery.conditions, recovery.conditionRequired), false);
+    assert.equal(contract.supportedEbayCondition('3000', recovery.conditions, recovery.conditionRequired), true);
+  }
+  assert.equal(contract.vinylConditionRecovery('176985', 'vinyl_records', false), null);
+  assert.equal(contract.vinylConditionRecovery('', 'vinyl_records', true), null);
 });
