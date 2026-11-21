@@ -30,13 +30,16 @@ export default function ListingEditor() {
   const actions = useListingEditorActions(draft, user?.id, tenant.tenantId, upload.photos.map(photo => photo.url), metadata.data?.aspects);
   const category = useListingCategorySuggestion(draft, user?.id, tenant.tenantId);
   const music = draft.item?.specialist_id === 'vinyl_records';
-  const recoveryPolicy = vinylConditionRecovery(
-    String(draft.form.category_id || ''), String(draft.item?.specialist_id || ''), metadata.isError && !metadata.data,
-  );
-  const conditionPolicy = metadata.data || recoveryPolicy;
-  const needsMusicConditionCheck = music && Boolean(draft.form.category_id);
-  const conditionReady = !needsMusicConditionCheck ||
-    Boolean(conditionPolicy && supportedEbayCondition(draft.form.condition_id, conditionPolicy.conditions, conditionPolicy.conditionRequired));
+  const categoryId = String(draft.form.category_id || '').trim();
+  // The query can be disabled (missing user, tenant or category), remain pending,
+  // or fail before React Query sets isError. None of those cases should silently
+  // hide the previously observed New/Used options for this ONE vinyl category.
+  // A successful live policy always overrides the observed recovery options.
+  const recoveryPolicy = vinylConditionRecovery(categoryId, String(draft.item?.specialist_id || ''), !metadata.data);
+  const conditionPolicy = metadata.data ?? recoveryPolicy;
+  const needsMusicConditionCheck = music;
+  const conditionReady = !music ||
+    Boolean(categoryId && conditionPolicy && supportedEbayCondition(draft.form.condition_id, conditionPolicy.conditions, conditionPolicy.conditionRequired));
   const disabled = actions.busy || upload.busy || category.busy || Boolean(publicationBlock(draft.form));
   if (tenant.isLoading || draft.loading) return <div role="status" className="swish-card p-6 text-muted-foreground">Loading the shared SWISH listing…</div>;
   if (tenant.error || draft.error) return <section role="alert" className="swish-card space-y-4 p-5"><h1 className="text-xl font-semibold">Listing unavailable</h1><p>{tenant.error?.message || draft.error?.message}</p><Link to="/listings" className="btn-secondary">Back to listings</Link></section>;
@@ -46,7 +49,7 @@ export default function ListingEditor() {
       <h2 className="text-lg font-semibold">Ready to sell</h2>
       <p className="text-base leading-7 text-muted-foreground">Submit saves your changes and sends this listing to your connected eBay account. No separate AI check or seller-review step.</p>
       <div className="flex flex-wrap gap-3"><button type="button" onClick={() => void actions.publish()} disabled={!actions.canPublish || upload.busy || category.busy || !conditionReady} className="btn-primary min-h-11 disabled:opacity-50"><Send size={18} />{actions.publishing ? 'Submitting…' : 'Submit to eBay'}</button><button type="button" onClick={() => void actions.save()} disabled={disabled || !tenant.tenantId || !draft.form.id} className="btn-secondary min-h-11 disabled:opacity-50"><Save size={18} />{actions.saving ? 'Saving…' : 'Save draft'}</button><button type="button" onClick={() => void actions.checkStatus()} disabled={actions.busy || upload.busy || category.busy || !draft.form.id} className="btn-ghost min-h-11 disabled:opacity-50"><RefreshCw size={18} />{actions.checking ? 'Checking…' : 'Refresh status'}</button></div>
-      {needsMusicConditionCheck && !conditionReady && <p role="status" className="text-sm text-warning">Choose a condition supported by the saved eBay category below, then save the draft. Record and sleeve grades are separate.</p>}
+      {needsMusicConditionCheck && !conditionReady && <p role="status" className="text-sm text-warning">{!categoryId ? 'The eBay category ID is missing. Use Find eBay category, confirm the correct category, then select its condition.' : 'Choose an eBay category-compatible condition below and save the draft before submitting. Record and sleeve grades stay separate.'}</p>}
     </section>
     <PublicationStatus reason={actions.reason} externalId={String(draft.form.external_listing_id || '')} refreshing={actions.checking} onRefresh={() => void actions.checkStatus()} />
     <ListingPublishFeedback message={actions.error} />
