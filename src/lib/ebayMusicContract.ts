@@ -29,20 +29,19 @@ export function supportedEbayCondition(selected: unknown, choices: EbayCondition
   const id = String(selected ?? '').trim();
   return !required && !id ? true : choices.some(choice => choice.id === id);
 }
-/** Fallback for the ONE category whose live backend response was observed
- * rejecting Very Good and naming New / Used (EBAY_GB Vinyl Records 176985).
- * Not a fresh policy lookup. May display while metadata is pending, disabled,
- * or failed, and must never automatically select a condition. The backend
- * validates the true current policy again before any marketplace publication. */
-export function vinylConditionRecovery(
-  categoryId: string, specialistId: string, livePolicyUnavailable: boolean,
-): { conditions: EbayCondition[]; conditionRequired: boolean; source: 'observed-recovery' } | null {
-  if (!livePolicyUnavailable || categoryId !== '176985' || specialistId !== 'vinyl_records') return null;
-  return {
-    conditions: [{ id: '1000', label: 'New' }, { id: '3000', label: 'Used' }],
-    conditionRequired: true,
-    source: 'observed-recovery',
-  };
+/** EBAY_GB Vinyl Records (176985) returned only New / Used in SWISH's
+ * category-policy response. This small UI policy prevents unnecessary
+ * category-condition round trips for that particular Tunes Flip category.
+ * It never automatically selects an item condition or changes media grades.
+ * The existing eBay publish function still revalidates the category policy. */
+export const VINYL_RECORD_ITEM_CONDITIONS: EbayCondition[] = [
+  { id: '1000', label: 'New' },
+  { id: '3000', label: 'Used' },
+];
+export function vinylRecordConditionPolicy(categoryId: string, specialistId: string):
+  { conditions: EbayCondition[]; conditionRequired: true } | null {
+  if (categoryId.trim() !== '176985' || specialistId !== 'vinyl_records') return null;
+  return { conditions: VINYL_RECORD_ITEM_CONDITIONS, conditionRequired: true };
 }
 export function musicGradeCode(value: unknown): string {
   const text = String(value ?? '').trim();
