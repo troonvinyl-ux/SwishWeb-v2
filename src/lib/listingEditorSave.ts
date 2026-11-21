@@ -10,6 +10,17 @@ import { musicSpecifics } from '@/lib/musicListing';
 import { musicFormSchema } from '@/lib/musicValidation';
 import { syncMusicConditionText } from '@/lib/musicConditionText';
 interface EditorSaveInput { client: SupabaseClient; userId: string; tenantId: string; form: Record<string, unknown>; item: Record<string, unknown>; photos: string[]; uploads: string[]; confirmedMusic?: ConfirmedMusicDetails; aspects?: EbayAspect[]; }
+interface ReadbackMismatch { field: string; expected: unknown; actual: unknown; }
+const sameValue = (expected: unknown, actual: unknown) => JSON.stringify(expected) === JSON.stringify(actual);
+const mismatch = (field: string, expected: unknown, actual: unknown): ReadbackMismatch | null => sameValue(expected, actual) ? null : { field, expected, actual };
+const numericMismatch = (field: string, expected: number, actual: unknown): ReadbackMismatch | null => actual === null || actual === undefined ? mismatch(field, expected, actual) : mismatch(field, expected, Number(actual));
+const normalizedSpecifics = (value: unknown) => Object.entries(listingSpecifics(value)).sort(([left], [right]) => left.localeCompare(right));
+/** Report individual persisted fields without treating a valid draft as publishable. */
+function throwReadbackMismatch(stage: 'atomic save' | 'metadata retention', listingId: unknown, mismatches: ReadbackMismatch[]) {
+  console.warn('[SWISH Editor] saved draft readback mismatch', { stage, listingId, mismatches });
+  const fields = mismatches.map(value => value.field).join(', ');
+  throw new Error(`SWISH ${stage} readback differs for: ${fields}. Your edits remain on screen; no eBay submission was requested. Reload this same draft and retry.`);
+}
 /** Native listingEditorService's atomic RPC, not web-only listings columns. */
 export async function saveSharedListingEditor({ client, userId, tenantId, form, item, photos, uploads, confirmedMusic, aspects = [] }: EditorSaveInput): Promise<ListingEditorSaveResult> {
   if (!form.id || form.tenant_id !== tenantId || item.tenant_id !== tenantId || item.id !== form.item_id) throw new Error('Open a saved listing and its stock item in this workspace.');
@@ -63,10 +74,40 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
     client.from('items').select('*').eq('id', item.id).eq('tenant_id', tenantId).single(),
   ]);
   if (read.error || !read.data || current.error || !current.data) throw new Error(read.error?.message || current.error?.message || 'Save completed but readback is unavailable. Your edits remain on screen.');
-  if (String(read.data.category_id || '') !== String(form.category_id || '') || String(current.data.condition || '') !== String(form.condition || item.condition || '') || String(current.data.condition_grade || '') !== conditionNotes || read.data.title !== title || read.data.description !== description) throw new Error('SWISH did not retain all category, condition or text changes. Your edits remain on screen; do not publish this version.');
+  // The shared RPC writes premium-editor notes to condition_notes. It retains
+  // condition_grade for legacy stock, so comparing condition_grade here created
+  // a false unsafe-save warning for every correctly saved vinyl draft.
+  const currentNotes = current.data.condition_notes;
+  const legacyNotes = current.data.condition_grade;
+  const persistedNotes = currentNotes === null || currentNotes === undefined || (currentNotes === '' && legacyNotes === conditionNotes) ? legacyNotes : currentNotes;
+  const atomicMismatches = [
+    mismatch('listing.title', title, read.data.title),
+    mismatch('listing.description', description, read.data.description),
+    numericMismatch('listing.price', price, read.data.price),
+    numericMismatch('listing.shipping_cost', shipping, read.data.shipping_cost),
+    numericMismatch('listing.floor_price', floor, read.data.floor_price),
+    numericMismatch('listing.ceiling_price', ceiling, read.data.ceiling_price),
+    mismatch('listing.category_id', String(form.category_id || ''), String(read.data.category_id || '')),
+    mismatch('item.condition', String(form.condition || item.condition || ''), String(current.data.condition || '')),
+    mismatch('item.condition_notes', conditionNotes, String(persistedNotes || '')),
+    numericMismatch('item.quantity', quantity, current.data.quantity),
+    mismatch('item.sku', String(form.sku || item.sku || ''), String(current.data.sku || '')),
+    mismatch('item.attributes.ebay_item_specifics', normalizedSpecifics(specifics), normalizedSpecifics(asRecord(current.data.attributes).ebay_item_specifics)),
+  ].filter((value): value is ReadbackMismatch => Boolean(value));
+  if (atomicMismatches.length) throwReadbackMismatch('atomic save', form.id, atomicMismatches);
   const retained = await retainListingEditorMetadata({ client, item: current.data, form: { ...form, condition_id: conditionId }, photos, uploads, options: listingOptions, confirmedMusic });
   const retainedAttrs = asRecord(retained.attributes);
-  if (String(retainedAttrs.ebay_category_name || '') !== String(form.category || '') || String(retainedAttrs.ebay_condition_id || '') !== conditionId || String(retained.condition_notes || '') !== conditionNotes) throw new Error('Category or condition readback differs. Your edits remain on screen; retry the same draft.');
+  const retainedMismatches = [
+    mismatch('item.condition', String(form.condition || item.condition || ''), String(retained.condition || '')),
+    mismatch('item.condition_notes', conditionNotes, String(retained.condition_notes || '')),
+    mismatch('item.attributes.ebay_category_id', String(form.category_id || ''), String(retainedAttrs.ebay_category_id || '')),
+    mismatch('item.attributes.ebay_category_name', String(form.category || ''), String(retainedAttrs.ebay_category_name || '')),
+    mismatch('item.attributes.ebay_condition_id', conditionId, String(retainedAttrs.ebay_condition_id || '')),
+    mismatch('item.attributes.ebay_item_specifics', normalizedSpecifics(specifics), normalizedSpecifics(retainedAttrs.ebay_item_specifics)),
+    mismatch('item.attributes.ebay_listing_media', photos, retainedAttrs.ebay_listing_media),
+    mismatch('item.attributes.ebay_listing_options', listingOptions, retainedAttrs.ebay_listing_options),
+  ].filter((value): value is ReadbackMismatch => Boolean(value));
+  if (retainedMismatches.length) throwReadbackMismatch('metadata retention', form.id, retainedMismatches);
   console.log('[SWISH Editor] Category and condition readback confirmed');
   return { listing: read.data, item: retained };
 }

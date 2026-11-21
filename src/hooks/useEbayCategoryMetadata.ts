@@ -2,23 +2,40 @@ import { useQuery } from '@tanstack/react-query';
 import { callEdgeFunction, getSupabaseClientAsync } from '@/lib/supabase';
 import { activateModuleScope } from '@/lib/moduleScope';
 import { asRecord } from '@/lib/itemPhotos';
-import { normalizeEbayAspects, type EbayCondition } from '@/lib/ebayMusicContract';
+import { normalizeEbayAspects, normalizeEbayConditionPolicy, vinylRecordConditionPolicy, type EbayCondition } from '@/lib/ebayMusicContract';
 /** Read the same eBay localized aspect values used by the native editor. Never invent an endpoint. */
-export function useEbayCategoryMetadata(userId: string | undefined, tenantId: string | null, nicheId: string, categoryId: string) {
+export function useEbayCategoryMetadata(userId: string | undefined, tenantId: string | null, nicheId: string, categoryId: string, specialistId = '') {
   return useQuery({
-    queryKey: ['ebay-category-metadata', userId, tenantId, nicheId, categoryId], enabled: Boolean(userId && tenantId && categoryId), staleTime: 300_000, retry: false,
+    queryKey: ['ebay-category-metadata', userId, tenantId, nicheId, categoryId, specialistId], enabled: Boolean(userId && tenantId && categoryId), staleTime: 300_000, retry: false,
     queryFn: async () => {
       const client = await getSupabaseClientAsync();
       if (!client || !userId || !tenantId) throw new Error('Open your SWISH workspace to load eBay values.');
       await activateModuleScope(client, userId, tenantId, nicheId);
-      const result = await callEdgeFunction<Record<string, unknown>>('swish-ebay-category', { route: 'get_category_aspects', tenantId, nicheId, categoryId }, client);
-      if (result.error) throw result.error;
-      if (result.data?.error || result.data?.success !== true) throw new Error(String(result.data?.error || 'eBay category values are unavailable.'));
-      const policy = asRecord(result.data.conditionPolicy || result.data.condition_policy);
-      const raw = policy.itemConditions || result.data.itemConditions || result.data.conditions;
-      const conditions: EbayCondition[] = Array.isArray(raw) ? raw.map(value => { const row = asRecord(value); return { id: String(row.conditionId || row.id || ''), label: String(row.conditionDescription || row.label || row.name || '') }; }).filter(row => row.id && row.label) : [];
-      const conditionRequired = typeof policy.itemConditionRequired === 'boolean' ? policy.itemConditionRequired : undefined;
-      return { aspects: normalizeEbayAspects(result.data.aspects), conditions, conditionRequired };
+      // The native EBAY_GB Vinyl Records policy has just New / Used. It is
+      // deliberately local so a condition service timeout cannot lock this
+      // saved draft; publication still performs the server-side eBay check.
+      const vinyl = vinylRecordConditionPolicy(categoryId, specialistId);
+      const [aspectsResult, conditionsResult] = await Promise.all([
+        callEdgeFunction<Record<string, unknown>>('swish-ebay-category',
+          { route: 'get_category_aspects', tenantId, nicheId, categoryId }, client),
+        vinyl ? Promise.resolve(null) : callEdgeFunction<Record<string, unknown>>('swish-ebay-list',
+          { route: 'get_condition_policies', tenantId, nicheId, categoryId }, client),
+      ]);
+      let conditions: EbayCondition[];
+      let conditionRequired: boolean;
+      if (vinyl) {
+        conditions = vinyl.conditions;
+        conditionRequired = vinyl.conditionRequired;
+      } else {
+        if (!conditionsResult || conditionsResult.error) throw conditionsResult?.error || new Error('Current eBay condition policy unavailable.');
+        if (conditionsResult.data?.success !== true) throw new Error(String(conditionsResult.data?.error || 'eBay condition choices are unavailable. Retry the lookup.'));
+        const policy = normalizeEbayConditionPolicy(asRecord(conditionsResult.data).policy, categoryId);
+        conditions = policy.conditions;
+        conditionRequired = policy.required;
+      }
+      const aspectError = aspectsResult.error?.message ||
+        (aspectsResult.data?.success !== true ? String(aspectsResult.data?.error || 'Category item specifics unavailable.') : '');
+      return { aspects: aspectError ? [] : normalizeEbayAspects(aspectsResult.data?.aspects), conditions, conditionRequired, aspectError: aspectError || null };
     },
   });
 }
