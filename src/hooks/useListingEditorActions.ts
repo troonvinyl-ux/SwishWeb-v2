@@ -22,6 +22,27 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
     if (draft.editRef.current !== edits || draft.formRef.current.id !== id) throw new Error('The draft changed while saving. Your newer edits have been kept; submit again when ready.');
     draft.commit(saved.listing, saved.item); return hydrateListingEditor(saved.listing, saved.item);
   };
+  // A clean, reopened draft is already saved. Rewriting it on every Submit
+  // needlessly runs the editor RPC and can produce a false readback conflict.
+  // Recheck both persisted rows before publishing instead of trusting stale UI.
+  const readCleanSavedDraft = async (client: Awaited<ReturnType<typeof getSupabaseClientAsync>>, listing: Record<string, unknown>) => {
+    if (!client || !tenantId || !draft.item) throw new Error('The saved draft and stock are unavailable. Reload before submitting.');
+    const stock = await client.from('items').select('*')
+      .eq('id', listing.item_id).eq('tenant_id', tenantId).single();
+    if (stock.error || !stock.data) throw new Error(stock.error?.message || 'Saved stock could not be checked. No eBay submission was requested.');
+    if (String(listing.item_id) !== String(draft.item.id) || String(stock.data.tenant_id) !== tenantId ||
+      !listing.updated_at || !draft.formRef.current.updated_at || !stock.data.updated_at || !draft.item.updated_at ||
+      String(listing.updated_at) !== String(draft.formRef.current.updated_at) ||
+      String(stock.data.updated_at) !== String(draft.item.updated_at)) {
+      throw new Error('This saved draft changed since it was opened. Refresh it and check the current category and condition before submitting.');
+    }
+    const saved = hydrateListingEditor(listing, stock.data);
+    const keys = ['title', 'description', 'price', 'category_id', 'condition', 'condition_id', 'condition_description', 'quantity', 'sku'];
+    if (keys.some(key => String(saved[key] ?? '') !== String(draft.formRef.current[key] ?? ''))) {
+      throw new Error('Saved category, condition or listing text differs from the open editor. Refresh the existing draft before submitting.');
+    }
+    return saved;
+  };
   const save = async () => {
     if (working.current || busy) return; working.current = true; setError(null);
     try { await saveCurrent(); toast.success('Listing saved'); }
@@ -37,10 +58,11 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       await activateModuleScope(client, userId, tenantId, nicheId);
       const before = await readSubmissionListing(client, tenantId, id);
       if (publicationBlock(before)) { draft.commit(before); throw new Error(publicationBlock(before)!); }
-      if (before.publish_claim_id && draft.dirtyRef.current) throw new Error('SWISH is processing an existing submission. Check its status before saving changes.');
-      // Save even an unchanged legacy draft to normalize abbreviated grades and persist condition IDs.
-      // A server-owned pending claim is never edited or cleared here.
-      const form = before.publish_claim_id ? draft.formRef.current : await saveCurrent();
+      if (before.publish_claim_id) throw new Error('SWISH is already processing this submission. Use Refresh status rather than submitting again.');
+      // Only edited drafts need a write. Reopened, unchanged drafts keep their
+      // saved category/condition and must not fail due to a redundant RPC save.
+      // The server still validates all eBay requirements and owns publish claims.
+      const form = draft.dirtyRef.current || uploads.length ? await saveCurrent() : await readCleanSavedDraft(client, before);
       // No AI check, seller override, browser reservation or automatic retry.
       const current = await prepareSharedSubmission(client, tenantId, id);
       const result = await callEdgeFunction<Record<string, unknown>>('swish-ebay-list', { route: 'publish', tenantId, nicheId, listingId: id, listingType: form.listing_type || 'FixedPriceItem', auctionDays: Number(form.auction_duration || 7), startPrice: Number(form.start_price || form.price), reservePrice: Number(form.reserve_price || 0) || undefined, categoryId: String(current.category_id || form.category_id || ''), conditionId: String(form.condition_id || ''), mediaUrls: draft.photos }, client);
