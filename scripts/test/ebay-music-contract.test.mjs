@@ -83,52 +83,49 @@ test('web condition UI gets the current server policy and never offers unsupport
 });
 
 
-test('New/Used recovery is limited to the observed UK vinyl category and never auto-selects', () => {
-  const recovery = contract.vinylConditionRecovery('176985', 'vinyl_records', true);
-  assert.deepEqual(recovery, {
+test('native eBay Vinyl Records category 176985 exposes New / Used directly without a policy request', () => {
+  const choices = contract.vinylRecordConditionPolicy('176985', 'vinyl_records');
+  assert.deepEqual(choices, {
     conditions: [{ id: '1000', label: 'New' }, { id: '3000', label: 'Used' }],
     conditionRequired: true,
-    source: 'observed-recovery',
   });
-  assert.equal(contract.supportedEbayCondition('', recovery.conditions, recovery.conditionRequired), false);
-  assert.equal(contract.supportedEbayCondition('4000', recovery.conditions, recovery.conditionRequired), false);
-  assert.equal(contract.supportedEbayCondition('3000', recovery.conditions, recovery.conditionRequired), true);
-  for (const [category, specialist, failed] of [
-    ['176985', 'vinyl_records', false], ['176985', 'coins', true],
-    ['176986', 'vinyl_records', true], ['', 'vinyl_records', true],
-  ]) {
-    assert.equal(contract.vinylConditionRecovery(category, specialist, failed), null);
-  }
-});
-test('vinyl recovery works without metadata.isError and keeps the server as final verifier', () => {
-  const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
-  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
-  const source = readFileSync('src/hooks/useListingEditorActions.ts', 'utf8');
-  const metadata = readFileSync('src/hooks/useEbayCategoryMetadata.ts', 'utf8');
-  assert.match(metadata, /enabled: Boolean\(userId && tenantId && categoryId\)/);
-  assert.match(editor, /vinylConditionRecovery\(categoryId/);
-  assert.match(editor, /!metadata\.data/);
-  assert.doesNotMatch(editor, /vinylConditionRecovery\([\s\S]*metadata\.isError/);
-  assert.match(editor, /metadata\.data \?\? recoveryPolicy/);
-  assert.match(editor, /const needsMusicConditionCheck = music/);
-  assert.match(editor, /Boolean\(categoryId && conditionPolicy/);
-  assert.match(editor, /supportedEbayCondition/);
-  assert.match(picker, /recoveryPolicy/);
-  assert.match(picker, /not freshly verified/);
-  assert.match(picker, /No saved eBay category ID/);
-  assert.doesNotMatch(picker, /eBay condition choices could not be verified\. Retry before submitting/);
-  assert.match(source, /'swish-ebay-list'/);
-  assert.match(source, /route: 'publish'/);
+  assert.equal(contract.supportedEbayCondition('', choices.conditions, choices.conditionRequired), false);
+  assert.equal(contract.supportedEbayCondition('4000', choices.conditions, choices.conditionRequired), false);
+  assert.equal(contract.supportedEbayCondition('3000', choices.conditions, choices.conditionRequired), true);
+  assert.equal(contract.supportedEbayCondition('1000', choices.conditions, choices.conditionRequired), true);
+  // The seller still needs to choose a condition; a VG+ record is NOT new.
+  assert.equal(contract.ebayMusicGrade('VG+'), 'Very Good Plus (VG+)');
+  for (const [category, specialist] of [
+    ['176985', 'coins'], ['176986', 'vinyl_records'], ['', 'vinyl_records'],
+  ]) assert.equal(contract.vinylRecordConditionPolicy(category, specialist), null);
 });
 
-test('Vinyl Records category 176985 is usable while metadata is loading, disabled or failed', () => {
-  for (const missingLiveData of [true]) {
-    const recovery = contract.vinylConditionRecovery('176985', 'vinyl_records', missingLiveData);
-    assert.deepEqual(recovery.conditions.map(row => row.id), ['1000', '3000']);
-    assert.equal(contract.supportedEbayCondition('', recovery.conditions, recovery.conditionRequired), false);
-    assert.equal(contract.supportedEbayCondition('4000', recovery.conditions, recovery.conditionRequired), false);
-    assert.equal(contract.supportedEbayCondition('3000', recovery.conditions, recovery.conditionRequired), true);
-  }
-  assert.equal(contract.vinylConditionRecovery('176985', 'vinyl_records', false), null);
-  assert.equal(contract.vinylConditionRecovery('', 'vinyl_records', true), null);
+test('web shows New / Used before item-specific metadata loads and skips redundant vinyl condition lookup', () => {
+  const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
+  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  const metadata = readFileSync('src/hooks/useEbayCategoryMetadata.ts', 'utf8');
+  const source = readFileSync('src/hooks/useListingEditorActions.ts', 'utf8');
+  assert.match(editor, /const vinylPolicy = vinylRecordConditionPolicy\(categoryId, specialistId\)/);
+  assert.match(editor, /const conditionPolicy = vinylPolicy \?\? metadata\.data/);
+  assert.match(editor, /simpleVinylCondition=\{Boolean\(vinylPolicy\)\}/);
+  assert.match(editor, /supportedEbayCondition/);
+  assert.match(editor, /!conditionReady/);
+  assert.match(metadata, /vinylRecordConditionPolicy\(categoryId, specialistId\)/);
+  assert.match(metadata, /vinyl \? Promise\.resolve\(null\) : callEdgeFunction/);
+  assert.match(metadata, /route: 'get_condition_policies'/); // still available for other categories
+  assert.match(metadata, /route: 'get_category_aspects'/); // keeps actual item-specific data
+  assert.match(picker, /simpleVinylCondition/);
+  assert.match(picker, /Choose New or Used/);
+  assert.doesNotMatch(picker, /recoveryPolicy|not freshly verified/);
+  assert.match(source, /'swish-ebay-list'/);
+  assert.match(source, /route: 'publish'/); // final server condition validation is unchanged
+});
+
+test('no eBay category is not silently treated as Vinyl Records and no stale Very Good ID is selected', () => {
+  assert.equal(contract.vinylRecordConditionPolicy('', 'vinyl_records'), null);
+  const choices = contract.vinylRecordConditionPolicy('176985', 'vinyl_records');
+  assert.equal(contract.supportedEbayCondition('4000', choices.conditions, choices.conditionRequired), false);
+  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  assert.match(picker, /invalidSavedCondition/);
+  assert.match(picker, /const selected = invalidSavedCondition/);
 });
