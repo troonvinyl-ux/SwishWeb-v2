@@ -117,7 +117,7 @@ async function allRows(client: SupabaseClient, table: 'items' | 'listings', colu
     if (table === 'items' && specialists?.length) query = query.in('specialist_id', specialists);
     const response = await query;
     if (response.error) throw new Error('SWISH could not check existing listings or inventory: ' + response.error.message);
-    rows.push(...(response.data || []) as Record<string, unknown>[]);
+    rows.push(...((response.data || []) as unknown as Record<string, unknown>[]));
     if ((response.data || []).length < 500) return rows;
   }
   throw new Error('Inventory is larger than this safe reconciliation window. Nothing was imported.');
