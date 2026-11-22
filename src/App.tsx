@@ -12,7 +12,6 @@ import LoginPage from '@/pages/LoginPage';
 import NicheEntry from '@/pages/NicheEntry';
 import NicheWorkspace from '@/pages/NicheWorkspace';
 import Onboarding from '@/pages/Onboarding';
-import Dashboard from '@/pages/Dashboard';
 import Inventory from '@/pages/Inventory';
 import InventoryItem from '@/pages/InventoryItem';
 import InventoryNew from '@/pages/InventoryNew';
@@ -21,7 +20,6 @@ import NicheCapture from '@/pages/NicheCapture';
 import Acquisitions from '@/pages/Acquisitions';
 import Opportunities from '@/pages/Opportunities';
 import ReviewRequired from '@/pages/ReviewRequired';
-import Audit from '@/pages/Audit';
 import Listings from '@/pages/Listings';
 import ListingNew from '@/pages/ListingNew';
 import ListingEditor from '@/pages/ListingEditor';
@@ -30,7 +28,6 @@ import Orders from '@/pages/Orders';
 import Dispatch from '@/pages/Dispatch';
 import Repricing from '@/pages/Repricing';
 import Insights from '@/pages/Insights';
-import Money from '@/pages/Money';
 import Tasks from '@/pages/Tasks';
 import CommandCentre from '@/pages/CommandCentre';
 import EbayHub from '@/pages/EbayHub';
@@ -42,14 +39,10 @@ import EbayOffers from '@/pages/EbayOffers';
 import EbayReturns from '@/pages/EbayReturns';
 import EbayCases from '@/pages/EbayCases';
 import EbayFinances from '@/pages/EbayFinances';
-import EbayAnalytics from '@/pages/EbayAnalytics';
 import EbayImport from '@/pages/EbayImport';
 import EbayLogs from '@/pages/EbayLogs';
 import Settings from '@/pages/Settings';
 import MasterAdmin from '@/pages/MasterAdmin';
-import ParityTools from '@/pages/ParityTools';
-import SpecialistTools from '@/pages/SpecialistTools';
-import StockCheck from '@/pages/StockCheck';
 import NotFound from '@/pages/NotFound';
 import SwishFlipHome from '@/pages/SwishFlipHome';
 import NicheComingSoon from '@/components/features/NicheComingSoon';
@@ -65,9 +58,9 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, sta
 const ENTRY_PATHS = ['/stamps', '/stamp-flip', '/stamp-flipper', '/entry/stamps', '/philately', '/coins', '/mx', '/bikes', '/threads', '/clothes', '/surplus', '/cards', '/games', '/antiques', '/home', '/fossils', '/beauty', '/tech', '/electronics', '/tunes', '/tunes-flip', '/tunes_flip', '/music', '/vinyl_records', '/collectibles', '/collectibles-flipper', '/collectibles_flipper'];
 
 function AppRoutes() {
-  const { connectionStatus, loading, user } = useAuth();
+  const { connectionStatus, loading, user, isPlatformOwner, isPlatformOwnerLoading } = useAuth();
   const location = useLocation();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
+  const isOwner = isPlatformOwner;
   const hostProduct = getHostProduct();
   if (isSwishHomeRoute(currentHostname, location.pathname, Boolean(hostProduct))) return <SwishFlipHome />;
   if (currentHostname.endsWith('.swishflip.co.uk') && !hostProduct) return <NicheComingSoon />;
@@ -78,6 +71,7 @@ function AppRoutes() {
   const entryWorkspace = needsOnboarding ? '/onboarding' : `/workspace/${safeNiche}`;
   if (connectionStatus === 'initialising' || (loading && connectionStatus === 'connected')) return <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background"><Loader2 className="h-7 w-7 animate-spin text-primary" /><span className="text-sm text-muted-foreground">Connecting to SWISH…</span></div>;
   if (!user) return <LoginPage />;
+  if (isPlatformOwnerLoading) return <div role="status" className="flex min-h-screen items-center justify-center gap-3 bg-background"><Loader2 className="h-6 w-6 animate-spin text-primary" />Verifying account permissions…</div>;
   // Hostnames select presentation, never grant backend authorization.
   if (hostProduct && !isOwner) {
     const path = location.pathname;
@@ -92,10 +86,10 @@ function AppRoutes() {
     <Route path="/workspace/:niche" element={<NicheWorkspace />} />
     <Route path="/onboarding" element={<Onboarding />} />
     <Route path="/niches" element={<NicheEntry />} />
-    <Route path="/dashboard" element={<Dashboard />} />
+    <Route path="/dashboard" element={<Navigate to={`/workspace/${safeNiche}`} replace />} />
     <Route path="/command-centre" element={<CommandCentre />} />
     <Route path="/inventory" element={<Inventory />} />
-    <Route path="/stock-check" element={<StockCheck />} />
+    <Route path="/stock-check" element={<NotFound />} />
     <Route path="/inventory/new" element={<InventoryNew />} />
     <Route path="/inventory/:id" element={<InventoryItem />} />
     <Route path="/identify" element={<Navigate to={`/scan/${safeNiche}`} replace />} />
@@ -109,7 +103,7 @@ function AppRoutes() {
     <Route path="/acquisitions" element={<Acquisitions />} />
     <Route path="/opportunities" element={<Opportunities />} />
     <Route path="/review-required" element={<ReviewRequired />} />
-    <Route path="/audit" element={<Audit />} />
+    <Route path="/audit" element={<NotFound />} />
     <Route path="/listings" element={<Listings />} />
     <Route path="/listings/new" element={<ListingNew />} />
     <Route path="/listings/:id" element={<ListingDetails />} />
@@ -118,14 +112,14 @@ function AppRoutes() {
     <Route path="/dispatch" element={<Dispatch />} />
     <Route path="/repricing" element={<Repricing />} />
     <Route path="/insights" element={<Insights />} />
-    <Route path="/money" element={<Money />} />
+    <Route path="/money" element={<NotFound />} />
     <Route path="/tasks" element={<Tasks />} />
     <Route path="/ebay" element={<EbayHub />} />
     <Route path="/ebay/account" element={<EbayAccount />} />
     <Route path="/ebay/admin" element={<MasterAdmin />} />
-    <Route path="/ebay/categories" element={<EbayHub />} />
+    <Route path="/ebay/categories" element={<NotFound />} />
     <Route path="/ebay/csv" element={<EbayImport />} />
-    <Route path="/ebay/draft-sync-test" element={<EbayLogs />} />
+    <Route path="/ebay/draft-sync-test" element={<NotFound />} />
     <Route path="/stock-listing/:id" element={<InventoryItem />} />
     <Route path="/ebay/listings" element={<EbayListings />} />
     <Route path="/ebay/orders" element={<EbayOrders />} />
@@ -134,14 +128,14 @@ function AppRoutes() {
     <Route path="/ebay/returns" element={<EbayReturns />} />
     <Route path="/ebay/cases" element={<EbayCases />} />
     <Route path="/ebay/finances" element={<EbayFinances />} />
-    <Route path="/ebay/analytics" element={<EbayAnalytics />} />
+    <Route path="/ebay/analytics" element={<NotFound />} />
     <Route path="/ebay/import" element={<EbayImport />} />
     <Route path="/ebay/logs" element={<EbayLogs />} />
-    <Route path="/tools" element={<ParityTools />} />
-    <Route path="/tools/islamic-batch" element={<SpecialistTools />} />
-    <Route path="/tools/silver-batch" element={<SpecialistTools />} />
+    <Route path="/tools" element={<NotFound />} />
+    <Route path="/tools/islamic-batch" element={<NotFound />} />
+    <Route path="/tools/silver-batch" element={<NotFound />} />
     <Route path="/tools/bike-flipper" element={<Navigate to="/scan/bikes" replace />} />
-    <Route path="/tools/listing-preflight" element={<Listings />} />
+    <Route path="/tools/listing-preflight" element={<NotFound />} />
     <Route path="/settings" element={<Settings />} />
     <Route path="/master-admin" element={<MasterAdmin />} />
     <Route path="/master-admin/" element={<MasterAdmin />} />

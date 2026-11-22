@@ -1,4 +1,4 @@
-import { useTable, useUpdate } from '@/hooks/useSupabaseQuery';
+import { useTable } from '@/hooks/useSupabaseQuery';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { formatCurrency, formatDate, statusVariant, truncate } from '@/lib/utils';
 import { RefreshCw } from 'lucide-react';
@@ -44,7 +44,7 @@ export default function EbayReturns() {
           <h1 className="page-title">eBay Returns</h1>
           <p className="page-subtitle">{items.length} return requests</p>
         </div>
-        <button onClick={() => void syncReturns()} disabled={syncing} className="btn-secondary">
+        <button onClick={() => void syncReturns()} disabled={syncing || tenantLoading || !tenantId} className="btn-secondary">
           <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Syncing…' : 'Sync from eBay'}
         </button>
       </div>
@@ -62,7 +62,7 @@ export default function EbayReturns() {
             <table className="tbl">
               <thead><tr>
                 <th>Return ID</th><th>Item</th><th>Buyer</th><th>Reason</th>
-                <th>Status</th><th className="text-right">Amount</th><th>Date</th><th>Actions</th>
+                <th>Status</th><th className="text-right">Amount</th><th>Date</th>
               </tr></thead>
               <tbody>
                 {items.map(r => (
@@ -74,11 +74,6 @@ export default function EbayReturns() {
                     <td>{r.status ? <span className={statusVariant(r.status as string)}>{r.status as string}</span> : '—'}</td>
                     <td className="text-right text-xs font-semibold swish-gold">{formatCurrency(r.amount as number)}</td>
                     <td className="text-xs text-muted-foreground">{formatDate(r.created_at as string)}</td>
-                    <td>
-                      <div className="flex gap-1">
-                        <button disabled title="Return actions are not available through the current secure backend" className="btn-ghost py-1 px-2 text-xs opacity-50">Unavailable</button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
