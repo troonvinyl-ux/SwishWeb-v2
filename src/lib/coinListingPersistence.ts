@@ -35,7 +35,7 @@ export async function createCoinListingDraft(scope: CaptureScope, itemId: string
   if (stock.error || !stock.data) throw new Error(stock.error?.message || 'Saved coin could not be found in this workspace.');
   if (!getSpecialistIdsForNiche('coins').includes(String(stock.data.specialist_id))) throw new Error('The saved inventory item is not a coin. Open its own listing workspace.');
   const evidence = coinItemDraftReadiness(stock.data as Record<string, unknown>);
-  if (!evidence.ready) throw new Error(evidence.message);
+  if ('message' in evidence) throw new Error(evidence.message);
 
   const existing = await scope.client.from('listings').select('id,status,external_listing_id,publish_claim_id').eq('tenant_id', scope.tenantId).eq('item_id', itemId).eq('marketplace_id', 'ebay').order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
