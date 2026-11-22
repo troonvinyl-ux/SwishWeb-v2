@@ -18,7 +18,8 @@ export function coinItemDraftReadiness(item: Record<string, unknown>): CoinDraft
   const typeId = [attributes.numista_type_id, attributes.numista_number, attributes.numista_n, attributes.numista_reference, attributes.reference_url, metadata.numista_number, metadata.numista_reference, metadata.reference_url]
     .map(parseNumistaNumber).find((value): value is number => Boolean(value));
   if (!typeId) return { ready: false, message: 'Enter and save a valid Numista N# before pulling a coin eBay draft.' };
-  if (!images.obverse || !images.reverse) return { ready: false, message: 'This saved coin is missing its obverse or reverse evidence. Reopen it and save both original faces before pulling a draft.' };
+  const permanentPhotos = [item.image_url, ...(Array.isArray(item.media) ? item.media : [])].filter(value => typeof value === 'string' && value.trim());
+  if ((!images.obverse || !images.reverse) && permanentPhotos.length < 2) return { ready: false, message: 'This saved coin is missing its obverse or reverse evidence. Reopen it and save both original faces before pulling a draft.' };
   const weight = item.weight_grams ?? attributes.supplied_weight_g ?? metadata.weight;
   if (!positive(weight)) return { ready: false, message: 'This saved coin has no valid actual weight. Reopen it and record the measured grams before pulling a draft.' };
   const dimensions = record(item.dimensions_mm);

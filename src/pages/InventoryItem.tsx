@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTableRow, useUpdate, useDelete } from '@/hooks/useSupabaseQuery';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
-import { callEdgeFunction, EdgeFunctionError } from '@/lib/supabase';
+import { callEdgeFunction, EdgeFunctionError, getSupabaseClientAsync } from '@/lib/supabase';
 import { formatCurrency, formatDate, formatDateTime, statusVariant } from '@/lib/utils';
 import { ArrowLeft, Edit2, Save, X, Trash2, Zap, RefreshCw, Package, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
+import { createCoinListingDraft, coinItemDraftReadiness } from '@/lib/coinListingPersistence';
+import { useAuth } from '@/contexts/AuthContext';
 import ItemDetailWorkspace from '@/components/features/ItemDetailWorkspace';
 import { captureNumistaReference } from '@/lib/numistaCapture';
 import NumistaCaptureReview from '@/components/features/NumistaCaptureReview';
@@ -16,6 +18,7 @@ import NumistaCaptureReview from '@/components/features/NumistaCaptureReview';
 export default function InventoryItem() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { tenantId } = useCurrentTenantId();
   const { data: item, isLoading, error, refetch } = useTableRow('items', id, '*', tenantId);
   const update = useUpdate('items', tenantId);
@@ -23,6 +26,7 @@ export default function InventoryItem() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [valuing, setValuing] = useState(false);
+  const [creatingCoinDraft, setCreatingCoinDraft] = useState(false);
 
   const row = item as Record<string, unknown> | null;
   const attrs = row?.attributes && typeof row.attributes === 'object' && !Array.isArray(row.attributes)
@@ -32,6 +36,7 @@ export default function InventoryItem() {
   const isBike = ['bicycles', 'bikes', 'cycling', 'bike_flipper'].includes(specialistId);
   const isMX = ['motocross', 'mx', 'flipper_mx'].includes(specialistId);
   const isCoin = getSpecialistIdsForNiche('coins').includes(specialistId);
+  const coinDraftReadiness = row && isCoin ? coinItemDraftReadiness(row) : null;
   const textValue = (...values: unknown[]) => {
     const value = values.find(v => v !== null && v !== undefined && String(v).trim() !== '');
     return value === undefined ? '' : String(value);
@@ -192,6 +197,22 @@ export default function InventoryItem() {
     }
   };
 
+  const handleCreateCoinDraft = async () => {
+    if (!id || !row || !tenantId || !user || creatingCoinDraft) return;
+    setCreatingCoinDraft(true);
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is not connected.');
+      const draft = await createCoinListingDraft({ client, userId: user.id, tenantId, nicheId: 'coins', sessionId: `inventory:${id}`, isCurrent: () => true }, id);
+      toast.success(draft.reused ? 'Existing coin draft opened. Nothing has been published.' : 'Coin eBay draft prepared. Nothing has been published.');
+      navigate(`/listings/${draft.listingId}/edit`);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Could not create the coin draft.');
+    } finally {
+      setCreatingCoinDraft(false);
+    }
+  };
+
   if (isLoading) return <div className="p-8 text-center text-muted-foreground text-sm">Loading…</div>;
 
   if (error || !row) {
@@ -210,7 +231,7 @@ export default function InventoryItem() {
   }
 
   if (!getSpecialistIdsForNiche(getActiveNicheId()).includes(String(row.specialist_id))) return <section role="alert" className="swish-card p-6 space-y-4"><h1 className="text-xl font-semibold">Open this item's specialist workspace</h1><p className="text-muted-foreground">This item is not part of the currently selected niche.</p><Link to="/niches" className="btn-secondary">Choose workspace</Link></section>;
-  if (!editing) return <ItemDetailWorkspace item={row} onEditItem={startEdit} />;
+  if (!editing) return <ItemDetailWorkspace item={row} onEditItem={startEdit} {...(isCoin ? { onCreateListingDraft: handleCreateCoinDraft, creatingListingDraft: creatingCoinDraft, listingDraftMessage: coinDraftReadiness?.ready ? null : coinDraftReadiness?.message ?? null } : {})} />;
 
   const f = (key: string) => editing ? (form[key] == null ? '' : String(form[key])) : fieldValue(key);
   const setF = (key: string, val: unknown) => setForm(p => ({ ...p, [key]: val }));

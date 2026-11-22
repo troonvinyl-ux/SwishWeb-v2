@@ -90,6 +90,11 @@ test('coin pull uses the shared generator and canonical draft RPC only after ret
   assert.equal(unsafeClient.generatorCalls.length, 0);
 });
 
+test('saved original media is accepted as both faces when an older item has no named scan-image map', () => {
+  const stored = coinItem({ media: ['https://fixture.invalid/obverse.jpg', 'https://fixture.invalid/reverse.jpg'], attributes: { numista_type_id: '438449', _numista_reference_source: 'seller_reference' } });
+  assert.deepEqual(coinItemDraftReadiness(stored), { ready: true, typeId: 438449 });
+});
+
 test('coin preparation blocks before identification and draft creation when Numista evidence is incomplete', () => {
   const flow = readFileSync('src/lib/quickCaptureFlow.ts', 'utf8');
   const persistence = readFileSync('src/lib/capturePersistence.ts', 'utf8');
@@ -103,4 +108,7 @@ test('coin preparation blocks before identification and draft creation when Numi
   assert.match(workspace, /coinReadiness && !coinReadiness\.ready/);
   assert.match(readFileSync('src/lib/coinListingPersistence.ts', 'utf8'), /swish_create_listing_draft/);
   assert.match(readFileSync('src/pages/Identify.tsx', 'utf8'), /Pull eBay draft/);
+  const inventory = readFileSync('src/pages/InventoryItem.tsx', 'utf8'), detailWorkspace = readFileSync('src/components/features/ItemDetailWorkspace.tsx', 'utf8');
+  assert.match(inventory, /createCoinListingDraft/);
+  assert.match(detailWorkspace, /onCreateListingDraft/);
 });

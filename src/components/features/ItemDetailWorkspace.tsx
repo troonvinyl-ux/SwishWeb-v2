@@ -7,9 +7,9 @@ import ItemOverview from '@/components/features/ItemOverview';
 import ItemMarketValue from '@/components/features/ItemMarketValue';
 import ItemReidentifyReview from '@/components/features/ItemReidentifyReview';
 import ItemPhotoGallery from '@/components/features/ItemPhotoGallery';
-interface ItemDetailWorkspaceProps { item: Record<string, unknown> | null; listing?: Record<string, unknown> | null; onEditItem?: () => void; }
+interface ItemDetailWorkspaceProps { item: Record<string, unknown> | null; listing?: Record<string, unknown> | null; onEditItem?: () => void; onCreateListingDraft?: () => void; creatingListingDraft?: boolean; listingDraftMessage?: string | null; }
 const TABS = [{ id: 'overview', label: 'Overview' }, { id: 'market', label: 'Market value' }, { id: 'reid', label: 'Re-ID' }, { id: 'photos', label: 'Photos' }];
-export default function ItemDetailWorkspace({ item, listing = null, onEditItem }: ItemDetailWorkspaceProps) {
+export default function ItemDetailWorkspace({ item, listing = null, onEditItem, onCreateListingDraft, creatingListingDraft = false, listingDraftMessage = null }: ItemDetailWorkspaceProps) {
   const [params, setParams] = useSearchParams(), intelligence = useItemIntelligence(item);
   const tab = TABS.some(value => value.id === params.get('view')) ? params.get('view')! : 'overview';
   const select = (id: string) => { const next = new URLSearchParams(params); next.set('view', id); setParams(next, { replace: true }); };
@@ -24,7 +24,8 @@ export default function ItemDetailWorkspace({ item, listing = null, onEditItem }
         {listing ? <Link to={`/listings/${listing.id}/edit`} className={`${tab === 'reid' && intelligence.candidate ? 'btn-secondary' : 'btn-primary'} w-full justify-center`}><Edit2 className="h-4 w-4" />{['active', 'live'].includes(String(listing.status)) ? 'Review listing editor' : 'Edit / submit draft'}</Link> : onEditItem ? <button type="button" onClick={onEditItem} className={`${tab === 'reid' && intelligence.candidate ? 'btn-secondary' : 'btn-primary'} w-full justify-center`}><Edit2 className="h-4 w-4" />Edit inventory</button> : null}
         {ebay && <a href={ebay} target="_blank" rel="noreferrer" className="btn-secondary w-full justify-center"><ExternalLink className="h-4 w-4" />View on eBay</a>}
         {listing && item && <Link to={`/inventory/${item.id}`} className="btn-ghost w-full justify-center">Open inventory record</Link>}
-        {!listing && item && !['sold', 'fulfilled', 'completed'].includes(String(item.status)) && <Link to={`/listings/new?item_id=${item.id}`} className="btn-secondary w-full justify-center">Create listing draft</Link>}
+        {!listing && item && !['sold', 'fulfilled', 'completed'].includes(String(item.status)) && (onCreateListingDraft ? <button type="button" onClick={onCreateListingDraft} disabled={creatingListingDraft || Boolean(listingDraftMessage)} title={listingDraftMessage || undefined} className="btn-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50">{creatingListingDraft ? 'Preparing listing draft…' : 'Create listing draft'}</button> : <Link to={`/listings/new?item_id=${item.id}`} className="btn-secondary w-full justify-center">Create listing draft</Link>)}
+        {!listing && listingDraftMessage && <p className="text-xs leading-5 text-muted-foreground">{listingDraftMessage}</p>}
       </div>
     </aside><div className="min-w-0 space-y-4">
       <nav className="item-detail-tabs" aria-label="Item details">{TABS.map(value => <button key={value.id} type="button" aria-current={tab === value.id ? 'page' : undefined} className={tab === value.id ? 'is-selected' : ''} onClick={() => select(value.id)}>{value.label}</button>)}</nav>
