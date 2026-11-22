@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     delete document.documentElement.dataset.niche;
     setUser(null);
     setSession(null);
-    // Do NOT call resetClient() or clearStoredAnonKey() here.
+    // Do NOT call resetClient or clearStoredAnonKey here.
     // The backend connection remains active; only the auth session is cleared.
   };
 
