@@ -22,6 +22,7 @@ export interface TableOptions {
   inFilter?: Record<string, unknown[]>;
   order?: { column: string; ascending?: boolean };
   limit?: number;
+  allPages?: boolean;
   search?: { column: string; query: string };
   enabled?: boolean;
 }
@@ -49,30 +50,41 @@ export function useTable(table: string, options?: TableOptions) {
     },
     queryFn: async () => {
       const sb = await getClient();
-      let q = sb.from(table).select(options?.select || '*');
-      if (options?.filter) {
-        Object.entries(options.filter).forEach(([k, v]) => {
-          if (v != null) q = q.eq(k, v);
-        });
+      const read = async (start?: number, pageSize = 500) => {
+        let q = sb.from(table).select(options?.select || '*');
+        if (options?.filter) {
+          Object.entries(options.filter).forEach(([k, v]) => {
+            if (v != null) q = q.eq(k, v);
+          });
+        }
+        if (options?.inFilter) {
+          Object.entries(options.inFilter).forEach(([k, values]) => {
+            if (Array.isArray(values) && values.length > 0) q = q.in(k, values);
+          });
+        }
+        if (options?.search?.query) q = q.ilike(options.search.column, `%${options.search.query}%`);
+        if (options?.order) q = q.order(options.order.column, { ascending: options.order.ascending ?? false });
+        if (start !== undefined) {
+          // Stable page boundaries prevent row duplication when timestamps tie.
+          if (options?.order?.column !== 'id') q = q.order('id', { ascending: true });
+          q = q.range(start, start + pageSize - 1);
+        } else if (options?.limit) q = q.limit(options.limit);
+        const { data, error } = await q.returns<Record<string, unknown>[]>();
+        if (error) throw new Error(error.message);
+        return data || [];
+      };
+      try {
+        if (!options?.allPages) return await read();
+        const pageSize = 500, rows: Record<string, unknown>[] = [];
+        for (let start = 0; ; start += pageSize) {
+          const page = await read(start, pageSize);
+          rows.push(...page);
+          if (page.length < pageSize) return rows;
+        }
+      } catch (error) {
+        console.warn(`[SWISH] useTable("${table}") error:`, error instanceof Error ? error.message : error);
+        throw error;
       }
-      if (options?.inFilter) {
-        Object.entries(options.inFilter).forEach(([k, values]) => {
-          if (Array.isArray(values) && values.length > 0) q = q.in(k, values);
-        });
-      }
-      if (options?.search?.query) {
-        q = q.ilike(options.search.column, `%${options.search.query}%`);
-      }
-      if (options?.order) {
-        q = q.order(options.order.column, { ascending: options.order.ascending ?? false });
-      }
-      if (options?.limit) q = q.limit(options.limit);
-      const { data, error } = await q.returns<Record<string, unknown>[]>();
-      if (error) {
-        console.warn(`[SWISH] useTable("${table}") error:`, error.message);
-        throw new Error(error.message);
-      }
-      return data || [];
     },
   });
 }
