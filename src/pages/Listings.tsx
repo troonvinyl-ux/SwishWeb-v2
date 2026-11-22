@@ -6,15 +6,20 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
+import { ListingStatusAction, InventoryPriceAction } from '@/components/features/InventoryListingActions';
+import { asRecord } from '@/lib/itemPhotos';
+import type { InventoryEntry } from '@/lib/inventoryNative';
 
 export default function Listings() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const specialistIds = getSpecialistIdsForNiche(getActiveNicheId());
+  const niche = getActiveNicheId();
+  const specialistIds = getSpecialistIdsForNiche(niche);
 
   const { data, isLoading, error } = useTable('listings', {
-    select: '*, items!inner(specialist_id)',
+    select: '*, items!inner(*)',
+    allPages: true,
     order: { column: 'created_at', ascending: false },
     search: search ? { column: 'title', query: search } : undefined,
     filter: { tenant_id: tenantId, marketplace_id: 'ebay' },
@@ -67,7 +72,7 @@ export default function Listings() {
                   <tr key={l.id as string}>
                     <td>
                       <div className="font-medium text-xs">{truncate((l.title || 'Untitled') as string, 45)}</div>
-                      {l.external_id && <div className="text-xs text-muted-foreground font-mono">{l.external_id as string}</div>}
+                      {l.external_listing_id && <div className="text-xs text-muted-foreground font-mono">eBay {String(l.external_listing_id)}</div>}
                     </td>
                     <td className="text-xs capitalize">eBay</td>
                     <td>{l.status ? <span className={statusVariant(l.status as string)}>{l.status as string}</span> : '—'}</td>
@@ -76,10 +81,20 @@ export default function Listings() {
                     <td className="text-xs text-muted-foreground">{(l.watchers ?? '—') as number}</td>
                     <td className="text-xs text-muted-foreground">{formatDate(l.created_at as string)}</td>
                     <td>
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         <Link to={`/listings/${l.id}`} className="btn-secondary py-1 px-2 text-xs">View listing</Link>
                         <Link to={`/listings/${l.id}/edit`} className="btn-ghost py-1 px-2 text-xs">Edit</Link>
-                        {l.url && <a href={l.url as string} target="_blank" rel="noopener noreferrer" className="btn-ghost py-1 px-2"><ExternalLink className="w-3 h-3" /></a>}
+                        {tenantId && <ListingStatusAction listing={l} tenantId={tenantId} nicheId={niche}/>}
+                        {tenantId && ['active', 'live'].includes(String(l.status || '').toLowerCase()) && (() => {
+                          const item = asRecord(l.items);
+                          const entry: InventoryEntry = { id: String(l.item_id || item.id || ''), item, listing: l,
+                            tab: 'live', sortAt: String(l.created_at || '') };
+                          return <InventoryPriceAction entry={entry} tenantId={tenantId} nicheId={niche}/>;
+                        })()}
+                        {/^\d{6,20}$/.test(String(l.external_listing_id || '')) &&
+                          <a href={'https://www.ebay.co.uk/itm/' + String(l.external_listing_id)}
+                            target="_blank" rel="noopener noreferrer" aria-label="Open linked eBay item" className="btn-ghost py-1 px-2">
+                            <ExternalLink className="w-3 h-3"/></a>}
                       </div>
                     </td>
                   </tr>
