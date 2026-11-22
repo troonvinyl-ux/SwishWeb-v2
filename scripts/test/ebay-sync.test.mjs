@@ -156,3 +156,13 @@ test('connected eBay consent without stored seller ID never displays disconnecte
   assert.match(account, /ebayConnectorHeading\(connector, Boolean\(tenantId\)/);
   assert.match(ui, /progress\.failed > 0 \? progress\.failed : error && progress\.partial \? 'Unconfirmed'/);
 });
+
+test('seller ID can be verified from the existing connector without reconnecting or publishing', async () => {
+  const hub = await readFile('src/pages/EbayHub.tsx','utf8');
+  assert.match(hub, /action: 'verify_connected_identity', tenantId/);
+  assert.match(hub, /onClick=\{\(\) => void verifyLinkedSeller\(\)\}/);
+  assert.match(hub, /readEbayConnector\(fresh\.data\?\.\[0\]\)\?\.seller_account_id !== name/);
+  assert.match(hub, /isConnected && !account\?\.seller_account_id\?\.trim\(\)/);
+  assert.match(hub, /No reconnection was needed/);
+  assert.doesNotMatch(hub, /seller_account_id:\s*name/);
+});

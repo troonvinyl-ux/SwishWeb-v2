@@ -1,7 +1,7 @@
 import { parseNativeLiteral, sourceArray, sourceBlock } from '@/lib/nativeSourceLiteral';
 import type { CaptureSlot, NativeCaptureProfile } from '@/types/capture';
 import type { SwishNicheId } from '@/lib/niche';
-export const CAPTURE_SOURCE_COMMIT = 'bb3634f6c531851c49b03b21a5731f48809fa9c0';
+export const CAPTURE_SOURCE_COMMIT = 'a6a0b0ef2b83beb0d6c4ea455abda2447e65859a';
 const ROOT = `https://raw.githubusercontent.com/troonvinyl-ux/SWISH/${CAPTURE_SOURCE_COMMIT}`;
 const sources = new Map<string, Promise<string>>();
 function publicSource(path: string): Promise<string> {
