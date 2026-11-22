@@ -31,6 +31,8 @@ import IdentificationDetails from '@/components/features/IdentificationDetails';
 import { identificationCandidates, identificationLines } from '@/lib/identificationResult';
 import { identificationItemPatch } from '@/lib/identificationItemPatch';
 import { asRecord } from '@/lib/itemPhotos';
+import { createCoinListingDraft } from '@/lib/coinListingPersistence';
+import { numistaReference, parseNumistaNumber } from '@/lib/numistaCapture';
 import { callEdgeFunction, getSupabaseClientAsync, EdgeFunctionError } from '@/lib/supabase';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,8 +44,8 @@ import { formatCurrency } from '@/lib/utils';
 import {
   Camera, Upload, X, Zap, Loader2, AlertCircle, CheckCircle, Tag,
   AlertTriangle, Info, Mic, MicOff, ExternalLink, RotateCcw,
-  Scale, Ruler, Link2, FileText, ChevronDown, ChevronRight,
-  Package, ArrowRight, Search
+  Scale, Ruler, FileText, ChevronDown, ChevronRight,
+  Package, ArrowRight, Search, BookOpen
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -131,6 +133,7 @@ interface IdentifyResult {
 interface ScanMetadata {
   weight?: string;
   diameter?: string;
+  numista_number?: string;
   reference_url?: string;
   notes?: string;
   voice_note?: string;
@@ -271,6 +274,7 @@ export default function Identify() {
   const [cameraSide, setCameraSide] = useState<CoinSide | null>(null);
   const [showUpdatePanel, setShowUpdatePanel] = useState(false);
   const [updateTargetId, setUpdateTargetId] = useState('');
+  const [draftBusy, setDraftBusy] = useState(false);
 
   // Existing inventory search (for REQ-INV-002 — update path)
   const [inventorySearch, setInventorySearch] = useState('');
@@ -567,6 +571,8 @@ export default function Identify() {
 
     const measurementWeight = metadata.weight ? parseFloat(metadata.weight) : undefined;
     const measurementDiameter = metadata.diameter ? parseFloat(metadata.diameter) : undefined;
+    const numistaTypeId = parseNumistaNumber(metadata.numista_number);
+    const numista = numistaTypeId ? numistaReference(numistaTypeId, 'seller_reference') : null;
     const observedMetal = String(metadata['metal'] || 'Unknown');
     const observationNotes = [metadata.notes, metadata.voice_note].filter(Boolean).join('\n').trim();
     const knownAttributes = {
@@ -575,6 +581,7 @@ export default function Identify() {
       thickness_mm: undefined,
       metal: observedMetal,
       notes: observationNotes,
+      ...(numista ? { numistaTypeId: numista.typeId, numistaReference: numista.url } : {}),
     };
     const imageSides = Array.from(images.values());
     const payload = {
@@ -595,7 +602,7 @@ export default function Identify() {
       diameter_mm: measurementDiameter,
       metal: observedMetal,
       notes: observationNotes || undefined,
-      reference_url: metadata.reference_url || undefined,
+      reference_url: numista?.url || metadata.reference_url || undefined,
       voice_note: metadata.voice_note || undefined,
       coin_type: coinType,
       specialist: needsSpecialist,
@@ -654,6 +661,8 @@ export default function Identify() {
     const candidates = result?.candidates ?? (result?.identification ? [result.identification as Candidate] : []);
     const candidate = candidates[selectedIdx];
     if (!candidate) { toast.error('Select a candidate before confirming'); return; }
+    const numistaTypeId = parseNumistaNumber(metadata.numista_number);
+    const numista = numistaTypeId ? numistaReference(numistaTypeId, 'seller_reference') : null;
 
     setStep('confirming');
 
@@ -666,7 +675,9 @@ export default function Identify() {
       scan_metadata: {
         weight: metadata.weight,
         diameter: metadata.diameter,
-        reference_url: metadata.reference_url,
+        numista_number: numista?.numistaN || metadata.numista_number,
+        numista_reference: numista?.url,
+        reference_url: numista?.url || metadata.reference_url,
         notes: metadata.notes,
         voice_note: metadata.voice_note,
         is_islamic: metadata.is_islamic,
@@ -710,7 +721,8 @@ export default function Identify() {
       source_scan: identificationData,
       supplied_weight_g: metadata.weight ? Number(metadata.weight) : undefined,
       supplied_diameter_mm: metadata.diameter ? Number(metadata.diameter) : undefined,
-      reference_url: metadata.reference_url || undefined,
+      ...(numista ? { numista_number: numista.numistaN, numista_n: numista.numistaN, numista_type_id: String(numista.typeId), numista_reference: numista.url, _numista_reference_source: numista.source } : {}),
+      reference_url: numista?.url || metadata.reference_url || undefined,
       custom_notes: metadata.notes || undefined,
       valuation_data: valuation,
     };
@@ -741,7 +753,7 @@ export default function Identify() {
       material: String(candidate.metal ?? candidate.alloy ?? ''),
       country_of_origin: String(candidate.country ?? ''),
       denomination: String(candidate.denomination ?? ''),
-      catalogue_number: String(candidate.reference ?? ''),
+      catalogue_number: numista?.numistaN || String(candidate.reference ?? ''),
       ...reviewedIdentification,
       attributes,
       warnings: [...new Set([
@@ -791,6 +803,25 @@ export default function Identify() {
     toast.success('Coin saved to SWISH inventory');
     setStep('confirmed');
     prepareCoinPhotos(user.id, tenantId, String(savedItem.id), permanentMedia);
+  };
+
+  const handleCreateCoinDraft = async () => {
+    if (!savedInventoryId || draftBusy) return;
+    setDraftBusy(true);
+    try {
+      const sb = await getSupabaseClientAsync();
+      if (!sb) throw new Error('SWISH backend is not connected');
+      const { data: { user }, error: userError } = await sb.auth.getUser();
+      if (userError || !user) throw new Error('Please sign in again before pulling a coin draft.');
+      if (!tenantId) throw new Error('Your SWISH workspace is not ready.');
+      const draft = await createCoinListingDraft({ client: sb, userId: user.id, tenantId, nicheId: 'coins', sessionId: `coin:${savedInventoryId}`, isCurrent: () => true }, savedInventoryId);
+      toast.success(draft.reused ? 'Existing coin draft opened. Nothing has been published.' : 'Coin eBay draft prepared. Nothing has been published.');
+      navigate(`/listings/${draft.listingId}/edit`);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Could not pull a coin draft.');
+    } finally {
+      setDraftBusy(false);
+    }
   };
 
   const handleReset = () => {
@@ -879,12 +910,14 @@ export default function Identify() {
         <div className="flex flex-col gap-3">
           {savedInventoryId && (
             <button
-              onClick={() => navigate(`/listings/new?item_id=${savedInventoryId}`)}
-              className="btn-primary w-full justify-center"
+              onClick={() => void handleCreateCoinDraft()}
+              disabled={draftBusy || !parseNumistaNumber(metadata.numista_number) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)}
+              className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Tag className="w-4 h-4" />Create eBay Listing
+              <Tag className="w-4 h-4" />{draftBusy ? 'Pulling eBay draft…' : 'Pull eBay draft'}
             </button>
           )}
+          {(!parseNumistaNumber(metadata.numista_number) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)) && <p className="text-xs leading-5 text-muted-foreground">A valid Numista N#, actual weight and actual diameter are required before SWISH can pull a coin eBay draft.</p>}
           <button
             onClick={() => navigate(savedInventoryId ? `/inventory/${savedInventoryId}` : '/inventory')}
             className="btn-secondary w-full justify-center"
@@ -1339,15 +1372,14 @@ export default function Identify() {
 
         <div>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-            <Link2 className="w-3 h-3" />Reference URL
-            <span className="text-xs">(Numista, NGC, PCGS, British Museum, etc.)</span>
+            <BookOpen className="w-3 h-3" />Numista number
+            <span className="text-xs">(required to pull an eBay draft)</span>
           </label>
           <input
-            type="url"
-            value={metadata.reference_url ?? ''}
-            onChange={e => setMeta('reference_url', e.target.value || undefined)}
+            value={metadata.numista_number ?? ''}
+            onChange={e => setMeta('numista_number', e.target.value || undefined)}
             className="input-field text-sm"
-            placeholder="https://en.numista.com/catalogue/…"
+            placeholder="N#438449 or Numista catalogue URL"
           />
         </div>
 

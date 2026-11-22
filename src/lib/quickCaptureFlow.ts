@@ -1,6 +1,7 @@
 import { prepareScanPhotos } from '@/lib/sharedScanPhotos';
 import { captureRequest, assertCaptureScope, captureRecord, captureText, captureStrings } from '@/lib/captureRequest';
 import { persistCaptureItem, persistCapturePhotos } from '@/lib/capturePersistence';
+import { assertCoinDraftReady, canonicalCoinReferenceAnswers } from '@/lib/coinListingGate';
 import { captureNumistaReference, parseNumistaNumber, prepareNumistaFaces } from '@/lib/numistaCapture';
 import type { CaptureCheckpoint, CaptureDraft, CapturePhoto, CaptureScope } from '@/types/capture';
 interface PrepareCaptureOptions { scope: CaptureScope; photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; checkpoint: CaptureCheckpoint; onCheckpoint: (value: CaptureCheckpoint) => void; onProgress: (message: string) => void; lead?: Record<string, unknown> | null; }
@@ -30,12 +31,14 @@ async function identifyCapture(options: PrepareCaptureOptions): Promise<Record<s
 /** Next prepares one canonical item and draft; it never publishes or automatically replays a request. */
 export async function prepareQuickCapture(options: PrepareCaptureOptions): Promise<CaptureDraft> {
   const { scope, photos, specialistId, mode, answers, onProgress, onCheckpoint } = options;
-  if (answers.numista_number && !parseNumistaNumber(answers.numista_number)) throw new Error('Enter a valid Numista N# before continuing.');
+  const numistaTypeId = scope.nicheId === 'coins' ? assertCoinDraftReady(answers, photos) : null;
+  if (scope.nicheId !== 'coins' && answers.numista_number && !parseNumistaNumber(answers.numista_number)) throw new Error('Enter a valid Numista N# before continuing.');
+  const savedAnswers = numistaTypeId ? canonicalCoinReferenceAnswers(answers, numistaTypeId) : answers;
   const checkpoint: CaptureCheckpoint = { ...options.checkpoint };
   const keep = (value: CaptureCheckpoint) => { Object.assign(checkpoint, value); onCheckpoint({ ...checkpoint }); };
   if (!checkpoint.identification) { onProgress('Identifying the photographed evidence…'); keep({ identification: await identifyCapture(options) }); }
   const result = checkpoint.identification!;
-  if (!checkpoint.itemId) { onProgress('Saving this physical item…'); keep({ itemId: await persistCaptureItem(scope, result, specialistId, answers, mode) }); }
+  if (!checkpoint.itemId) { onProgress('Saving this physical item…'); keep({ itemId: await persistCaptureItem(scope, result, specialistId, savedAnswers, mode) }); }
   onProgress('Attaching permanent original photographs…');
   const urls = await persistCapturePhotos(scope, checkpoint.itemId!, photos, checkpoint.photos ?? {}, value => keep({ photos: value }));
   if (!checkpoint.generated) {
@@ -56,7 +59,7 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   const read = await scope.client.from('listings').select('id,title,description,price,external_listing_id,publish_claim_id,status').eq('id', checkpoint.listingId!).eq('tenant_id', scope.tenantId).single();
   if (read.error || !read.data) throw new Error('Draft saved, but readback is unavailable. Retry readback, not publication.');
   if (read.data.external_listing_id || read.data.publish_claim_id || ['active', 'live'].includes(String(read.data.status))) throw new Error('An existing submission needs inspection. Open this listing; do not publish it again.');
-  const reference = scope.nicheId === 'coins' ? captureNumistaReference(result, answers.numista_number) : null;
+  const reference = scope.nicheId === 'coins' ? captureNumistaReference(result, savedAnswers.numista_number) : null;
   const backendReference = captureNumistaReference(result);
   const referenceConflict = reference?.source === 'seller_reference' && backendReference && reference.typeId !== backendReference.typeId ? [`Your Numista ${reference.numistaN} differs from the backend candidate ${backendReference.numistaN}. Resolve the reference against both original faces before listing.`] : [];
   const research = scope.nicheId === 'coins' ? captureRecord(result.numistaImageSearch) : {};
