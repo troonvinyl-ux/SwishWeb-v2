@@ -98,3 +98,61 @@ test('all web eBay listing sync entry points use the shared runner', async () =>
   assert.match(app, /AuthorizedModule/);
   assert.doesNotMatch(listings, /swish-image-download/);
 });
+
+test('partial Edge 503 preserves confirmed write counts and identifies one failed listing without another call', async () => {
+  const ebayId = '123456789012'; const invocations = []; const updates = [];
+  const result = await runEbaySyncBatches({ tenantId, nicheId,
+    onProgress: progress => updates.push(progress),
+    invoke: async payload => {
+      invocations.push(payload);
+      if (invocations.length === 1) return response({ ...batch });
+      return response({ success: false, partial: true, batchComplete: false, processed: 6,
+        updated: 5, failed: 1, blocked: 0, imagesFetched: 0, titlesFixed: 0,
+        failedEbayIds: [ebayId], error: '1 listing reconciliations were not confirmed' },
+        '[swish-ebay-sync] 1 listing reconciliations were not confirmed (HTTP 503)');
+    } });
+  assert.equal(invocations.length, 2, 'A failed batch must not be retried or followed by another batch');
+  assert.equal(invocations[1].afterListingId, cursor);
+  assert.equal(result.data.processed, 12);
+  assert.equal(result.data.updated, 11);
+  assert.equal(result.data.failed, 1);
+  assert.equal(result.data.partial, true);
+  assert.equal(result.data.issues[0].externalListingId, ebayId);
+  assert.equal(updates.at(-1).failed, 1);
+  assert.match(result.error, /503/);
+});
+test('unknown 503 cannot pretend zero failures were verified or invent an eBay ID', async () => {
+  let calls = 0;
+  const result = await runEbaySyncBatches({ tenantId, nicheId, invoke: async () => {
+    calls++; return response(null, 'Backend timeout (HTTP 503)');
+  } });
+  assert.equal(calls, 1);
+  assert.equal(result.data.partial, true);
+  assert.deepEqual(result.data.issues, []);
+  assert.match(result.error, /503/);
+});
+test('failed batch with inconsistent counts is not accepted as a confirmed partial outcome', async () => {
+  const result = await runEbaySyncBatches({ tenantId, nicheId, invoke: async () => response({
+    success: false, partial: true, batchComplete: false, processed: 6, updated: 6, failed: 1,
+    imagesFetched: 0, titlesFixed: 0, blocked: 0, failedEbayIds: ['123456789012'],
+  }, 'Conflict (HTTP 503)') });
+  assert.equal(result.data.updated, 0);
+  assert.equal(result.data.failed, 0);
+  assert.equal(result.data.partial, true);
+});
+test('connected eBay consent without stored seller ID never displays disconnected', async () => {
+  const { readEbayConnector, ebayConnectorHeading } = await load('src/types/marketplace.ts');
+  const connector = readEbayConnector({ status: 'connected', seller_account_id: '',
+    access_token_expires_at: '2026-11-22T17:48:00Z' });
+  assert.equal(ebayConnectorHeading(connector, true), 'eBay connected — seller ID not recorded');
+  assert.equal(ebayConnectorHeading(readEbayConnector({ ...connector, seller_account_id: 'verifiedSeller' }), true), 'verifiedSeller');
+  assert.equal(ebayConnectorHeading(null, true), 'No eBay account connected');
+  assert.equal(ebayConnectorHeading(connector, false), 'Workspace not ready');
+  const [hub, account, ui] = await Promise.all([
+    readFile('src/pages/EbayHub.tsx','utf8'), readFile('src/pages/EbayAccount.tsx','utf8'),
+    readFile('src/components/features/EbaySyncStatus.tsx','utf8'),
+  ]);
+  assert.match(hub, /ebayConnectorHeading\(account, Boolean\(tenantId\)/);
+  assert.match(account, /ebayConnectorHeading\(connector, Boolean\(tenantId\)/);
+  assert.match(ui, /progress\.failed > 0 \? progress\.failed : error && progress\.partial \? 'Unconfirmed'/);
+});
