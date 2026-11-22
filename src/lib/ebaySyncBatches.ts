@@ -27,7 +27,7 @@ export async function runEbaySyncBatches(options: EbayBatchRunnerOptions): Promi
         const seenIds = new Set(issues.map(issue => String(issue.externalListingId || '')));
         const failedIds = Array.isArray(data.failedEbayIds) ? data.failedEbayIds : [];
         for (const id of failedIds) {
-          if (typeof id !== 'string' || !/^\\d{6,20}$/.test(id) || seenIds.has(id)) continue;
+          if (typeof id !== 'string' || !/^\d{6,20}$/.test(id) || seenIds.has(id)) continue;
           seenIds.add(id);
           issues.push({ externalListingId: id, message: 'SWISH could not confirm this existing eBay listing reconciliation. Review saved status before retrying.' });
         }
