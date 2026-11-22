@@ -79,8 +79,8 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { user, signOut } = useAuth();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
+  const { user, signOut, isPlatformOwner } = useAuth();
+  const isOwner = isPlatformOwner;
   const [ebayOpen, setEbayOpen] = useState(false);
   const location = useLocation();
   const activeNicheId = String(localStorage.getItem('swish_active_niche') || user?.user_metadata?.preferred_niche || 'coins');
@@ -137,13 +137,15 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <button
             className={cn('nav-item', ebayOpen && 'bg-[hsl(var(--sidebar-accent))]')}
             onClick={() => setEbayOpen(!ebayOpen)}
+            aria-expanded={ebayOpen}
+            aria-controls="swish-ebay-navigation"
           >
             <span className="text-xs font-bold w-4 text-center shrink-0">eB</span>
             <span className="flex-1">eBay</span>
             {ebayOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
           {ebayOpen && (
-            <div className="ml-2 border-l border-[hsl(var(--sidebar-border))] pl-2 mt-0.5 space-y-0.5">
+            <div id="swish-ebay-navigation" className="ml-2 border-l border-[hsl(var(--sidebar-border))] pl-2 mt-0.5 space-y-0.5">
               {EBAY_ITEMS.map(item => (
                 <NavLink
                   key={item.to}
@@ -182,7 +184,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium truncate">{user?.email || 'User'}</div>
           </div>
-          <button onClick={handleSignOut} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded" title="Sign out">
+          <button onClick={handleSignOut} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded" title="Sign out" aria-label="Sign out of SWISH">
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
