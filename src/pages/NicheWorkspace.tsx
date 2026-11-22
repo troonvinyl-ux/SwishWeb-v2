@@ -39,7 +39,6 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
     actions: [
       { label: 'Scan Coin', detail: 'Capture a coin and check specialist references.', icon: ScanLine, to: '/identify' },
       { label: 'My Coin Inventory', detail: 'Review saved coins and references.', icon: Package, to: '/inventory' },
-      { label: 'Islamic Silver', detail: 'Process silver and countermark batches.', icon: Sparkles, to: '/tools/islamic-batch' },
       { label: 'eBay Hub', detail: 'Create, publish and monitor listings.', icon: Store, to: '/ebay' },
       { label: 'Orders', detail: 'Manage sales and dispatch.', icon: ShoppingCart, to: '/orders' },
       { label: 'List & Sell', detail: 'Prepare a listing with evidence.', icon: Tag, to: '/listings' },
