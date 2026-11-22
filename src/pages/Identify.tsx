@@ -32,7 +32,7 @@ import { identificationCandidates, identificationLines } from '@/lib/identificat
 import { identificationItemPatch } from '@/lib/identificationItemPatch';
 import { asRecord } from '@/lib/itemPhotos';
 import { createCoinListingDraft } from '@/lib/coinListingPersistence';
-import { numistaReference, parseNumistaNumber } from '@/lib/numistaCapture';
+import { numistaReference, parseNumistaNumber, numistaIdentifyKnownAttributes, numistaAnchoredReview } from '@/lib/numistaCapture';
 import { callEdgeFunction, getSupabaseClientAsync, EdgeFunctionError } from '@/lib/supabase';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -575,13 +575,20 @@ export default function Identify() {
     const numista = numistaTypeId ? numistaReference(numistaTypeId, 'seller_reference') : null;
     const observedMetal = String(metadata['metal'] || 'Unknown');
     const observationNotes = [metadata.notes, metadata.voice_note].filter(Boolean).join('\n').trim();
+    const referenceFields = numistaIdentifyKnownAttributes(metadata.numista_number);
     const knownAttributes = {
+      // swish-identify's existing direct Numista lookup and physical comparison
+      // read these camel-case fields, not just weight_g/numistaTypeId.
+      weight: measurementWeight,
+      diameter: measurementDiameter,
+      material: observedMetal,
       weight_g: measurementWeight,
       diameter_mm: measurementDiameter,
       thickness_mm: undefined,
       metal: observedMetal,
       notes: observationNotes,
-      ...(numista ? { numistaTypeId: numista.typeId, numistaReference: numista.url } : {}),
+      ...referenceFields,
+      customNotes: [referenceFields.customNotes, observationNotes].filter(Boolean).join('\n'),
     };
     const imageSides = Array.from(images.values());
     const payload = {
@@ -607,6 +614,12 @@ export default function Identify() {
       coin_type: coinType,
       specialist: needsSpecialist,
     };
+
+    console.info('[CoinFlipper] Numista identification request fields', {
+      service: fnName, sellerReference: Boolean(numista),
+      referenceFields: Object.keys(referenceFields),
+      measurementFields: ['weight', 'diameter'].filter(field => knownAttributes[field as 'weight' | 'diameter'] != null),
+    });
 
     let identResult: IdentifyResult | null = null;
 
@@ -639,17 +652,35 @@ export default function Identify() {
     }
 
     const normalizedCandidates = identificationCandidates(identResult) as Candidate[];
-    identResult = { ...(identResult ?? {}), candidates: normalizedCandidates };
-    console.log('[CoinFlipper] Identification fields received', normalizedCandidates.map(candidate => ({ title: candidate.title, fields: Object.keys(candidate) })));
+    const numistaReview = numistaAnchoredReview(identResult, normalizedCandidates, metadata.numista_number);
+    identResult = {
+      ...(identResult ?? {}),
+      ...(numistaReview.reference ? { unable_to_identify: false } : {}),
+      candidates: numistaReview.candidates as Candidate[],
+      ...(numistaReview.reference ? { numista_review: {
+        reference: numistaReview.reference,
+        catalogueRetrieved: numistaReview.catalogueRetrieved,
+        visualConflict: numistaReview.visualConflict,
+        visualCandidate: numistaReview.visualCandidate,
+      } } : {}),
+    };
+    console.info('[CoinFlipper] Numista identification response fields', {
+      sellerReference: Boolean(numistaReview.reference),
+      verificationPresent: Boolean(identResult.numistaVerification),
+      catalogueRetrieved: numistaReview.catalogueRetrieved,
+      visualCandidateCount: normalizedCandidates.length,
+      reviewCandidateCount: numistaReview.candidates.length,
+    });
     setProgressMsg('');
     setResult(identResult);
     setSelectedIdx(0);
     setStep('review');
     submitGuard.current = false;
 
-    // REQ-VAL-001 — fetch valuation for top candidate
+    // Do not value a seller-supplied reference as if its physical identity
+    // were independently established by image AI.
     const topCandidate = identResult?.candidates?.[0] ?? (identResult?.identification ?? null);
-    if (topCandidate && !identResult?.unable_to_identify) {
+    if (topCandidate && !identResult?.unable_to_identify && !numistaReview.reference) {
       fetchValuation(topCandidate);
     }
   };
@@ -670,6 +701,7 @@ export default function Identify() {
     const identificationData = {
       confirmed_candidate: candidate,
       all_candidates: result?.candidates ?? [],
+      numista_review: result?.numista_review ?? null,
       service_used: needsSpecialist ? 'swish-islamic-identify' : 'swish-identify',
       specialist_routed: result?.specialist_routed ?? false,
       scan_metadata: {
@@ -938,6 +970,12 @@ export default function Identify() {
   if (step === 'review') {
     const selected = candidates[selectedIdx];
     const selectionMade = candidates.length > 0;
+    const sellerReview = (result?.numista_review ?? {}) as {
+      reference?: ReturnType<typeof numistaReference>;
+      catalogueRetrieved?: boolean;
+      visualConflict?: boolean;
+      visualCandidate?: Candidate | null;
+    };
 
     return (
       <div className="space-y-5 animate-fade-in max-w-3xl">
@@ -959,6 +997,37 @@ export default function Identify() {
             <RotateCcw className="w-3.5 h-3.5" />New scan
           </button>
         </div>
+
+        {sellerReview.reference && (
+          <section className="swish-card p-4 space-y-3" aria-label="Seller-supplied Numista reference">
+            <h2 className="text-sm font-semibold">Seller-supplied Numista reference</h2>
+            <a href={sellerReview.reference.url} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-mono text-primary hover:underline">
+              <ExternalLink className="w-3.5 h-3.5" />{sellerReview.reference.numistaN} · View Numista catalogue
+            </a>
+            <p className="text-xs text-muted-foreground">
+              {sellerReview.catalogueRetrieved
+                ? 'Catalogue record retrieved directly by SWISH; this does not verify the coin in the photographs.'
+                : 'Catalogue details could not be retrieved. This reference is seller-supplied, not an AI-confirmed catalogue match.'}
+            </p>
+            <div className="text-xs">
+              <span className="font-semibold">Visual identification evidence: </span>
+              {sellerReview.visualCandidate?.title
+                ? <span>{sellerReview.visualCandidate.title} (image-AI suggestion only — not selected)</span>
+                : <span>No independent visual identification established</span>}
+            </div>
+            {sellerReview.visualConflict && (
+              <p role="alert" className="flex items-start gap-2 text-xs text-warning">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                Visual evidence may not match the seller-supplied Numista reference — compare both coin faces, weight and diameter before confirming.
+              </p>
+            )}
+            <p className="flex items-start gap-2 text-xs text-warning">
+              <Scale className="w-4 h-4 shrink-0" />
+              <strong>Physical verification still required.</strong> Check obverse, reverse, weight and diameter against the linked catalogue record; saving keeps Review Required safeguards.
+            </p>
+          </section>
+        )}
 
         {/* Unable to identify */}
         {result?.unable_to_identify && (
@@ -1381,6 +1450,10 @@ export default function Identify() {
             className="input-field text-sm"
             placeholder="N#438449 or Numista catalogue URL"
           />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            A valid N# anchors identification to that Numista catalogue type; image AI remains separate evidence.
+            The actual coin must still be checked against both faces, weight and diameter.
+          </p>
         </div>
 
         {/* Notes — REQ-CAP-003 */}
