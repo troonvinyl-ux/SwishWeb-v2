@@ -74,10 +74,42 @@ test('arbitrary batchComplete cannot bypass unknown failure', async () => {
 test('only fully accounted-for native eBay policy 21920397 permits a new batch', async () => {
   const calls = [];
   const result = await runEbaySyncBatches({ tenantId, nicheId, invoke: async body => {
-    calls.push(body); return calls.length === 1 ? response({ ...batch, updated: 5, blocked: 1, failed: 1, issues: [{ code: '21920397' }] }, 'Restricted') : response({ success: true, processed: 1, updated: 1, failed: 0, nextAfterListingId: null });
+    calls.push(body); return calls.length === 1 ? response({ ...batch, success: false, updated: 5, blocked: 1, readSkipped: 0, failed: 1, issues: [{ code: '21920397' }] }, 'Restricted') : response({ success: true, processed: 1, updated: 1, failed: 0, nextAfterListingId: null });
   } });
   assert.equal(calls.length, 2); assert.equal(calls[1].previousIssues, true);
   assert.equal(result.data.partial, true); assert.match(result.error, /21920397/);
+});
+test('one read-only eBay GetItem timeout does not abandon the remaining linked listings', async () => {
+  const calls = [];
+  const item = '123456789012';
+  const issue = { externalListingId: item, code: 'EBAY_ITEM_READ_TIMEOUT', message: 'Read-only request timed out; original inventory preserved.' };
+  const result = await runEbaySyncBatches({ tenantId, nicheId, invoke: async body => {
+    calls.push(body);
+    return calls.length === 1
+      ? response({ ...batch, success: false, processed: 6, updated: 5, failed: 1, blocked: 0, readSkipped: 1, issues: [issue], batchComplete: true }, 'One GetItem read timeout')
+      : response({ success: true, processed: 4, updated: 4, failed: 0, blocked: 0, nextAfterListingId: null, batchComplete: true });
+  } });
+  assert.equal(calls.length, 2, 'No timed-out GetItem was retried');
+  assert.equal(calls[1].afterListingId, cursor);
+  assert.equal(calls[1].previousIssues, true);
+  assert.equal(result.data.processed, 10);
+  assert.equal(result.data.updated, 9);
+  assert.equal(result.data.failed, 1);
+  assert.equal(result.data.partial, true);
+  assert.equal(result.data.issues[0].externalListingId, item);
+  assert.match(result.error, /need attention/);
+});
+test('an unconfirmed status write cannot use the read-only timeout bypass', async () => {
+  const calls = [];
+  const result = await runEbaySyncBatches({ tenantId, nicheId, invoke: async body => {
+    calls.push(body);
+    return response({ ...batch, success: false, updated: 5, failed: 1, blocked: 0,
+      readSkipped: 1, issues: [{ code: 'SWISH_STATUS_READBACK', externalListingId: '123456789012' }],
+      batchComplete: true }, 'Write not confirmed');
+  } });
+  assert.equal(calls.length, 1);
+  assert.ok(result.error);
+  assert.equal(result.data.partial, true);
 });
 test('repeated cursor, invalid cursor and zero-work continuation stop safely', async () => {
   for (const data of [{ ...batch, nextAfterListingId: 'bad' }, { ...batch, processed: 0 }, batch]) {

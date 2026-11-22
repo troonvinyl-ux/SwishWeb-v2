@@ -33,6 +33,8 @@ export interface SellerDiscovery {
   excludedForReview: number;
   ignoredNotActive: number;
   truncated: boolean;
+  activeReported: number | null;
+  activeFetched: number;
 }
 const musicSpecific = /^(record grading|sleeve grading|cd grading|cassette condition|case condition|inlay condition|media grade|sleeve grade)$/i;
 const value = (v: unknown) => typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '';
@@ -140,7 +142,19 @@ export async function discoverEbayInventory(client: SupabaseClient, userId: stri
   return {
     ...matching,
     excludedForReview: Math.max(0, Number(result.data.excludedForReview) || 0),
-    truncated: result.data.listings.length >= 400,
+    // Global seller-account ActiveList count is separate from niche-linked
+    // SWISH inventory. Neither represents a count of imported stock rows.
+    activeReported: typeof result.data.activeReported === 'number'
+      && Number.isSafeInteger(result.data.activeReported) && result.data.activeReported >= 0
+        ? result.data.activeReported : null,
+    activeFetched: typeof result.data.activeFetched === 'number'
+      && Number.isSafeInteger(result.data.activeFetched) && result.data.activeFetched >= 0
+        ? result.data.activeFetched : 0,
+    truncated: result.data.listings.length >= 400 || (
+      typeof result.data.activeReported === 'number'
+      && typeof result.data.activeFetched === 'number'
+      && result.data.activeReported > result.data.activeFetched
+    ),
   };
 }
 /** A single explicit import; database RPC enforces same tenant + niche and atomic uniqueness. */
