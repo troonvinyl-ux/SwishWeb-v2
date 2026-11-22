@@ -74,3 +74,12 @@ test('each active scanner route has an explicit scoped flow that saves evidence 
 test('new scanner files transpile without syntax errors', async () => {
   for (const path of ['src/lib/nativeSourceLiteral.ts', 'src/lib/nativeCaptureProfiles.ts', 'src/lib/captureRequest.ts', 'src/lib/capturePersistence.ts', 'src/lib/quickCaptureFlow.ts', 'src/hooks/useQuickCapture.ts', 'src/hooks/useCaptureCamera.ts', 'src/components/features/QuickCaptureWorkspace.tsx', 'src/components/features/CaptureDraftReview.tsx', 'src/components/features/BarcodeCapture.tsx', 'src/components/features/CaptureCamera.tsx']) assert.equal(compile(await readFile(path, 'utf8')).diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length ?? 0, 0, path);
 });
+
+test('dynamic web capture reference matches the exact manually reviewed native source pin', async () => {
+  const config = JSON.parse(await readFile('config/swish-source.json', 'utf8'));
+  const captureSource = await readFile('src/lib/nativeCaptureProfiles.ts', 'utf8');
+  assert.match(config.commit, /^[a-f0-9]{40}$/);
+  assert.ok(captureSource.includes(`CAPTURE_SOURCE_COMMIT = '${config.commit}'`),
+    'Capture profiles must not silently fetch a different native revision than config/swish-source.json');
+  assert.equal(config.review.status, 'pending', 'This source-alignment change must not falsely claim production approval');
+});
