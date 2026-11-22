@@ -67,7 +67,7 @@ export default function EbaySellerDiscovery({ tenantId }: Props) {
     {error && <p role="alert" className="text-sm text-destructive flex gap-2"><AlertCircle size={18}/>{error}</p>}
     {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
     {relevant && discovery && <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">{discovery.existing} already linked · {discovery.ignoredNotActive} not confirmed active · {discovery.excludedForReview} excluded for classification review. {discovery.truncated ? 'The seller response reached its 400-listing limit; not all listings may have been checked.' : ''}</p>
+      <p className="text-sm text-muted-foreground">eBay active: {discovery.activeReported ?? 'not reported'} · Fetched active: {discovery.activeFetched} · SWISH linked: {discovery.existing} (in the checked response) · {discovery.ignoredNotActive} not confirmed active · {discovery.excludedForReview} excluded for classification review. {discovery.truncated ? 'The seller response reached its 400-listing limit; not all listings may have been checked.' : ''}</p>
       {!available.length && <p className="text-sm text-muted-foreground">No new active listings ready for import in this checked niche.</p>}
       {available.map(({ listing, matches }) => <article key={listing.itemId} className="rounded-lg border border-border p-3 space-y-2">
         <div className="flex flex-wrap justify-between gap-2"><div><strong className="text-sm">{listing.title}</strong><p className="text-xs text-muted-foreground">eBay #{listing.itemId} · {listing.categoryName || 'Category not named'} · Active · £{listing.price.toFixed(2)}</p></div></div>

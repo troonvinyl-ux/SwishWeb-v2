@@ -1,7 +1,7 @@
 {
   "repository": "troonvinyl-ux/SWISH",
   "branch": "main",
-  "commit": "a44d5737838c728d25d073c5d9c1298b390d04be",
+  "commit": "cb0a008d68e871fde0c6763d541baf5a41077d4b",
   "backendUrl": "https://iwgaqieyoahmcjfziwga.backend.onspace.ai",
   "inspectedAt": "2026-11-22",
   "review": {
@@ -9,14 +9,14 @@
     "reviewUrl": null
   },
   "contracts": {
-    "app": "5542733ba51fa851d7cc7d93bc5598d384cab611",
-    "services": "79c6a8cc82bd0d4f9ebe8342dc1e93af1b266ef6",
+    "app": "f2108fb9141ef72f774556c4b0524807d743ff22",
+    "services": "86640cc951c82e040203d1969b8e5bab4dba8fc1",
     "constants": "27a9daca1cb4bc6415ae750ce9af5cdad7fa7a46",
     "contexts": "fee5f45ca684ad6743169692ce5473fc876bdd61",
     "hooks": "d95f4a7165dd979ef71f055e157159ce22f9dc82",
     "template": "67c80df146495a7aa3d0745473d6cf7dee0f6967",
     "shared": "41aaf0b3985ff5c8636834b74e948a45d5f47cd1",
-    "supabase": "dacb3c730dd33ae33d3936cc9f0aff3275bb42fa",
+    "supabase": "2379b86175ca3cc634da0d2d618a6175e9622600",
     "niches": "7144a2de0e7b0ed6f98307b9bbac932576dae7f3",
     "niche-modules.json": "8cd4f122847735d2ce748cc27e86919e19f5579e",
     ".github": "0a2b283ae718cd90837f667b25b280c93bb9a177",
