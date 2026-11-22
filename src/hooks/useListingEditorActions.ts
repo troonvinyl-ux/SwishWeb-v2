@@ -61,8 +61,7 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       // A separate verified active listing for the same canonical stock item
       // always wins over a stale draft. Never send a second AddItem request.
       const siblings = await client.from('listings').select('id,status,external_listing_id')
-        .eq('tenant_id', tenantId).eq('item_id', draft.item.id).eq('marketplace_id', 'ebay')
-        .not('external_listing_id', 'is', null);
+        .eq('tenant_id', tenantId).eq('item_id', draft.item.id).eq('marketplace_id', 'ebay');
       if (siblings.error) throw new Error('Cannot check whether this item is already live on eBay. No new submission was sent.');
       if (hasLiveSibling(siblings.data || [], id)) throw new Error('This stock item already has a recorded live eBay listing. Open Live inventory or refresh its status; do not submit this older draft again.');
       const before = await readSubmissionListing(client, tenantId, id);
