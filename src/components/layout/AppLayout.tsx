@@ -29,9 +29,9 @@ function StandaloneProductNav({ product, onClose }: { product: NonNullable<Retur
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const { user } = useAuth();
+  const { isPlatformOwner } = useAuth();
   const product = getHostProduct();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
+  const isOwner = isPlatformOwner;
   const standalone = Boolean(product && !isOwner);
   const isAdminScreen = isOwner && (location.pathname.startsWith('/master-admin') || location.pathname === '/niches');
 
