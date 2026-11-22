@@ -64,8 +64,9 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   // same category; a category change requires a fresh compatible selection.
   const savedCategoryId = String(attrs.ebay_category_id || item.ebay_category_id || '');
   const categoryId = String(form.category_id || savedCategoryId || '').trim();
-  const categoryName = String(form.category || attrs.ebay_category_name || item.ebay_category_name || '').trim();
-  const conditionId = String(form.condition_id || (categoryId === savedCategoryId ? attrs.ebay_condition_id || item.ebay_condition_id : '') || ebayConditionId(form.condition));
+  const categoryChanged = Boolean(categoryId && categoryId !== savedCategoryId);
+  const categoryName = String(form.category || (!categoryChanged ? attrs.ebay_category_name || item.ebay_category_name : '') || '').trim();
+  const conditionId = String(form.condition_id || (!categoryChanged ? attrs.ebay_condition_id || item.ebay_condition_id || ebayConditionId(form.condition) : '') || '').trim();
   const description = musicValues ? syncMusicConditionText(String(form.description || ''), musicValues) : String(form.description || '');
   if (conditionNotes.length > 1000) throw new Error('Keep eBay condition notes to 1,000 characters.');
   const listingOptions = { listingType: form.listing_type === 'Chinese' ? 'Chinese' : 'FixedPriceItem', auctionDays: Number(form.auction_duration || 7), startPrice: String(form.start_price || price), reservePrice: String(form.reserve_price || ''), bestOfferEnabled: form.best_offer_enabled === true, dispatchDays: Number(form.dispatch_days || 3) };
@@ -103,7 +104,7 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
     mismatch('item.attributes.ebay_item_specifics', normalizedSpecifics(specifics), normalizedSpecifics(asRecord(current.data.attributes).ebay_item_specifics)),
   ].filter((value): value is ReadbackMismatch => Boolean(value));
   if (atomicMismatches.length) throwReadbackMismatch('atomic save', form.id, atomicMismatches);
-  const retained = await retainListingEditorMetadata({ client, item: current.data, form: { ...form, category_id: categoryId, category: categoryName, condition_id: conditionId }, photos, uploads, options: listingOptions, confirmedMusic });
+  const retained = await retainListingEditorMetadata({ client, item: current.data, form: { ...form, category_id: categoryId, category: categoryName, condition_id: conditionId }, photos, uploads, options: listingOptions, confirmedMusic, categoryChanged });
   const retainedAttrs = asRecord(retained.attributes);
   const retainedMismatches = [
     mismatch('item.condition', String(form.condition || item.condition || ''), String(retained.condition || '')),
