@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { contractDrift, validateSource, validateEvidence, REQUIRED_CHECKS } from '../lib/swish-contracts.mjs';
 const commit = 'a'.repeat(40);
-const source = { repository: 'troonvinyl-ux/SWISH', branch: 'main', commit, backendUrl: 'https://iwgaqieyoahmcjfziwga.backend.onspace.ai', contracts: { app: commit }, review: { status: 'approved', reviewUrl: 'https://github.com/troonvinyl-ux/SwishWeb-v2/pull/1' } };
+const source = { repository: 'troonvinyl-ux/SWISH', branch: 'main', commit, backendUrl: 'https://iwgaqieyoahmcjfziwga.backend.onspace.ai', contracts: { app: commit }, review: { status: 'approved', reviewUrl: 'https://github.com/troonvinyl-ux/SwishWeb/pull/1' } };
 const now = Date.parse('2026-11-14T12:00:00Z');
 const evidence = () => ({ nativeCommit: commit, webSourceDigest: 'digest', backendUrl: source.backendUrl, domain: 'swishflip.co.uk', testedAt: '2026-11-14T10:00:00Z', knownGaps: [], checks: Object.fromEntries(REQUIRED_CHECKS.map(name => [name, { status: 'passed', reviewer: 'reviewer', evidenceUrl: 'https://github.com/troonvinyl-ux/SwishWeb/actions/runs/1' }])) });
 test('contract changes and removals require review', () => {
