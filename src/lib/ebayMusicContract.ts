@@ -47,6 +47,7 @@ export function musicGradeCode(value: unknown): string {
   const text = String(value ?? '').trim();
   const found = EBAY_MUSIC_GRADES.find(([code, label]) => code === text.toUpperCase() || label.toLowerCase() === text.toLowerCase());
   if (found) return found[0];
+  if (/^(very good plus|vg\s*plus)(?:\s*\(vg\+\))?$/i.test(text)) return 'VG+';
   if (/^(near mint|nm|m-)(?:\s*\([^)]*\))?$/i.test(text)) return 'NM';
   if (/^(poor|p)(?:\s*\(p\))?$/i.test(text)) return 'P';
   return text;

@@ -254,7 +254,7 @@ function ImageSlot({
 export default function Identify() {
   const prepareCoinPhotos = useCoinPhotoPreparation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isPlatformOwner } = useAuth();
 
   // Duplicate-submit guard (ref — not state — so it doesn't cause re-renders)
   const submitGuard = useRef(false);
@@ -279,8 +279,8 @@ export default function Identify() {
   // Existing inventory search (for REQ-INV-002 — update path)
   const [inventorySearch, setInventorySearch] = useState('');
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const { nicheIds: entitledNiches, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
-  const coinAllowed = entitledNiches.includes('coins');
+  const { nicheIds: entitledNiches, isOwner: verifiedOwnerMembership, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
+  const coinAllowed = entitledNiches.includes('coins') || (isPlatformOwner && verifiedOwnerMembership);
   const specialistIds = getSpecialistIdsForNiche(getActiveNicheId());
   const { data: inventoryResults } = useTable('items', {
     filter: { tenant_id: tenantId },

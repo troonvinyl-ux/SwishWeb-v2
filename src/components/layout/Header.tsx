@@ -4,7 +4,6 @@ import { Menu, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ROUTE_LABELS: Record<string, string> = {
-  '/dashboard': 'Dashboard',
   '/command-centre': 'Command Centre',
   '/inventory': 'Inventory',
   '/identify': 'Coin Flipper',
@@ -12,13 +11,11 @@ const ROUTE_LABELS: Record<string, string> = {
   '/acquisitions': 'Acquisitions',
   '/opportunities': 'Opportunities',
   '/review-required': 'Review Required',
-  '/audit': 'Audit',
   '/listings': 'Listings',
   '/orders': 'Orders',
   '/dispatch': 'Dispatch',
   '/repricing': 'Repricing',
   '/insights': 'Insights',
-  '/money': 'Money',
   '/tasks': 'Tasks',
   '/ebay': 'eBay Hub',
   '/ebay/listings': 'eBay Listings',
@@ -28,7 +25,6 @@ const ROUTE_LABELS: Record<string, string> = {
   '/ebay/returns': 'eBay Returns',
   '/ebay/cases': 'eBay Cases',
   '/ebay/finances': 'eBay Finances',
-  '/ebay/analytics': 'eBay Analytics',
   '/ebay/import': 'eBay Import',
   '/ebay/logs': 'eBay Logs',
   '/settings': 'Settings',
@@ -42,12 +38,13 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
   const pageLabel = ROUTE_LABELS[location.pathname] || location.pathname.split('/').filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' › ');
 
-  const handleSearch = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && searchVal.trim()) {
-      navigate(`/inventory?q=${encodeURIComponent(searchVal.trim())}`);
-      setSearchOpen(false);
-      setSearchVal('');
-    }
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = searchVal.trim();
+    if (!query) return;
+    navigate(`/inventory?q=${encodeURIComponent(query)}`);
+    setSearchOpen(false);
+    setSearchVal('');
   };
 
   return (
@@ -58,19 +55,21 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
       <div className="flex-1 min-w-0">
         {searchOpen ? (
-          <div className="flex items-center gap-2 max-w-sm">
+          <form onSubmit={submitSearch} role="search" className="flex items-center gap-2 max-w-sm">
             <input
               autoFocus
+              type="search"
+              aria-label="Search inventory"
               value={searchVal}
               onChange={e => setSearchVal(e.target.value)}
-              onKeyDown={handleSearch}
               placeholder="Search inventory…"
               className="input-field text-sm"
             />
-            <button onClick={() => { setSearchOpen(false); setSearchVal(''); }} className="text-muted-foreground hover:text-foreground">
+            <button type="submit" disabled={!searchVal.trim()} className="btn-secondary min-h-11" aria-label="Find inventory items">Find</button>
+            <button type="button" aria-label="Close inventory search" onClick={() => { setSearchOpen(false); setSearchVal(''); }} className="min-h-11 min-w-11 text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4" />
             </button>
-          </div>
+          </form>
         ) : (
           <h1 className="text-base font-semibold truncate">{pageLabel}</h1>
         )}

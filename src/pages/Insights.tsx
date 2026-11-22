@@ -1,130 +1,143 @@
-import { useTable } from '@/hooks/useSupabaseQuery';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { TrendingUp, RefreshCw } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
+import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
+import { getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
+import { formatCurrency } from '@/lib/utils';
+import { buildInsightsMetrics, type InsightRow } from '@/lib/insightsMetrics';
 
-const CHART_COLORS = { primary: '#F5A623', secondary: '#4A90D9', muted: '#4B5563' };
+const PAGE_SIZE = 500;
 
-const CustomTooltip = ({ active, payload, label }: Record<string, unknown>) => {
-  if (active && Array.isArray(payload) && payload.length) {
-    return (
-      <div className="bg-card border border-border rounded-lg p-2.5 text-xs">
-        <p className="font-medium mb-1">{label as string}</p>
-        {(payload as Array<{ name: string; value: number }>).map((p, i) => (
-          <p key={i} style={{ color: p.name === 'revenue' ? CHART_COLORS.primary : CHART_COLORS.secondary }}>
-            {p.name}: {p.name === 'revenue' ? formatCurrency(p.value) : p.value}
-          </p>
-        ))}
-      </div>
-    );
+/** Paginate the full tenant/niche result set instead of calling 100 rows "total". */
+async function readAllRows(table: 'items' | 'orders' | 'sales', tenantId: string, specialistIds: string[]): Promise<InsightRow[]> {
+  const client = getSupabaseClient() || await getSupabaseClientAsync();
+  if (!client) throw new Error('SWISH backend is unavailable. Retry after the connection is restored.');
+  const result: InsightRow[] = [];
+  for (let start = 0; ; start += PAGE_SIZE) {
+    let request = client.from(table)
+      .select(table === 'items' ? 'id,specialist_id' : table === 'sales'
+        ? 'id,sold_at,sale_price,items!inner(specialist_id)'
+        : 'id,created_at,total_amount,sale_price,items!inner(specialist_id)')
+      .eq('tenant_id', tenantId);
+    if (table === 'items') request = request.in('specialist_id', specialistIds);
+    else request = request.eq('marketplace_id', 'ebay').in('items.specialist_id', specialistIds);
+    const ordered = request.order(table === 'sales' ? 'sold_at' : 'created_at', { ascending: true })
+      .order('id', { ascending: true });
+    const { data, error } = await ordered.range(start, start + PAGE_SIZE - 1);
+    if (error) throw new Error(`Could not read ${table}: ${error.message}`);
+    const page = (data || []) as unknown as InsightRow[];
+    result.push(...page);
+    if (page.length < PAGE_SIZE) break;
   }
-  return null;
-};
+  return result;
+}
 
 export default function Insights() {
-  const qc = useQueryClient();
-  const { data: ordersData } = useTable('orders', { order: { column: 'created_at', ascending: false }, limit: 100 });
-  const { data: inventoryData } = useTable('inventory', { limit: 100 });
-
-  const orders = (ordersData || []) as Record<string, unknown>[];
-  const inventory = (inventoryData || []) as Record<string, unknown>[];
-
-  // Aggregate orders by date for chart
-  const chartData = orders.reduce((acc: Record<string, { date: string; revenue: number; orders: number }>, o) => {
-    const d = new Date(o.created_at as string);
-    const key = `${d.getMonth() + 1}/${d.getFullYear()}`;
-    if (!acc[key]) acc[key] = { date: key, revenue: 0, orders: 0 };
-    acc[key].revenue += Number((o.total_amount || o.sale_price) || 0);
-    acc[key].orders++;
-    return acc;
-  }, {});
-
-  const chartArray = Object.values(chartData).slice(-12);
-
-  const totalRevenue = orders.reduce((s, o) => s + Number((o.total_amount || o.sale_price) || 0), 0);
-  const avgOrderValue = orders.length ? totalRevenue / orders.length : 0;
-  const categories = inventory.reduce<Record<string, number>>((acc, i) => {
-    const c = (i.category as string) || 'Uncategorised';
-    acc[c] = (acc[c] || 0) + 1;
-    return acc;
-  }, {});
-  const catArray = Object.entries(categories).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
+  const { user } = useAuth();
+  const { tenantId, isLoading: tenantLoading, error: tenantError, refetch: retryTenant } = useCurrentTenantId();
+  const niche = getActiveNicheId();
+  const specialistIds = getSpecialistIdsForNiche(niche);
+  const query = useQuery({
+    queryKey: ['insights-reconciled', user?.id, tenantId, niche],
+    enabled: Boolean(user?.id && tenantId && specialistIds.length),
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    retry: false,
+    queryFn: async () => {
+      if (!tenantId || !specialistIds.length) throw new Error('Select a valid specialist workspace.');
+      const [sales, orders, items] = await Promise.all([
+        readAllRows('sales', tenantId, specialistIds),
+        readAllRows('orders', tenantId, specialistIds),
+        readAllRows('items', tenantId, specialistIds),
+      ]);
+      return buildInsightsMetrics(sales, orders, items);
+    },
+  });
+  const fetching = tenantLoading || query.isFetching;
+  const error = tenantError || query.error;
+  const data = !error ? query.data : null;
+  const refresh = () => {
+    if (!tenantId) void retryTenant();
+    else void query.refetch();
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Insights</h1>
-          <p className="page-subtitle">Performance analytics from your real data</p>
+          <p className="page-subtitle">Recorded eBay sales and orders, plus actual stock · {niche}</p>
         </div>
-        <button onClick={() => { qc.invalidateQueries({ queryKey: ['orders'] }); qc.invalidateQueries({ queryKey: ['inventory'] }); }} className="btn-ghost">
-          <RefreshCw className="w-3.5 h-3.5" />Refresh
+        <button type="button" onClick={refresh} disabled={fetching} aria-label="Refresh insights from SWISH" className="btn-secondary min-h-11">
+          <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin' : ''}`} aria-hidden="true" />
+          {fetching ? 'Refreshing…' : 'Refresh'}
         </button>
-      </div>
+      </header>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Total Revenue', value: formatCurrency(totalRevenue) },
-          { label: 'Total Orders', value: orders.length },
-          { label: 'Avg Order Value', value: formatCurrency(avgOrderValue) },
-          { label: 'Total Inventory', value: inventory.length },
-        ].map(s => (
-          <div key={s.label} className="stat-card">
-            <div className="stat-value">{s.value}</div>
-            <div className="stat-label">{s.label}</div>
-          </div>
-        ))}
-      </div>
+      {error && <section role="alert" className="swish-card space-y-3 border-destructive/40 p-5">
+        <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Insights unavailable</p>
+        <p className="text-sm text-muted-foreground">{error.message}. No partial totals or graphs are shown.</p>
+        <button type="button" onClick={refresh} disabled={fetching} className="btn-secondary">Retry data refresh</button>
+      </section>}
+      {!error && fetching && !data && <div role="status" className="swish-card p-6 text-sm text-muted-foreground">Loading complete workspace records…</div>}
+      {!error && !fetching && !tenantId && <div className="swish-card p-6 text-sm text-muted-foreground">No current workspace is available for Insights.</div>}
+      {!error && !fetching && !specialistIds.length && <div className="swish-card p-6 text-sm text-muted-foreground">Select a recognised specialist workspace to view its records.</div>}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="swish-card p-4">
-          <h3 className="text-sm font-semibold mb-4">Revenue by Month</h3>
-          {chartArray.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartArray} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 35% 18%)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(215 20% 55%)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'hsl(215 20% 55%)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="revenue" fill={CHART_COLORS.primary} radius={[3, 3, 0, 0]} />
+      {data && <>
+        {fetching && <p role="status" className="text-sm text-muted-foreground">Refreshing figures from SWISH…</p>}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="stat-card"><div className="stat-value">{data.inventoryCount.toLocaleString('en-GB')}</div><div className="stat-label">Inventory items</div></div>
+          <div className="stat-card"><div className="stat-value">{data.orderCount.toLocaleString('en-GB')}</div><div className="stat-label">Recorded eBay orders</div></div>
+          {data.averageOrderValue !== null && <div className="stat-card"><div className="stat-value">{formatCurrency(data.averageOrderValue)}</div><div className="stat-label">Average recorded order value</div></div>}
+          {data.realisedRevenue !== null && <div className="stat-card"><div className="stat-value">{formatCurrency(data.realisedRevenue)}</div><div className="stat-label">Recorded eBay sales value</div></div>}
+        </div>
+
+        {(data.ordersIncomplete || data.salesIncomplete) && <p role="alert" className="text-sm text-warning">Some financial records contain missing or invalid amounts. Unverifiable values and related charts are hidden; counts use the complete fetched records.</p>}
+        {!data.recordedSaleCount && <p className="text-sm text-muted-foreground">No confirmed sales are recorded in the sales ledger for this workspace. No sales revenue is being inferred from orders.</p>}
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {data.salesByMonth && data.salesByMonth.length > 0 && <section className="swish-card p-4">
+            <h2 className="mb-4 text-sm font-semibold">Recorded sales value by month</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={data.salesByMonth} margin={{ top: 0, right: 0, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip formatter={value => formatCurrency(Number(value))} />
+                <Bar dataKey="value" name="Sales value" fill="#F5A623" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No order data yet</div>}
-        </div>
-
-        <div className="swish-card p-4">
-          <h3 className="text-sm font-semibold mb-4">Orders by Month</h3>
-          {chartArray.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={chartArray} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 35% 18%)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'hsl(215 20% 55%)' }} />
-                <YAxis tick={{ fontSize: 10, fill: 'hsl(215 20% 55%)' }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="orders" stroke={CHART_COLORS.secondary} strokeWidth={2} dot={false} />
+          </section>}
+          {data.ordersByMonth && data.ordersByMonth.length > 0 && <section className="swish-card p-4">
+            <h2 className="mb-4 text-sm font-semibold">Recorded orders by month</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={data.ordersByMonth} margin={{ top: 0, right: 0, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" name="Orders" stroke="#4A90D9" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
-          ) : <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data yet</div>}
-        </div>
-
-        <div className="swish-card p-4 lg:col-span-2">
-          <h3 className="text-sm font-semibold mb-4">Inventory by Category</h3>
-          {catArray.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={catArray} layout="vertical" margin={{ top: 0, right: 30, left: 80, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 35% 18%)" />
-                <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(215 20% 55%)' }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: 'hsl(215 20% 55%)' }} width={75} />
+          </section>}
+          {data.inventoryBySpecialist.length > 0 && <section className="swish-card p-4 lg:col-span-2">
+            <h2 className="mb-4 text-sm font-semibold">Inventory by specialist</h2>
+            <ResponsiveContainer width="100%" height={Math.max(180, data.inventoryBySpecialist.length * 35)}>
+              <BarChart data={data.inventoryBySpecialist} layout="vertical" margin={{ top: 0, right: 30, left: 80, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={100} />
                 <Tooltip />
-                <Bar dataKey="count" fill={CHART_COLORS.primary} radius={[0, 3, 3, 0]} />
+                <Bar dataKey="count" name="Stock items" fill="#F5A623" radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">No inventory data</div>}
+          </section>}
         </div>
-      </div>
+        {!data.inventoryCount && !data.orderCount && !data.recordedSaleCount && <div className="swish-card p-8 text-sm text-muted-foreground">This workspace has no inventory, eBay orders or recorded sales yet.</div>}
+        <p className="text-xs text-muted-foreground">Values are calculated from all pages of the signed-in tenant and active specialist, not a top-100 sample. Recorded sales value comes from the sales ledger; order value is not called realised revenue. A refresh performs fresh server requests.</p>
+      </>}
     </div>
   );
 }

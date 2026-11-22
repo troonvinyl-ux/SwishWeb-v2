@@ -10,10 +10,10 @@ import { callEdgeFunction, getSupabaseClientAsync } from '@/lib/supabase';
 
 export default function Dispatch() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, isPlatformOwner } = useAuth();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const preferredNiche = String(user?.user_metadata?.preferred_niche || localStorage.getItem('swish_active_niche') || 'coins').toLowerCase();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
+  const isOwner = isPlatformOwner;
   const activeNiche = String((isOwner ? localStorage.getItem('swish_active_niche') : preferredNiche) || preferredNiche).toLowerCase();
   const specialistIds: string[] =
     ['clothing', 'fashion', 'threads', 'threads_flip', 'trainers', 'trainers_sneakers'].includes(activeNiche) ? ['clothing', 'trainers_sneakers'] :

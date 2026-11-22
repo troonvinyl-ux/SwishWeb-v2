@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTable } from '@/hooks/useSupabaseQuery';
 import { Package, Search, Plus, RefreshCw, AlertTriangle, Archive, Pencil, Store, CheckCircle2, Coins, Info } from 'lucide-react';
@@ -14,10 +14,12 @@ export default function Inventory() {
   const tab: InventoryTab = TABS.some(value => value.id === params.get('tab')) ? params.get('tab') as InventoryTab : 'stock';
   const setTab = (value: InventoryTab) => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next, { replace: true }); };
   const [search, setSearch] = useState(params.get('q') || ''), qc = useQueryClient();
+  const externalSearch = params.get('q') || '';
+  useEffect(() => { setSearch(externalSearch); }, [externalSearch]);
   const tenant = useCurrentTenantId(), tenantId = tenant.tenantId, niche = getActiveNicheId();
   const specialistIds = getSpecialistIdsForNiche(niche);
-  const stockQuery = useTable('items', { order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId }, inFilter: { specialist_id: specialistIds }, enabled: Boolean(tenantId) && specialistIds.length > 0 });
-  const listingsQuery = useTable('listings', { select: '*, items!inner(id, specialist_id, canonical_title, media, attributes, condition)', order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, inFilter: { 'items.specialist_id': specialistIds }, enabled: Boolean(tenantId) && specialistIds.length > 0 });
+  const stockQuery = useTable('items', { order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId }, inFilter: { specialist_id: specialistIds }, allPages: true, enabled: Boolean(tenantId) && specialistIds.length > 0 });
+  const listingsQuery = useTable('listings', { select: '*, items!inner(id, specialist_id, canonical_title, media, attributes, condition)', order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, inFilter: { 'items.specialist_id': specialistIds }, allPages: true, enabled: Boolean(tenantId) && specialistIds.length > 0 });
   const allStock = stockQuery.data || [], allListings = listingsQuery.data || [];
   const sold = allStock.filter(row => row.status === 'sold');
   const drafts = allListings.filter(row => ['draft', 'pending'].includes(String(row.status).toLowerCase()));

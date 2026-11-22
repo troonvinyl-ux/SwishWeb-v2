@@ -5,7 +5,7 @@ import NicheAccessStatus from '@/components/features/NicheAccessStatus';
 import { normaliseNicheId, type SwishNicheId } from '@/lib/niche';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Info, CheckCircle2, Circle, Coins, Bike, Shirt, Wrench, Package, Search, ShieldCheck, Grid3X3, Construction, Gamepad2, Watch, Gem, Palette, Smartphone, Sparkles } from 'lucide-react';
+import { Info, CheckCircle2, Circle, Coins, Bike, Shirt, Wrench, Package, Search, ShieldCheck, Grid3X3, Gamepad2, Watch, Gem, Palette, Smartphone, Sparkles } from 'lucide-react';
 
 type Niche = {
   id: SwishNicheId;
@@ -36,8 +36,9 @@ const NICHES: Niche[] = [
 ];
 
 export default function NicheEntry() {
-  const { user } = useAuth();
-  const { nicheIds: enabled, isOwner, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
+  const { user, isPlatformOwner } = useAuth();
+  const { nicheIds: enabled, isOwner: verifiedMembershipOwner, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
+  const isOwner = isPlatformOwner && verifiedMembershipOwner;
   const navigate = useNavigate();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const [query, setQuery] = useState('');
@@ -95,7 +96,6 @@ export default function NicheEntry() {
           })}
           {niches.length === 0 && <p role="status" className="py-8 text-center leading-7 text-muted-foreground">{enabled.length ? 'No included niches match that search.' : 'No niche entitlements were returned for this account. If your membership includes niches, refresh access or check your account settings.'}</p>}
         </div>
-        <div className="vertical-coming"><Construction className="w-5 h-5 shrink-0" /><div><strong>More verticals coming</strong><p>Musical instruments · Sports equipment · Golf · Watches · Tools · Homeware</p></div></div>
         <div className="vertical-note"><Grid3X3 className="w-4 h-4 shrink-0" /><div><strong>ONE PLATFORM, MANY NICHES</strong><p>Your inventory, eBay integration, AI engine, valuation and orders share one platform. Switching niche changes the specialist context; existing backend access controls remain authoritative.</p></div></div>
       </section>
       <footer className="vertical-done"><button onClick={done} disabled={tenantLoading || entitlementsLoading || Boolean(entitlementsError) || !tenantId || !enabled.includes(activeId)}><CheckCircle2 className="w-5 h-5" />{`Done — Using ${NICHES.find(n => n.id === activeId)?.name || 'SWISH'}`}</button></footer>
