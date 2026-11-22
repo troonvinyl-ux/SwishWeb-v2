@@ -43,7 +43,6 @@ import EbayImport from '@/pages/EbayImport';
 import EbayLogs from '@/pages/EbayLogs';
 import Settings from '@/pages/Settings';
 import MasterAdmin from '@/pages/MasterAdmin';
-import SpecialistTools from '@/pages/SpecialistTools';
 import NotFound from '@/pages/NotFound';
 import SwishFlipHome from '@/pages/SwishFlipHome';
 import NicheComingSoon from '@/components/features/NicheComingSoon';
@@ -133,8 +132,8 @@ function AppRoutes() {
     <Route path="/ebay/import" element={<EbayImport />} />
     <Route path="/ebay/logs" element={<EbayLogs />} />
     <Route path="/tools" element={<NotFound />} />
-    <Route path="/tools/islamic-batch" element={<SpecialistTools />} />
-    <Route path="/tools/silver-batch" element={<SpecialistTools />} />
+    <Route path="/tools/islamic-batch" element={<NotFound />} />
+    <Route path="/tools/silver-batch" element={<NotFound />} />
     <Route path="/tools/bike-flipper" element={<Navigate to="/scan/bikes" replace />} />
     <Route path="/tools/listing-preflight" element={<NotFound />} />
     <Route path="/settings" element={<Settings />} />
