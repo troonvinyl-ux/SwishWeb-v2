@@ -1,12 +1,7 @@
 import { useLocation, Link } from 'react-router-dom';
-import { useEffect } from 'react';
 
 export default function NotFound() {
   const location = useLocation();
-  useEffect(() => {
-    console.error('404:', location.pathname);
-  }, [location.pathname]);
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center">
