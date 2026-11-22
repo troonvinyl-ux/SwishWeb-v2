@@ -24,7 +24,7 @@ export default function InventoryCard({ row, item, tab, onCheckListing, checking
       </div><ChevronRight size={18} className="swish-inventory-chevron" />
     </button>
     {tab === 'stock' && <Link className="swish-inventory-submit" to={`/listings/new?item_id=${row.id}`}><Tag size={16} /><span>List</span></Link>}
-    {tab === 'draft' && /^\\d{6,20}$/.test(linkedEbayId) && onCheckListing
+    {tab === 'draft' && /^\d{6,20}$/.test(linkedEbayId) && onCheckListing
       ? <button type="button" className="swish-inventory-submit" disabled={Boolean(checkingId)} onClick={() => void onCheckListing(String(row.id))}><RefreshCw size={16}/><span>{checkingId === row.id ? 'Checking…' : 'Check eBay'}</span></button>
       : tab === 'draft' && <Link className="swish-inventory-submit" to={`/listings/${row.id}/edit`}><span>Review</span></Link>}
     {tab === 'live' && ebay && <a className="swish-inventory-submit is-live" href={ebay} target="_blank" rel="noreferrer" aria-label="View live listing on eBay"><Store size={16} /><span>eBay</span></a>}
