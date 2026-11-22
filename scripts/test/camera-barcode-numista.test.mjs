@@ -98,7 +98,7 @@ test('invalid or missing Numista references keep normal visual identification fl
     assert.deepEqual(numistaAnchoredReview({}, visual, entry).candidates, visual);
   }
 });
-test('Coin Flipper's active /scan/coins route retains two-face capture and existing draft gates', async () => {
+test("Coin Flipper active /scan/coins route retains two-face capture and existing draft gates", async () => {
   const [app, identify, gate] = await Promise.all([
     'src/App.tsx', 'src/pages/Identify.tsx', 'src/lib/coinListingGate.ts',
   ].map(path => readFile(path, 'utf8')));
