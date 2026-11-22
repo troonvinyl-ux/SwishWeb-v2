@@ -117,3 +117,27 @@ test('saved eBay category, condition and grade survive a partially empty editor 
   assert.equal(reopened.category_id, '176985');
   assert.equal(reopened.condition_id, '3000');
 });
+
+test('changing category never copies an incompatible previously saved condition identifier', async () => {
+  const { calls, input } = fixture();
+  input.item.attributes = {
+    ...input.item.attributes,
+    ebay_category_id: '176985',
+    ebay_category_name: 'Vinyl Records',
+    ebay_condition_id: '3000',
+  };
+  input.form = {
+    ...input.form,
+    category_id: '176983',
+    category: 'CDs',
+    condition_id: '',
+  };
+  const saved = await saveSharedListingEditor(input);
+  assert.equal(calls[0].body.p_listing_patch.category_id, '176983');
+  assert.equal(calls[0].body.p_item_patch.ebay_condition_id, '');
+  assert.equal(saved.item.attributes.ebay_category_id, '176983');
+  assert.equal(saved.item.attributes.ebay_condition_id, '');
+  const reopened = hydrateListingEditor(saved.listing, saved.item);
+  assert.equal(reopened.category_id, '176983');
+  assert.equal(reopened.condition_id, '');
+});
