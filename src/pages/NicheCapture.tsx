@@ -43,12 +43,12 @@ export default function NicheCapture() {
   // Normalise supported entry aliases before choosing the workflow.
   const niche = normaliseNicheId(routeNiche) || routeNiche;
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isPlatformOwner } = useAuth();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const canonicalNicheId = normaliseNicheId(niche);
-  const { nicheIds: entitledNiches, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
+  const { nicheIds: entitledNiches, isOwner: verifiedOwnerMembership, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
   const isSupportedNiche = canonicalNicheId !== null;
-  const nicheAllowed = canonicalNicheId !== null && entitledNiches.includes(canonicalNicheId);
+  const nicheAllowed = canonicalNicheId !== null && (entitledNiches.includes(canonicalNicheId) || (isPlatformOwner && verifiedOwnerMembership));
   useEffect(() => { if (nicheAllowed && canonicalNicheId) { localStorage.setItem('swish_active_niche', canonicalNicheId); document.documentElement.dataset.niche = canonicalNicheId; } }, [nicheAllowed, isSupportedNiche, canonicalNicheId]);
   const insert = useInsert('items', tenantId);
   const config = useMemo(() => CONFIG[niche] || CONFIG[canonicalNicheId === 'trading_cards' ? 'cards' : canonicalNicheId === 'bicycles' ? 'bikes' : canonicalNicheId === 'motocross' ? 'mx' : (canonicalNicheId ?? '')] || CONFIG.generic, [niche, canonicalNicheId]);
