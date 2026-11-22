@@ -10,7 +10,7 @@ export function useBarcodeLookup(scope: CaptureScope) {
   const flight = useRef(false), serial = useRef(0), alive = useRef(true), scopeRef = useRef(scope); scopeRef.current = scope;
   useEffect(() => { alive.current = true; return () => { alive.current = false; serial.current++; }; }, []);
   const lookup = useCallback(async (reading: BarcodeReading) => {
-    const gtin = normalizeProductBarcode(reading.code, reading.type);
+    const gtin = normalizeProductBarcode(reading.value, reading.format);
     if (!gtin) { setError('Invalid EAN/UPC/ISBN check digit. Rescan or edit the barcode.'); return; }
     if (flight.current) return;
     const captured = scopeRef.current, version = ++serial.current, valid = () => alive.current && captured.isCurrent() && version === serial.current;
