@@ -65,9 +65,9 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, sta
 const ENTRY_PATHS = ['/stamps', '/stamp-flip', '/stamp-flipper', '/entry/stamps', '/philately', '/coins', '/mx', '/bikes', '/threads', '/clothes', '/surplus', '/cards', '/games', '/antiques', '/home', '/fossils', '/beauty', '/tech', '/electronics', '/tunes', '/tunes-flip', '/tunes_flip', '/music', '/vinyl_records', '/collectibles', '/collectibles-flipper', '/collectibles_flipper'];
 
 function AppRoutes() {
-  const { connectionStatus, loading, user } = useAuth();
+  const { connectionStatus, loading, user, isPlatformOwner, isPlatformOwnerLoading } = useAuth();
   const location = useLocation();
-  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
+  const isOwner = isPlatformOwner;
   const hostProduct = getHostProduct();
   if (isSwishHomeRoute(currentHostname, location.pathname, Boolean(hostProduct))) return <SwishFlipHome />;
   if (currentHostname.endsWith('.swishflip.co.uk') && !hostProduct) return <NicheComingSoon />;
@@ -78,6 +78,7 @@ function AppRoutes() {
   const entryWorkspace = needsOnboarding ? '/onboarding' : `/workspace/${safeNiche}`;
   if (connectionStatus === 'initialising' || (loading && connectionStatus === 'connected')) return <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background"><Loader2 className="h-7 w-7 animate-spin text-primary" /><span className="text-sm text-muted-foreground">Connecting to SWISH…</span></div>;
   if (!user) return <LoginPage />;
+  if (isPlatformOwnerLoading) return <div role="status" className="flex min-h-screen items-center justify-center gap-3 bg-background"><Loader2 className="h-6 w-6 animate-spin text-primary" />Verifying account permissions…</div>;
   // Hostnames select presentation, never grant backend authorization.
   if (hostProduct && !isOwner) {
     const path = location.pathname;
