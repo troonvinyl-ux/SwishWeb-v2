@@ -2,8 +2,8 @@ import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, Package, Coins, ShoppingBag, Lightbulb, Tag, ShoppingCart, ClipboardCheck,
-  Truck, TrendingUp, BarChart3, Wallet, CheckSquare, Terminal, Settings,
+  Package, Coins, ShoppingBag, Lightbulb, Tag, ShoppingCart,
+  Truck, TrendingUp, Wallet, CheckSquare, Terminal, Settings,
   LogOut, ChevronDown, ChevronRight, Zap, RefreshCw, AlertCircle, ClipboardList, Sparkles, Crown
 } from 'lucide-react';
 import { useState } from 'react';
@@ -29,7 +29,6 @@ const EBAY_ITEMS: NavItemDef[] = [
   { label: 'Returns', to: '/ebay/returns', icon: RefreshCw },
   { label: 'Cases', to: '/ebay/cases', icon: AlertCircle },
   { label: 'Finances', to: '/ebay/finances', icon: Wallet },
-  { label: 'Analytics', to: '/ebay/analytics', icon: BarChart3 },
   { label: 'Import', to: '/ebay/import', icon: () => <span className="text-xs">↓</span> },
   { label: 'Logs', to: '/ebay/logs', icon: ClipboardList },
 ];
@@ -37,21 +36,17 @@ const EBAY_ITEMS: NavItemDef[] = [
 const NAV_SECTIONS: NavSection[] = [
   {
     items: [
-      { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
       { label: 'Command Centre', to: '/command-centre', icon: Terminal },
-      { label: 'App Tools & Parity', to: '/tools', icon: Sparkles },
     ],
   },
   {
     label: 'Stock',
     items: [
       { label: 'Inventory', to: '/inventory', icon: Package },
-      { label: 'Stock Check', to: '/stock-check', icon: ClipboardCheck },
       { label: 'Identify / Scan', to: '/identify', icon: Coins },
       { label: 'Acquisitions', to: '/acquisitions', icon: ShoppingBag },
       { label: 'Opportunities', to: '/opportunities', icon: Lightbulb },
       { label: 'Review Required', to: '/review-required', icon: AlertCircle },
-      { label: 'Audit', to: '/audit', icon: ClipboardList },
     ],
   },
   {
@@ -67,7 +62,6 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Insights',
     items: [
       { label: 'Insights', to: '/insights', icon: TrendingUp },
-      { label: 'Money', to: '/money', icon: Wallet },
     ],
   },
   {
