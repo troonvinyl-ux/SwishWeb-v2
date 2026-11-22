@@ -69,3 +69,14 @@ test('real import uses one atomic canonical RPC with current-module verification
   const importPage = await readFile('src/pages/EbayImport.tsx', 'utf8');
   assert.match(importPage, /EbaySellerDiscovery/);
 });
+
+test('new-listing form hides coin valuation and grading outside Coin Flipper', async () => {
+  const newListing = await readFile('src/pages/ListingNew.tsx', 'utf8');
+  assert.match(newListing, /coinWorkspace && valuationPanel/);
+  assert.match(newListing, /coinWorkspace && <div className="swish-card overflow-hidden">/);
+  assert.match(newListing, /coinWorkspace \? 'Used – Good \(Fine \/ VG\)' : 'Used – Good'/);
+  const sale = await readFile('src/components/features/ListingSaleFields.tsx', 'utf8');
+  assert.match(sale, /item\?\.specialist_id === 'vinyl_records' && <MusicListingPrice/);
+  const category = await readFile('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  assert.match(category, /placeholder=\{music \?/);
+});
