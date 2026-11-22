@@ -11,6 +11,9 @@ const { hydrateListingEditor, listingSpecifics } = load('src/lib/listingEditorDa
 test('music grading uses exact eBay text, with Goldmine Poor explicitly represented as Worn', () => {
   const expected = { M: 'Mint (M)', NM: 'Near Mint (NM or M-)', EX: 'Excellent (EX)', 'VG+': 'Very Good Plus (VG+)', VG: 'Very Good (VG)', 'G+': 'Good Plus (G+)', G: 'Good (G)', F: 'Fair (F)', W: 'Worn (W)', P: 'Worn (W)' };
   for (const [code, label] of Object.entries(expected)) { assert.equal(contract.ebayMusicGrade(code), label); if (code !== 'P') assert.equal(contract.musicGradeCode(label), code); }
+  assert.equal(contract.musicGradeCode('Very Good Plus'), 'VG+');
+  assert.equal(contract.musicGradeCode('VG Plus'), 'VG+');
+  assert.equal(contract.ebayMusicGrade('Very Good Plus'), 'Very Good Plus (VG+)');
   assert.equal(contract.ebayMusicGrade('NM', ['Near Mint (NM or M-)']), 'Near Mint (NM or M-)');
 });
 test('native music aspect names differ for vinyl, CDs and cassettes', () => {
