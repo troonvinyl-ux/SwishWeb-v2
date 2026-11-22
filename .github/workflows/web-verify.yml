@@ -26,12 +26,16 @@ jobs:
       - name: Shared flow regression tests
         run: node --test scripts/test/*.test.mjs
       - name: Typecheck
+        if: ${{ !cancelled() }}
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: Build
+        if: ${{ !cancelled() }}
         run: npm run build
       - name: Lint
+        if: ${{ !cancelled() }}
         run: npm run lint
       - name: Niche mapping regression check
+        if: ${{ !cancelled() }}
         run: npm run test:niches
 
 

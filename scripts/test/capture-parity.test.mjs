@@ -37,14 +37,48 @@ test('barcodes require valid checksums; arbitrary QR URLs cannot become fetch ta
   assert.equal(normalizeProductBarcode('https://example.com/secret'), null);
   assert.equal(normalizeProductBarcode('0306406152'), '9780306406157');
 });
-test('all scanner entry points share capture, permanent photos, native generation and canonical draft RPC', async () => {
-  const [app, capture, pipeline, persistence, review] = await Promise.all(['src/App.tsx', 'src/pages/NicheCapture.tsx', 'src/lib/quickCaptureFlow.ts', 'src/lib/capturePersistence.ts', 'src/components/features/CaptureDraftReview.tsx'].map(path => readFile(path, 'utf8')));
-  assert.match(app, /\/stamps/); assert.match(app, /path="\/capture"/); assert.match(app, /path="\/identify\/coins" element=\{<NicheCapture/);
-  assert.match(capture, /QuickCaptureWorkspace/); assert.doesNotMatch(capture, /CONFIG\.generic/);
-  assert.match(pipeline, /swish-identify/); assert.match(pipeline, /swish-list-generate/); assert.match(pipeline, /swish_create_listing_draft/);
-  assert.doesNotMatch(pipeline, /route: 'publish'/); assert.match(persistence, /swish-capture-v1/); assert.match(persistence, /item-images/);
-  assert.doesNotMatch(persistence, /preview:/); assert.match(review, /Save for later/); assert.match(review, /publish_claim_id/);
+test('each active scanner route has an explicit scoped flow that saves evidence without publishing', async () => {
+  const [app, capture, pipeline, persistence, review, coin] = await Promise.all([
+    'src/App.tsx', 'src/pages/NicheCapture.tsx', 'src/lib/quickCaptureFlow.ts',
+    'src/lib/capturePersistence.ts', 'src/components/features/CaptureDraftReview.tsx',
+    'src/pages/Identify.tsx',
+  ].map(path => readFile(path, 'utf8')));
+  // The existing coin Numista workflow remains the production coin route.
+  assert.ok(app.includes('path="/identify/coins" element={<Navigate to="/scan/coins" replace />}'));
+  assert.ok(app.includes('path="/scan/coins" element={<Identify />}'));
+  assert.ok(app.includes('path="/scan/:niche" element={<NicheCapture />}'));
+  assert.ok(app.includes('path="/capture" element={<Navigate to='));
+  assert.match(coin, /coinAllowed/);
+  // Other niche scan routes persist the current tenant's items and original
+  // images; they do not pretend to have created a marketplace listing.
+  assert.match(capture, /useInsert\('items', tenantId\)/);
+  assert.match(capture, /swish-identify/);
+  assert.match(capture, /storage\.from\('item-images'\)\.upload/);
+  assert.match(capture, /\.eq\('tenant_id',tenantId\)/);
+  assert.doesNotMatch(capture, /route: 'publish'/);
+  // The shared quick-capture service is separately tested for durable photos,
+  // generation, and draft RPC, without asserting it replaces all niche flows.
+  assert.match(pipeline, /swish-identify/);
+  assert.match(pipeline, /swish-list-generate/);
+  assert.match(pipeline, /swish_create_listing_draft/);
+  assert.doesNotMatch(pipeline, /route: 'publish'/);
+  const pathSource = await readFile('src/lib/sharedScanPhotos.ts', 'utf8');
+  assert.match(pathSource, /scanPhotoStoragePath/);
+  assert.match(pathSource, /crypto\.randomUUID\(\)/);
+  assert.match(persistence, /scanPhotoStoragePath\(itemId,photo\.slotId,photo\.file\)/);
+  assert.match(persistence, /item-images/);
+  assert.match(review, /Save for later/);
+  assert.match(review, /publish_claim_id/);
 });
+
 test('new scanner files transpile without syntax errors', async () => {
   for (const path of ['src/lib/nativeSourceLiteral.ts', 'src/lib/nativeCaptureProfiles.ts', 'src/lib/captureRequest.ts', 'src/lib/capturePersistence.ts', 'src/lib/quickCaptureFlow.ts', 'src/hooks/useQuickCapture.ts', 'src/hooks/useCaptureCamera.ts', 'src/components/features/QuickCaptureWorkspace.tsx', 'src/components/features/CaptureDraftReview.tsx', 'src/components/features/BarcodeCapture.tsx', 'src/components/features/CaptureCamera.tsx']) assert.equal(compile(await readFile(path, 'utf8')).diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length ?? 0, 0, path);
+});
+
+test('dynamic web capture reference matches the exact manually reviewed native source pin', async () => {
+  const config = JSON.parse(await readFile('config/swish-source.json', 'utf8'));
+  const captureSource = await readFile('src/lib/nativeCaptureProfiles.ts', 'utf8');
+  assert.match(config.commit, /^[a-f0-9]{40}$/);
+  assert.ok(captureSource.includes(`CAPTURE_SOURCE_COMMIT = '${config.commit}'`),
+    'Capture profiles must not silently fetch a different native revision than config/swish-source.json');
 });

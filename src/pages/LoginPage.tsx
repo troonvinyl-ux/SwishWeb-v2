@@ -25,7 +25,7 @@ function ConnectionBanner({ status }: { status: ConnectionStatus }) {
     return <div className="mb-5 flex h-7 items-center justify-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Connecting to SWISH backend…</div>;
   }
   if (status === 'error') {
-    return <div className="mb-5 flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"><WifiOff className="h-3.5 w-3.5 shrink-0" />Backend connection error. Check your network and try again.</div>;
+    return <div role="alert" className="mb-5 flex items-center gap-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"><WifiOff className="h-3.5 w-3.5 shrink-0" /><span>Could not restore your SWISH session. Check your network, then retry.</span><button type="button" onClick={() => window.location.reload()} className="btn-secondary min-h-10">Retry</button></div>;
   }
   return <div className="mb-5 h-7" />;
 }
@@ -186,7 +186,7 @@ export default function LoginPage() {
             <label className="block text-xs font-medium mb-1.5 text-muted-foreground"><Key className="w-3 h-3 inline mr-1" />Backend public API key</label>
             <div className="relative">
               <input type={showKey ? 'text' : 'password'} value={manualKey} onChange={e => setManualKeyInput(e.target.value)} placeholder="Public anon key" className="input-field pr-9 font-mono text-xs" autoComplete="off" />
-              <button type="button" onClick={() => setShowKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">{showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}</button>
+              <button type="button" aria-label={showKey ? 'Hide backend public key' : 'Show backend public key'} onClick={() => setShowKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">{showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}</button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">Only the public anon key belongs here. Never enter a service-role key or marketplace secret.</p>
           </div>}
