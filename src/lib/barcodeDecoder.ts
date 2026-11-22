@@ -5,7 +5,7 @@ export async function decodeBarcodeImage(source: CanvasImageSource, width: numbe
   const DetectorClass = (globalThis as unknown as {BarcodeDetector?: new () => Detector}).BarcodeDetector;
   if (DetectorClass) {
     try { const readings=await new DetectorClass().detect(source);if(readings[0])return {value:readings[0].rawValue,format:readings[0].format}; }
-    catch { /* Unsupported native format/implementation: use the software decoder. */ }
+    catch { /* A native decode failure must report an actionable manual-entry fallback. */ }
   }
   // No optional decoder dependency is bundled in this web build. The camera
   // deliberately reports unsupported scanning instead of showing a fake result;
