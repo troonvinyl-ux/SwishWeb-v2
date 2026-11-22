@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTable } from '@/hooks/useSupabaseQuery';
 import { Package, Search, Plus, RefreshCw, AlertTriangle, Archive, Pencil, Store, CheckCircle2, Coins, Info } from 'lucide-react';
@@ -14,6 +14,8 @@ export default function Inventory() {
   const tab: InventoryTab = TABS.some(value => value.id === params.get('tab')) ? params.get('tab') as InventoryTab : 'stock';
   const setTab = (value: InventoryTab) => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next, { replace: true }); };
   const [search, setSearch] = useState(params.get('q') || ''), qc = useQueryClient();
+  const externalSearch = params.get('q') || '';
+  useEffect(() => { setSearch(externalSearch); }, [externalSearch]);
   const tenant = useCurrentTenantId(), tenantId = tenant.tenantId, niche = getActiveNicheId();
   const specialistIds = getSpecialistIdsForNiche(niche);
   const stockQuery = useTable('items', { order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId }, inFilter: { specialist_id: specialistIds }, enabled: Boolean(tenantId) && specialistIds.length > 0 });
