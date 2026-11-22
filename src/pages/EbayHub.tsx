@@ -12,7 +12,7 @@ const QUICK_LINKS = [
   { to: '/ebay/orders', label: 'Orders' }, { to: '/ebay/messages', label: 'Messages' },
   { to: '/ebay/offers', label: 'Offers' }, { to: '/ebay/returns', label: 'Returns' },
   { to: '/ebay/cases', label: 'Cases' }, { to: '/ebay/finances', label: 'Finances' },
-  { to: '/ebay/analytics', label: 'Analytics' }, { to: '/ebay/import', label: 'Import / Export' },
+  { to: '/ebay/import', label: 'Import' },
   { to: '/ebay/logs', label: 'Logs' },
 ];
 export default function EbayHub() {
