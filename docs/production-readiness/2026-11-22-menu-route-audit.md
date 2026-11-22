@@ -98,3 +98,28 @@
 Reconcile every **Remove** decision in *all* route aliases, main navigation, mobile menus, workspace CTAs, command/search results and keyboard state. Correct **Implement** source paths, verify each with representative populated account, truly empty account, failed API response, refresh/reopen, wrong-tenant denial, narrow viewport and direct-link revisit. Run tests, TypeScript, lint, build, niche checks and native contract comparison. Only after green evidence merge/commit to `main`, wait for actual OnSpace sync completion and verify `swishflip.co.uk` signed-in workflows; record the exact commit and any remaining risk.
 
 **Do not represent this work as complete or deployed while any line above is pending.**
+
+
+## Implemented on review branch — source changes, not a production claim
+
+| Web capability | Review-branch disposition |
+|---|---|
+| Legacy Dashboard | Sidebar entry removed; `/dashboard` redirects to current authorised workspace instead of presenting stale tenant totals |
+| App Tools & Parity, Stock Check, Audit, Money, eBay Analytics | Entries removed from desktop navigation, eBay Hub where applicable, and direct routes resolve to controlled unavailable response |
+| Misleading eBay Categories, draft-sync test, listing-preflight aliases | Controlled unavailable route instead of silently substituting an unrelated page |
+| Unfinished Islamic/Silver batch tool | Removed workspace entry and direct batch routes: identification results were ephemeral, not saved with a recoverable inventory journey |
+| Threads Flip pseudo-tabs | Decorative/inert Identify, Style and misdirected Value controls replaced by real Listings and Sales/Stock Insights links |
+| Insights | Full paginated eBay sales/orders and stock reads scoped by signed-in tenant and specialist; hide invalid data instead of showing zero; date-sorted months; explicit refetch/error |
+| Inventory | Full paginated items and listings rather than one server page. URL query synchronisation repaired for header search while Inventory remains open |
+| Command Centre | Legacy inventory counts corrected to `items`, removed inactive batch actions and false backend-connected label, added activity retry |
+| eBay Returns | Removed unsupported disabled action, retained bounded read/synchronisation paths |
+| Settings | Unsupported notification toggles removed; saved options still require real-data readback tests. Sign-out label clarified |
+| Admin/permissions | Privileged navigation and route UI now use verified backend `isPlatformOwner`; Master Admin niche list comes from `PRODUCTS`; unsupported subscriber grant teaser removed |
+| eBay category, condition and music grading | Preserve saved IDs when draft form blank; when category changes, require a new compatible condition instead of reusing old ID; reopen respects explicit cleared condition; `Very Good Plus` canonicalises to `VG+` |
+| Barcode | Native `BarcodeDetector` when browser supports it; explicit visible EAN/UPC/ISBN manual lookup where automatic decoder unavailable; no pretend software decoder |
+| Legacy deep link fallback | Controlled explanation, workspace recovery link, and no console-error log on expected unavailable routes |
+| Native/source parser | Rejected prototype-mutating keys in imported native configuration literal (security fix) |
+
+**Review evidence:** GitHub Actions on the review branch have reported passing TypeScript, production build, lint, and niche mapping checks in completed intermediate runs. All added persistence/analytics tests passed; the shared regression suite had outdated scanner/category/decoder source expectations which were reviewed and updated to assert the actual supported journeys rather than bypassing the test runner. The current tip must receive its own clean CI result before any merge. The native contract drift gate remains independently blocked until its pinned reference is reconciled against native main.
+
+**No authenticated live-browser / OnSpace production evidence exists for this branch.** These fixes remain candidates. The broader retained journeys (inventory mutations, membership switching, all eBay subsections, scan/identify, Acquisitions, Opportunities, Tasks, Settings, direct routes, error/empty, mobile) are *not* certified. Don't merge to `main` or deploy on the basis of source checks alone.
