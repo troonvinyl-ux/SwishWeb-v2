@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Settings as SettingsIcon, User, Bell, Shield, Save, Bot, Radio, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Settings as SettingsIcon, User, Shield, Save, Bot, Radio, ShieldCheck, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 const LOCAL_VECTOR_PAIRING_URL = 'http://127.0.0.1:8788/v1/pair';
@@ -69,7 +69,6 @@ export default function Settings() {
   const TABS = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'business', label: 'Business', icon: SettingsIcon },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'vector', label: 'Vector', icon: Bot },
     { id: 'security', label: 'Security', icon: Shield },
   ];
@@ -90,17 +89,20 @@ export default function Settings() {
           <Link to="/listings" className="rounded-lg border border-border p-3">Listings</Link>
         </div>
         {isPlatformOwner && <Link to="/master-admin" className="block rounded-lg border border-border p-3 text-sm">Master Admin</Link>}
-        <button type="button" onClick={() => void signOut()} className="w-full rounded-lg border border-border p-3 text-left text-sm">Sign out</button>
+        <button type="button" aria-label="Sign out of SWISH" onClick={() => void signOut()} className="w-full rounded-lg border border-border p-3 text-left text-sm">Sign out</button>
       </nav>
       <div className="page-header">
         <h1 className="page-title">Settings</h1>
         <p className="page-subtitle">Manage your account and application settings</p>
       </div>
 
-      <div className="flex gap-1 border-b border-border pb-0 -mb-2">
+      <div role="tablist" aria-label="Account settings" className="flex gap-1 border-b border-border pb-0 -mb-2 overflow-x-auto">
         {TABS.map(t => (
           <button
+            type="button"
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === t.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -171,32 +173,6 @@ export default function Settings() {
           </div>
           <button onClick={saveProfile} disabled={saving} className="btn-primary">
             <Save className="w-3.5 h-3.5" />{saving ? 'Saving…' : 'Save Business Settings'}
-          </button>
-        </div>
-      )}
-
-      {tab === 'notifications' && (
-        <div className="swish-card p-5 space-y-4">
-          <h3 className="text-sm font-semibold">Notification Preferences</h3>
-          {[
-            { key: 'notify_orders', label: 'New Orders' },
-            { key: 'notify_messages', label: 'eBay Messages' },
-            { key: 'notify_returns', label: 'Returns & Cases' },
-            { key: 'notify_low_stock', label: 'Low Stock Alerts' },
-            { key: 'notify_repricing', label: 'Repricing Events' },
-          ].map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-sm">{label}</span>
-              <button
-                onClick={() => setProfile(p => ({ ...p, [key]: !p[key] }))}
-                className={`w-10 h-6 rounded-full transition-colors relative ${profile[key] ? 'bg-primary' : 'bg-secondary'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${profile[key] ? 'translate-x-5' : 'translate-x-1'}`} />
-              </button>
-            </div>
-          ))}
-          <button onClick={saveProfile} disabled={saving} className="btn-primary mt-2">
-            <Save className="w-3.5 h-3.5" />{saving ? 'Saving…' : 'Save Preferences'}
           </button>
         </div>
       )}
