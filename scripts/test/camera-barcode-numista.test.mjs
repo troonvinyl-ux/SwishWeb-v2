@@ -102,13 +102,13 @@ test('Coin Flipper's active /scan/coins route retains two-face capture and exist
   const [app, identify, gate] = await Promise.all([
     'src/App.tsx', 'src/pages/Identify.tsx', 'src/lib/coinListingGate.ts',
   ].map(path => readFile(path, 'utf8')));
-  assert.match(app, /path="\\/scan\\/coins" element=\\{<Identify \\/>\\}/);
+  assert.match(app, /path="\/scan\/coins" element=\{<Identify \/>\}/);
   assert.match(identify, /const canSubmit = !!obverse && !!reverse/);
-  assert.match(identify, /numistaIdentifyKnownAttributes\\(metadata\\.numista_number\\)/);
-  assert.match(identify, /numistaAnchoredReview\\(identResult, normalizedCandidates, metadata\\.numista_number\\)/);
+  assert.match(identify, /numistaIdentifyKnownAttributes\(metadata\.numista_number\)/);
+  assert.match(identify, /numistaAnchoredReview\(identResult, normalizedCandidates, metadata\.numista_number\)/);
   assert.match(identify, /createCoinListingDraft/);
-  assert.match(gate, /faces\\.has\\('obverse'\\).*faces\\.has\\('reverse'\\)/);
-  assert.match(gate, /positiveMeasurement\\(answers\\.weight\\)/);
-  assert.match(gate, /positiveMeasurement\\(answers\\.diameter\\)/);
-  assert.match(gate, /parseNumistaNumber\\(answers\\.numista_number\\)/);
+  assert.match(gate, /faces\.has\('obverse'\).*faces\.has\('reverse'\)/);
+  assert.match(gate, /positiveMeasurement\(answers\.weight\)/);
+  assert.match(gate, /positiveMeasurement\(answers\.diameter\)/);
+  assert.match(gate, /parseNumistaNumber\(answers\.numista_number\)/);
 });
