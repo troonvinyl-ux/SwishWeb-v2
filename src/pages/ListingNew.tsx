@@ -200,6 +200,7 @@ export default function ListingNew() {
   // Load linked inventory record to extract AI identification data
   const { data: linkedItem } = useTableRow('items', itemIdParam || null, '*', tenantId);
   const inv = linkedItem as Record<string, unknown> | null;
+  const coinWorkspace = inv?.specialist_id ? getSpecialistIdsForNiche('coins').includes(String(inv.specialist_id)) : getActiveNicheId() === 'coins';
 
   // Initial param pre-fill (lightweight — just the URL params)
   useEffect(() => {
@@ -473,7 +474,7 @@ export default function ListingNew() {
       )}
 
       {/* ── AI pre-fill badge ── */}
-      {preFilled && inv && (
+      {coinWorkspace && preFilled && inv && (
         <div className="flex items-center gap-2 text-xs text-green-400 swish-card p-3">
           <CheckCircle className="w-3.5 h-3.5 shrink-0" />
           <span>
@@ -510,7 +511,7 @@ export default function ListingNew() {
       )}
 
       {/* ── Valuation panel — click a value to use it as the price ── */}
-      {valuationPanel && Object.keys(valuationPanel).length > 0 && (
+      {coinWorkspace && valuationPanel && Object.keys(valuationPanel).length > 0 && (
         <div className="swish-card overflow-hidden">
           <button
             type="button"
@@ -700,10 +701,10 @@ export default function ListingNew() {
             <label className="text-xs text-muted-foreground">Condition</label>
             <select value={f('condition')} onChange={e => setF('condition', e.target.value)} className="input-field mt-0.5">
               <option value="">Select…</option>
-              <option value="Used - Like New">Used – Like New (Uncirculated / BU)</option>
-              <option value="Used - Very Good">Used – Very Good (EF / AU / VF)</option>
-              <option value="Used - Good">Used – Good (Fine / VG)</option>
-              <option value="Used - Acceptable">Used – Acceptable (Good / Fair or below)</option>
+              <option value="Used - Like New">{coinWorkspace ? 'Used – Like New (Uncirculated / BU)' : 'Used – Like New'}</option>
+              <option value="Used - Very Good">{coinWorkspace ? 'Used – Very Good (EF / AU / VF)' : 'Used – Very Good'}</option>
+              <option value="Used - Good">{coinWorkspace ? 'Used – Good (Fine / VG)' : 'Used – Good'}</option>
+              <option value="Used - Acceptable">{coinWorkspace ? 'Used – Acceptable (Good / Fair or below)' : 'Used – Acceptable'}</option>
               <option value="For parts">For parts / not working</option>
             </select>
           </div>
@@ -816,8 +817,8 @@ export default function ListingNew() {
         );
       })()}
 
-      {/* ── Coin item specifics ── */}
-      <div className="swish-card overflow-hidden">
+      {/* Only coins have coin-specific identification fields. */}
+      {coinWorkspace && <div className="swish-card overflow-hidden">
         <button
           type="button"
           onClick={() => setShowSpecifics(!showSpecifics)}
@@ -912,7 +913,7 @@ export default function ListingNew() {
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── REQ-LST-003: Shipping locked ── */}
       <div className="swish-card p-4 space-y-2">
