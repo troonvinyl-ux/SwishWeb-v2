@@ -1,4 +1,4 @@
-const WEB_REPOSITORY = 'troonvinyl-ux/SwishWeb-v2';
+const WEB_REPOSITORY = 'troonvinyl-ux/SwishWeb';
 const SOURCE_REVIEWER = 'troonvinyl-ux';
 function snapshot(source) {
   return JSON.stringify([source.repository, source.branch, source.commit, source.backendUrl,
@@ -6,7 +6,7 @@ function snapshot(source) {
 }
 /** Read-only GitHub verification. Local labels and URLs alone never approve a release. */
 export async function verifySourceReview(source, readGithub) {
-  const match = /^https:\/\/github\.com\/troonvinyl-ux\/SwishWeb-v2\/pull\/(\d+)$/.exec(source.review?.reviewUrl ?? '');
+  const match = /^https:\/\/github\.com\/troonvinyl-ux\/SwishWeb\/pull\/(\d+)$/.exec(source.review?.reviewUrl ?? '');
   if (source.review?.status !== 'approved' || !match) return ['Native baseline has no claimed review to verify.'];
   const pr = await readGithub(WEB_REPOSITORY, `pulls/${match[1]}`);
   if (!pr.merged || pr.base?.ref !== 'main' || pr.base?.repo?.full_name !== WEB_REPOSITORY || !/^[a-f0-9]{40}$/.test(pr.head?.sha ?? '')) return ['Baseline review must be a merged pull request into SwishWeb main.'];

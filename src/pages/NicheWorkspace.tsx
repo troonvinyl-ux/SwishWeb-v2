@@ -1,9 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, Bike, Camera, CheckCircle2, Coins, Gem, Grid2X2, Package, Palette, ScanLine, Shirt, ShoppingCart, Smartphone, Sparkles, Store, Tag, Trophy, Wrench } from 'lucide-react';
+import { ArrowRight, Bike, Camera, CheckCircle2, Coins, Gem, Grid2X2, ImagePlus, Package, Palette, ScanLine, Shirt, ShoppingCart, Smartphone, Sparkles, Store, Tag, Trophy, Wrench } from 'lucide-react';
 import { useNicheAccess } from '@/hooks/useNicheAccess';
-import { useAuth } from '@/contexts/AuthContext';
 import NicheAccessStatus from '@/components/features/NicheAccessStatus';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useCount, useTable } from '@/hooks/useSupabaseQuery';
@@ -30,7 +29,7 @@ const standardActions = (scan: string, item: string, icon: LucideIcon): Action[]
   { label: 'eBay Hub', detail: 'Create drafts, publish listings and monitor sales.', icon: Store, to: '/ebay' },
   { label: 'Orders', detail: 'Track sold items and fulfilment.', icon: ShoppingCart, to: '/orders' },
   { label: 'List & Sell', detail: 'Prepare a listing with your specialist evidence.', icon: Tag, to: '/listings' },
-  { label: 'Sales & stock insights', detail: 'Review recorded sales, orders and stock figures.', icon, to: '/insights' },
+  { label: 'Market insights', detail: 'Review opportunities, value and demand.', icon, to: '/insights' },
 ];
 const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
   stamps: { id: 'stamps', name: 'Stamp Flipper', shortName: 'Stamps', headline: 'Discover the story behind every stamp.', detail: 'Stamps · postal history · collections', accent: '#6366F1', artwork: antiqueArtwork, icon: Package, scan: 'Scan Stamp', actions: standardActions('Scan Stamp','Stamp',Package), guidance: 'Capture the front and reverse, watermark and perforations where visible.' },
@@ -39,6 +38,7 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
     actions: [
       { label: 'Scan Coin', detail: 'Capture a coin and check specialist references.', icon: ScanLine, to: '/identify' },
       { label: 'My Coin Inventory', detail: 'Review saved coins and references.', icon: Package, to: '/inventory' },
+      { label: 'Islamic Silver', detail: 'Process silver and countermark batches.', icon: Sparkles, to: '/tools/islamic-batch' },
       { label: 'eBay Hub', detail: 'Create, publish and monitor listings.', icon: Store, to: '/ebay' },
       { label: 'Orders', detail: 'Manage sales and dispatch.', icon: ShoppingCart, to: '/orders' },
       { label: 'List & Sell', detail: 'Prepare a listing with evidence.', icon: Tag, to: '/listings' },
@@ -49,6 +49,7 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
     actions: [
       { label: 'Identify Bike', detail: 'Start a bike or parts assessment.', icon: ScanLine, to: '/identify' },
       { label: 'Workshop Stock', detail: 'Review bikes, parts and projects.', icon: Package, to: '/inventory' },
+      { label: 'Acquisition Calculator', detail: 'Estimate prep costs and potential margin.', icon: Wrench, to: '/opportunities' },
       { label: 'eBay Hub', detail: 'Create and manage marketplace listings.', icon: Store, to: '/ebay' },
       { label: 'Orders', detail: 'Track completed sales and fulfilment.', icon: ShoppingCart, to: '/orders' },
       { label: 'List & Sell', detail: 'Prepare an honest, evidence-led listing.', icon: Tag, to: '/listings' },
@@ -74,6 +75,7 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
   surplus_flip: {
     id: 'surplus_flip', name: 'Surplus Flip', shortName: 'Surplus', headline: 'Turn a job lot into a structured, sellable catalogue.', detail: 'Job lots · pallets · wholesale · returns · manifests', accent: '#14B8A6', artwork: techArtwork, icon: Package, scan: 'Match Product',
     actions: [
+      { label: 'Import Manifest', detail: 'Bring supplier lines into SWISH.', icon: ImagePlus, to: '/tools' },
       { label: 'Match Product Photo', detail: 'Identify product and packaging.', icon: ScanLine, to: '/identify' },
       { label: 'My Stock', detail: 'Check quantities and saved stock.', icon: Package, to: '/inventory' },
       { label: 'eBay Hub', detail: 'Create and manage marketplace listings.', icon: Store, to: '/ebay' },
@@ -85,7 +87,7 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
     id: 'tunes_flip', name: 'Tunes Flip', shortName: 'Music', headline: 'Find the exact pressing. Describe it with confidence. Sell the right release.', detail: 'Vinyl · singles · CDs · cassettes · box sets · pressings', accent: '#A855F7', artwork: swishHero, icon: Sparkles, scan: 'Identify Music',
     actions: [
       { label: 'Identify Music', detail: 'Capture a release, labels and its catalogue detail.', icon: ScanLine, to: '/identify' },
-      { label: 'Sales & stock insights', detail: 'Review recorded music sales, orders and inventory.', icon: Sparkles, to: '/insights' },
+      { label: 'Music Research', detail: 'Review market signals and opportunity context.', icon: Sparkles, to: '/insights' },
       { label: 'My Collection', detail: 'Review saved releases and condition evidence.', icon: Package, to: '/inventory' },
       { label: 'eBay Hub', detail: 'Create, publish and monitor music listings.', icon: Store, to: '/ebay' },
       { label: 'Orders', detail: 'Track sales and dispatch.', icon: ShoppingCart, to: '/orders' },
@@ -98,7 +100,7 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
       { label: 'Quick List', detail: 'Capture an item and start a practical resale record.', icon: Camera, to: '/identify' },
       { label: 'Scan Barcode', detail: 'Scan packaging or labels where a barcode is available.', icon: ScanLine, to: '/identify' },
       { label: 'Inventory', detail: 'Review collectibles, accessories and condition evidence.', icon: Package, to: '/inventory' },
-      { label: 'Sales & stock insights', detail: 'Review recorded sales, orders and inventory.', icon: Sparkles, to: '/insights' },
+      { label: 'Research', detail: 'Review market signals and opportunity context.', icon: Sparkles, to: '/insights' },
       { label: 'eBay Hub', detail: 'Create, publish and monitor listings.', icon: Store, to: '/ebay' },
       { label: 'Orders', detail: 'Track sold collectibles and dispatch.', icon: ShoppingCart, to: '/orders' },
     ], guidance: 'Photograph the complete item, packaging, edition numbers, labels, stamps and maker marks. Show accessories, completeness and missing parts; record damage, repairs, wear or restoration. Include dimensions or scale where useful, and retain provenance or collection information when available.',
@@ -111,14 +113,13 @@ function activateWorkspace(config: WorkspaceConfig) {
 }
 export default function NicheWorkspace() {
   const { niche = 'coins' } = useParams();
-  const { isPlatformOwner } = useAuth();
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const { nicheIds: entitledNiches, isOwner: verifiedOwnerMembership, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
+  const { nicheIds: entitledNiches, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
   const canonicalRouteNiche = normaliseNicheId(niche);
   const config = useMemo(() => canonicalRouteNiche ? CONFIGS[canonicalRouteNiche] : undefined, [canonicalRouteNiche]);
   const specialists = config ? getSpecialistIdsForNiche(config.id) : [];
   const firstEntitledNiche = useMemo(() => (Object.keys(CONFIGS) as SwishNicheId[]).find(candidate => entitledNiches.includes(candidate)), [entitledNiches]);
-  const nicheAllowed = Boolean(config && (entitledNiches.includes(config.id) || (isPlatformOwner && verifiedOwnerMembership)));
+  const nicheAllowed = Boolean(config && entitledNiches.includes(config.id));
   // Membership and tenant verification precede specialist data queries. Inventory filters remain unchanged.
   const queryReady = Boolean(tenantId) && !tenantLoading && !entitlementsLoading && !entitlementsError && nicheAllowed && specialists.length > 0;
   const inventory = useCount('items', { tenant_id: tenantId }, { specialist_id: specialists }, queryReady);

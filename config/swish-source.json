@@ -1,34 +1,33 @@
 {
   "repository": "troonvinyl-ux/SWISH",
   "branch": "main",
-  "commit": "a6a0b0ef2b83beb0d6c4ea455abda2447e65859a",
+  "commit": "fab5c890e9186150de221753c5d5d7c232cb39ab",
   "backendUrl": "https://iwgaqieyoahmcjfziwga.backend.onspace.ai",
-  "inspectedAt": "2026-11-22",
+  "inspectedAt": "2026-11-16",
   "review": {
     "status": "pending",
     "reviewUrl": null
   },
   "contracts": {
-    "app": "2b11aa0af1803171c5cd4fea0f3da2f332083f57",
-    "services": "a03dbad6af1138ff6a297bb6fa9e4a70615ec199",
+    "app": "78363ce4c1933db14d7ff46b6214a56f8a4f0eb1",
+    "services": "4fddaf1efac76b1d4be2e5862e5620ae520739cb",
     "constants": "27a9daca1cb4bc6415ae750ce9af5cdad7fa7a46",
-    "contexts": "fee5f45ca684ad6743169692ce5473fc876bdd61",
-    "hooks": "d95f4a7165dd979ef71f055e157159ce22f9dc82",
+    "contexts": "c6d7b7ec4b548e2cf0d1d9b0891c1df938e2135c",
+    "hooks": "a02d726740523f76b6e38cd5ff274f0f412bb91b",
     "template": "67c80df146495a7aa3d0745473d6cf7dee0f6967",
-    "shared": "41aaf0b3985ff5c8636834b74e948a45d5f47cd1",
-    "supabase": "84a25cc28b49ea0c5a85d0bea1c7e7f27036bafc",
+    "shared": "a3a5a8bd84e8098032799abef9909047d5f458c2",
+    "supabase": "98d63388eb8cc966e36fa81a2dd64ab0ae38dd83",
     "niches": "7144a2de0e7b0ed6f98307b9bbac932576dae7f3",
     "niche-modules.json": "8cd4f122847735d2ce748cc27e86919e19f5579e",
-    ".github": "0a2b283ae718cd90837f667b25b280c93bb9a177",
-    "scripts": "294441a5064fa2fbaef32b3ba206346023239697",
-    "app.config.js": "dab04ba82a89b15b893b0028a4675152feb9d456",
+    ".github": "7bd2051f4de1b57ba4112a8447880d9a73633ec3",
+    "scripts": "d140f95922b2ac0bc04cad73f1772ec3efa98b7d",
+    "app.config.js": "999a49c8c2ecd1061531c8d00ca08a507a10e765",
     "package.json": "ce562921a0a3ff518bd6ad1187d94454d7b64a2d",
-    "components": "a2a164c2934e650c77ffa7bb35e063ddf5da684f",
+    "components": "d30cd1d1e60120f9aff6f5d598dd289fc2bfc499",
     "assets": "f57464d8ecd9da7f28726a653578946e59961495",
     "app.json": "d936203a50b786a4152aece424e0c775863040da",
     "eas.json": "4d4fe250cbcd352fec8b8cada211ecc2f1ecb9ed",
     "pnpm-lock.yaml": "8c6167887bcc163e4fc0679198bccb1a3e7cb1be",
-    "release": "958edf8e426687a1593132ba90f88ea25515cb8a",
-    "deno.json": "fbd70ec480291a34d3871b16b1599a47e834baa5"
+    "release": "958edf8e426687a1593132ba90f88ea25515cb8a"
   }
 }

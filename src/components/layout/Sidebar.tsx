@@ -2,8 +2,8 @@ import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
-  Package, Coins, ShoppingBag, Lightbulb, Tag, ShoppingCart,
-  Truck, TrendingUp, Wallet, CheckSquare, Terminal, Settings,
+  LayoutDashboard, Package, Coins, ShoppingBag, Lightbulb, Tag, ShoppingCart, ClipboardCheck,
+  Truck, TrendingUp, BarChart3, Wallet, CheckSquare, Terminal, Settings,
   LogOut, ChevronDown, ChevronRight, Zap, RefreshCw, AlertCircle, ClipboardList, Sparkles, Crown
 } from 'lucide-react';
 import { useState } from 'react';
@@ -29,6 +29,7 @@ const EBAY_ITEMS: NavItemDef[] = [
   { label: 'Returns', to: '/ebay/returns', icon: RefreshCw },
   { label: 'Cases', to: '/ebay/cases', icon: AlertCircle },
   { label: 'Finances', to: '/ebay/finances', icon: Wallet },
+  { label: 'Analytics', to: '/ebay/analytics', icon: BarChart3 },
   { label: 'Import', to: '/ebay/import', icon: () => <span className="text-xs">↓</span> },
   { label: 'Logs', to: '/ebay/logs', icon: ClipboardList },
 ];
@@ -36,17 +37,21 @@ const EBAY_ITEMS: NavItemDef[] = [
 const NAV_SECTIONS: NavSection[] = [
   {
     items: [
+      { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
       { label: 'Command Centre', to: '/command-centre', icon: Terminal },
+      { label: 'App Tools & Parity', to: '/tools', icon: Sparkles },
     ],
   },
   {
     label: 'Stock',
     items: [
       { label: 'Inventory', to: '/inventory', icon: Package },
+      { label: 'Stock Check', to: '/stock-check', icon: ClipboardCheck },
       { label: 'Identify / Scan', to: '/identify', icon: Coins },
       { label: 'Acquisitions', to: '/acquisitions', icon: ShoppingBag },
       { label: 'Opportunities', to: '/opportunities', icon: Lightbulb },
       { label: 'Review Required', to: '/review-required', icon: AlertCircle },
+      { label: 'Audit', to: '/audit', icon: ClipboardList },
     ],
   },
   {
@@ -62,6 +67,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Insights',
     items: [
       { label: 'Insights', to: '/insights', icon: TrendingUp },
+      { label: 'Money', to: '/money', icon: Wallet },
     ],
   },
   {
@@ -73,8 +79,8 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { user, signOut, isPlatformOwner } = useAuth();
-  const isOwner = isPlatformOwner;
+  const { user, signOut } = useAuth();
+  const isOwner = user?.email?.toLowerCase() === 'troonvinyl@gmail.com';
   const [ebayOpen, setEbayOpen] = useState(false);
   const location = useLocation();
   const activeNicheId = String(localStorage.getItem('swish_active_niche') || user?.user_metadata?.preferred_niche || 'coins');
@@ -131,15 +137,13 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <button
             className={cn('nav-item', ebayOpen && 'bg-[hsl(var(--sidebar-accent))]')}
             onClick={() => setEbayOpen(!ebayOpen)}
-            aria-expanded={ebayOpen}
-            aria-controls="swish-ebay-navigation"
           >
             <span className="text-xs font-bold w-4 text-center shrink-0">eB</span>
             <span className="flex-1">eBay</span>
             {ebayOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
           {ebayOpen && (
-            <div id="swish-ebay-navigation" className="ml-2 border-l border-[hsl(var(--sidebar-border))] pl-2 mt-0.5 space-y-0.5">
+            <div className="ml-2 border-l border-[hsl(var(--sidebar-border))] pl-2 mt-0.5 space-y-0.5">
               {EBAY_ITEMS.map(item => (
                 <NavLink
                   key={item.to}
@@ -178,7 +182,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium truncate">{user?.email || 'User'}</div>
           </div>
-          <button onClick={handleSignOut} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded" title="Sign out" aria-label="Sign out of SWISH">
+          <button onClick={handleSignOut} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded" title="Sign out">
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>

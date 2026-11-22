@@ -7,7 +7,6 @@ import { checkSharedListingStatus } from '@/lib/listingStatusRecovery';
 import { listingNicheId, readSubmissionListing, prepareSharedSubmission } from '@/lib/listingSubmission';
 import { completeScanToLive } from '@/lib/scanToLiveTiming';
 import { hydrateListingEditor } from '@/lib/listingEditorData';
-import { hasLiveSibling } from '@/lib/inventoryLifecycle';
 import { useListingEditorSave } from '@/hooks/useListingEditorSave';
 import type { useListingEditorDraft } from '@/hooks/useListingEditorDraft';
 import type { EbayAspect } from '@/lib/ebayMusicContract';
@@ -58,12 +57,6 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
     try {
       const client = await getSupabaseClientAsync(); if (!client) throw new Error('SWISH backend is not connected.');
       await activateModuleScope(client, userId, tenantId, nicheId);
-      // A separate verified active listing for the same canonical stock item
-      // always wins over a stale draft. Never send a second AddItem request.
-      const siblings = await client.from('listings').select('id,status,external_listing_id')
-        .eq('tenant_id', tenantId).eq('item_id', draft.item.id).eq('marketplace_id', 'ebay');
-      if (siblings.error) throw new Error('Cannot check whether this item is already live on eBay. No new submission was sent.');
-      if (hasLiveSibling(siblings.data || [], id)) throw new Error('This stock item already has a recorded live eBay listing. Open Live inventory or refresh its status; do not submit this older draft again.');
       const before = await readSubmissionListing(client, tenantId, id);
       if (publicationBlock(before)) { draft.commit(before); throw new Error(publicationBlock(before)!); }
       if (before.publish_claim_id) throw new Error('SWISH is already processing this submission. Use Refresh status rather than submitting again.');

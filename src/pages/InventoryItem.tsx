@@ -231,7 +231,7 @@ export default function InventoryItem() {
   }
 
   if (!getSpecialistIdsForNiche(getActiveNicheId()).includes(String(row.specialist_id))) return <section role="alert" className="swish-card p-6 space-y-4"><h1 className="text-xl font-semibold">Open this item's specialist workspace</h1><p className="text-muted-foreground">This item is not part of the currently selected niche.</p><Link to="/niches" className="btn-secondary">Choose workspace</Link></section>;
-  if (!editing) return <ItemDetailWorkspace item={row} onEditItem={startEdit} {...(isCoin ? { onCreateListingDraft: handleCreateCoinDraft, creatingListingDraft: creatingCoinDraft, listingDraftMessage: coinDraftReadiness && 'message' in coinDraftReadiness ? coinDraftReadiness.message : null } : {})} />;
+  if (!editing) return <ItemDetailWorkspace item={row} onEditItem={startEdit} {...(isCoin ? { onCreateListingDraft: handleCreateCoinDraft, creatingListingDraft: creatingCoinDraft, listingDraftMessage: coinDraftReadiness?.ready ? null : coinDraftReadiness?.message ?? null } : {})} />;
 
   const f = (key: string) => editing ? (form[key] == null ? '' : String(form[key])) : fieldValue(key);
   const setF = (key: string, val: unknown) => setForm(p => ({ ...p, [key]: val }));
