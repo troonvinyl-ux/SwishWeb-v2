@@ -18,8 +18,8 @@ export default function Inventory() {
   useEffect(() => { setSearch(externalSearch); }, [externalSearch]);
   const tenant = useCurrentTenantId(), tenantId = tenant.tenantId, niche = getActiveNicheId();
   const specialistIds = getSpecialistIdsForNiche(niche);
-  const stockQuery = useTable('items', { order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId }, inFilter: { specialist_id: specialistIds }, enabled: Boolean(tenantId) && specialistIds.length > 0 });
-  const listingsQuery = useTable('listings', { select: '*, items!inner(id, specialist_id, canonical_title, media, attributes, condition)', order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, inFilter: { 'items.specialist_id': specialistIds }, enabled: Boolean(tenantId) && specialistIds.length > 0 });
+  const stockQuery = useTable('items', { order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId }, inFilter: { specialist_id: specialistIds }, allPages: true, enabled: Boolean(tenantId) && specialistIds.length > 0 });
+  const listingsQuery = useTable('listings', { select: '*, items!inner(id, specialist_id, canonical_title, media, attributes, condition)', order: { column: 'created_at', ascending: false }, filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, inFilter: { 'items.specialist_id': specialistIds }, allPages: true, enabled: Boolean(tenantId) && specialistIds.length > 0 });
   const allStock = stockQuery.data || [], allListings = listingsQuery.data || [];
   const sold = allStock.filter(row => row.status === 'sold');
   const drafts = allListings.filter(row => ['draft', 'pending'].includes(String(row.status).toLowerCase()));
