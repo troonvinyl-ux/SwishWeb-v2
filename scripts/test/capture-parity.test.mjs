@@ -62,7 +62,10 @@ test('each active scanner route has an explicit scoped flow that saves evidence 
   assert.match(pipeline, /swish-list-generate/);
   assert.match(pipeline, /swish_create_listing_draft/);
   assert.doesNotMatch(pipeline, /route: 'publish'/);
-  assert.match(persistence, /swish-capture-v1/);
+  const pathSource = await readFile('src/lib/sharedScanPhotos.ts', 'utf8');
+  assert.match(pathSource, /scanPhotoStoragePath/);
+  assert.match(pathSource, /crypto\.randomUUID\(\)/);
+  assert.match(persistence, /scanPhotoStoragePath\(itemId,photo\.slotId,photo\.file\)/);
   assert.match(persistence, /item-images/);
   assert.match(review, /Save for later/);
   assert.match(review, /publish_claim_id/);
