@@ -8,6 +8,7 @@ import { retainListingEditorMetadata } from '@/lib/listingEditorMetadata';
 import { ebayConditionId, ebayMusicGrade, musicGradeAspects, normalizeMusicSpecifics, type EbayAspect } from '@/lib/ebayMusicContract';
 import { musicSpecifics } from '@/lib/musicListing';
 import { musicFormSchema } from '@/lib/musicValidation';
+import type { MusicValues } from '@/types/music';
 import { syncMusicConditionText } from '@/lib/musicConditionText';
 import { jsonEqual } from '@/lib/jsonEquality';
 interface EditorSaveInput { client: SupabaseClient; userId: string; tenantId: string; form: Record<string, unknown>; item: Record<string, unknown>; photos: string[]; uploads: string[]; confirmedMusic?: ConfirmedMusicDetails; aspects?: EbayAspect[]; }
@@ -38,7 +39,7 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   if (Object.keys(music).length && item.specialist_id !== 'vinyl_records') throw new Error('Music corrections require the original Tunes Flip stock item.');
   const parsed = form.music_values ? musicFormSchema.safeParse(form.music_values) : null;
   if (parsed && !parsed.success) throw new Error(parsed.error.issues[0]?.message || 'Check the edited music details.');
-  const musicValues = parsed?.success ? parsed.data : null;
+  const musicValues = parsed?.success ? parsed.data as MusicValues : null;
   let specificsMap = listingSpecifics(attrs.ebay_item_specifics);
   if (item.specialist_id === 'vinyl_records') {
     if (musicValues) {
