@@ -31,7 +31,7 @@ export async function webSourceDigest() {
 }
 export function validateEvidence(evidence, source, digest, now = Date.now()) {
   const failures = [];
-  if (source.review?.status !== 'approved' || !/^https:\/\/github\.com\/troonvinyl-ux\/SwishWeb\/pull\/\d+$/.test(source.review?.reviewUrl || '')) failures.push('Source baseline requires a reviewed SwishWeb pull request.');
+  if (source.review?.status !== 'approved' || !/^https:\/\/github\.com\/troonvinyl-ux\/SwishWeb-v2\/pull\/\d+$/.test(source.review?.reviewUrl || '')) failures.push('Source baseline requires a reviewed SwishWeb pull request.');
   if (evidence.webSourceDigest !== digest || evidence.nativeCommit !== source.commit) failures.push('Evidence must match the exact web source digest and pinned native commit.');
   if (evidence.backendUrl !== source.backendUrl || evidence.domain !== 'swishflip.co.uk') failures.push('Evidence targets a different backend or domain.');
   const tested = Date.parse(evidence.testedAt);
