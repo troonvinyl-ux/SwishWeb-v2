@@ -113,7 +113,7 @@ async function allRows(client: SupabaseClient, table: 'items' | 'listings', colu
   const rows: Record<string, unknown>[] = [];
   for (let offset = 0; offset < 10000; offset += 500) {
     let query = client.from(table).select(columns).eq('tenant_id', tenantId).order('id').range(offset, offset + 499);
-    if (table === 'listings') query = query.eq('marketplace_id', 'ebay').not('external_listing_id', 'is', null);
+    if (table === 'listings') query = query.in('marketplace_id', ['ebay', 'ebay_gb']).not('external_listing_id', 'is', null);
     if (table === 'items' && specialists?.length) query = query.in('specialist_id', specialists);
     const response = await query;
     if (response.error) throw new Error('SWISH could not check existing listings or inventory: ' + response.error.message);
