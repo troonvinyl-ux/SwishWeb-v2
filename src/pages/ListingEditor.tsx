@@ -52,7 +52,7 @@ export default function ListingEditor() {
     </section>
     <PublicationStatus reason={actions.reason} externalId={actions.publicationExternalId} refreshing={actions.checking} onRefresh={() => void actions.checkStatus()} />
     <ListingPublishFeedback message={actions.error} />
-    {draft.item?.specialist_id !== 'vinyl_records' && <RecommendedPriceButton marketValue={draft.item?.valuation_mid || draft.item?.expected_selling_price} onApply={price => draft.change('price', price)} />}
+    {draft.item?.specialist_id !== 'vinyl_records' && <RecommendedPriceButton marketValue={draft.item?.valuation_mid} suggestedPrice={draft.item?.expected_selling_price} onApply={price => draft.change('price', price)} />}
     <ListingEditorPhotos draft={draft} upload={upload} disabled={disabled} />
     <ListingTitleFields form={draft.form} onChange={draft.change} disabled={disabled} />
     <ListingSaleFields form={draft.form} item={draft.item} onChange={draft.change} disabled={disabled} />
