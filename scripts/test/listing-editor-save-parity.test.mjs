@@ -96,3 +96,24 @@ test('field-level readback diagnostics identify the failed persisted field', asy
 test('save has no marketplace publication or parallel listing creation', () => {
   assert.doesNotMatch(readFileSync('src/lib/listingEditorSave.ts', 'utf8'), /route: 'publish'|swish_create_listing_draft|createClient|service_role/);
 });
+
+test('saved eBay category, condition and grade survive a partially empty editor form', async () => {
+  const { calls, input } = fixture();
+  input.item.attributes = {
+    ...input.item.attributes,
+    ebay_category_id: '176985',
+    ebay_category_name: 'Vinyl Records',
+    ebay_condition_id: '3000',
+    ebay_item_specifics: [{ name: 'Record Grading', value: 'Very Good Plus (VG+)' }, { name: 'Sleeve Grading', value: 'Very Good Plus (VG+)' }],
+  };
+  input.form = { ...input.form, category_id: '', category: '', condition_id: '' };
+  const saved = await saveSharedListingEditor(input);
+  assert.equal(calls[0].body.p_listing_patch.category_id, '176985');
+  assert.equal(calls[0].body.p_item_patch.ebay_condition_id, '3000');
+  assert.equal(saved.item.attributes.ebay_category_id, '176985');
+  assert.equal(saved.item.attributes.ebay_condition_id, '3000');
+  assert.equal(listingSpecifics(saved.item.attributes.ebay_item_specifics)['Record Grading'], 'Very Good Plus (VG+)');
+  const reopened = hydrateListingEditor(saved.listing, saved.item);
+  assert.equal(reopened.category_id, '176985');
+  assert.equal(reopened.condition_id, '3000');
+});
