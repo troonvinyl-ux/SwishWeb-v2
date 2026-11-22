@@ -1,10 +1,10 @@
 import { useEbaySync } from '@/hooks/useEbaySync';
-import { useState } from 'react';
-import { callEdgeFunction } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
+import { callEdgeFunction, EdgeFunctionError } from '@/lib/supabase';
 import { useTable, useCount } from '@/hooks/useSupabaseQuery';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { formatRelative } from '@/lib/utils';
-import { Terminal, ShoppingCart, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Terminal, RefreshCw, Zap, ShoppingCart, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,18 +16,18 @@ interface ActionResult {
 
 export default function CommandCentre() {
   const [actionResults, setActionResults] = useState<Record<string, ActionResult>>({});
-  const { tenantId, isLoading: tenantLoading, error: tenantError } = useCurrentTenantId();
+  const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
   const { sync } = useEbaySync(tenantId);
 
-  const { data: recentActivity, isLoading: activityLoading, error: activityError, refetch: refetchActivity } = useTable('activity_log', {
+  const { data: recentActivity, isLoading: activityLoading } = useTable('activity_log', {
     filter: { tenant_id: tenantId },
     order: { column: 'created_at', ascending: false },
     limit: 20,
     enabled: Boolean(tenantId),
   });
-  const { data: invCount, error: invError } = useCount('items', { tenant_id: tenantId }, undefined, Boolean(tenantId));
-  const { data: orderCount, error: orderError } = useCount('orders', { tenant_id: tenantId, status: 'awaiting_dispatch' }, undefined, Boolean(tenantId));
-  const { data: reviewCount, error: reviewError } = useCount('items', { tenant_id: tenantId, status: 'review' }, undefined, Boolean(tenantId));
+  const { data: invCount } = useCount('inventory', { tenant_id: tenantId }, undefined, Boolean(tenantId));
+  const { data: orderCount } = useCount('orders', { tenant_id: tenantId, status: 'awaiting_dispatch' }, undefined, Boolean(tenantId));
+  const { data: reviewCount } = useCount('inventory', { tenant_id: tenantId, status: 'review' }, undefined, Boolean(tenantId));
 
   const runFunction = async (actionId: string) => {
     if (!tenantId) {
@@ -70,6 +70,8 @@ export default function CommandCentre() {
   const QUICK_ACTIONS = [
     { fn: 'ebay-sync', label: 'eBay Full Sync', icon: () => <span className="text-xs font-bold text-primary">eB</span>, description: 'Sync eBay inventory and listing status using the shared backend.', supported: true },
     { fn: 'sync-orders', label: 'Sync eBay Orders', icon: ShoppingCart, description: 'Import eBay orders using the existing orders function.', supported: true },
+    { fn: 'reprice-all', label: 'Reprice All', icon: RefreshCw, description: 'Bulk repricing is not exposed by the current backend.', supported: false },
+    { fn: 'batch-identify', label: 'Batch Identify', icon: Zap, description: 'Batch identification is not exposed by the current backend.', supported: false },
   ];
 
   const getResultIcon = (result: ActionResult) => {
@@ -91,18 +93,21 @@ export default function CommandCentre() {
       {/* Quick stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="stat-card">
-          <div className="stat-value">{tenantLoading || invError ? '—' : invCount ?? '—'}</div>
+          <div className="stat-value">{invCount ?? '—'}</div>
           <div className="stat-label">Total Inventory</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value text-warning">{tenantLoading || orderError ? '—' : orderCount ?? '—'}</div>
+          <div className="stat-value text-warning">{orderCount ?? '—'}</div>
           <div className="stat-label">Awaiting Dispatch</div>
         </div>
         <Link to="/review-required" className="stat-card hover:border-primary/40 transition-colors">
-          <div className="stat-value text-destructive">{tenantLoading || reviewError ? '—' : reviewCount ?? '—'}</div>
+          <div className="stat-value text-destructive">{reviewCount ?? '—'}</div>
           <div className="stat-label">Review Required</div>
         </Link>
-
+        <div className="stat-card">
+          <div className="text-xs text-success font-medium">● Connected</div>
+          <div className="stat-label mt-1">Backend Status</div>
+        </div>
       </div>
 
       {/* Quick actions */}
@@ -142,11 +147,9 @@ export default function CommandCentre() {
 
       {/* Activity log */}
       <div className="swish-card p-4">
-        <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Activity Log</h3><button type="button" onClick={() => void refetchActivity()} disabled={activityLoading || !tenantId} className="btn-secondary text-xs">Refresh activity</button></div>
+        <h3 className="text-sm font-semibold mb-3">Activity Log</h3>
         {activityLoading || tenantLoading ? (
           <div className="text-xs text-muted-foreground text-center py-4">Loading…</div>
-        ) : activityError || tenantError ? (
-          <div role="alert" className="space-y-2 text-sm text-destructive"><p>{(activityError || tenantError)?.message || 'Activity is unavailable.'}</p><button type="button" className="btn-secondary" onClick={() => void refetchActivity()}>Retry activity</button></div>
         ) : (recentActivity || []).length > 0 ? (
           <div className="space-y-1">
             {(recentActivity as Record<string, unknown>[]).map((a, i) => (

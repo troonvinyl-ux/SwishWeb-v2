@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { getSupabaseClientAsync } from '@/lib/supabase';
+import { activateModuleScope } from '@/lib/moduleScope';
+import { listingNicheId } from '@/lib/listingSubmission';
 import { getActiveNicheId } from '@/lib/niche';
 import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
 import { asRecord } from '@/lib/itemPhotos';
@@ -13,11 +15,12 @@ export function useListingCategorySuggestion(draft: ReturnType<typeof useListing
     setBusy(true); setSuggestion(null);
     try {
       const client = await getSupabaseClientAsync(); if (!client) throw new Error('SWISH backend is not connected');
-      const nicheId = getActiveNicheId();
+      const nicheId = draft.item ? listingNicheId(draft.item) : getActiveNicheId();
+      await activateModuleScope(client, userId, tenantId, nicheId);
       const result = await lookupScopedListingCategory({ client, userId, tenantId, nicheId, title, attributes: asRecord(draft.item?.attributes), isCurrent: () => getActiveNicheId() === nicheId && draft.revisionRef.current === revision });
       if (draft.revisionRef.current !== revision) return;
       setSuggestion(result); draft.change('category', result.name); draft.change('category_id', result.id);
-      toast.success('eBay suggested a category. Save and verify before publishing.');
+      toast.success('Category selected. Submit will save it automatically.');
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not suggest an eBay category'); }
     finally { setBusy(false); }
   };

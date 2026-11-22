@@ -4,9 +4,9 @@ import { listingSpecifics, type ConfirmedMusicDetails } from '@/lib/listingEdito
 import { MUSIC_EDIT_FIELDS } from '@/constants/music';
 import { ebayMusicGrade, musicGradeAspects } from '@/lib/ebayMusicContract';
 import { jsonEqual } from '@/lib/jsonEquality';
-interface MetadataInput { client: SupabaseClient; item: Record<string, unknown>; form: Record<string, unknown>; photos: string[]; uploads: string[]; options: Record<string, unknown>; confirmedMusic?: ConfirmedMusicDetails; categoryChanged?: boolean; }
+interface MetadataInput { client: SupabaseClient; item: Record<string, unknown>; form: Record<string, unknown>; photos: string[]; uploads: string[]; options: Record<string, unknown>; confirmedMusic?: ConfirmedMusicDetails; }
 /** Compatibility for existing RPC versions that ignore newer p_item_patch keys. No schema changes. */
-export async function retainListingEditorMetadata({ client, item, form, photos, uploads, options, confirmedMusic, categoryChanged = false }: MetadataInput): Promise<Record<string, unknown>> {
+export async function retainListingEditorMetadata({ client, item, form, photos, uploads, options, confirmedMusic }: MetadataInput): Promise<Record<string, unknown>> {
   const attrs = asRecord(item.attributes), values = asRecord(form.music_values), music: Record<string, unknown> = { ...confirmedMusic }, evidence = { ...asRecord(attrs._music_evidence) };
   if (item.specialist_id === 'vinyl_records' && Object.keys(values).length) {
     for (const [key] of MUSIC_EDIT_FIELDS) if (key !== 'location' && values[key] !== undefined) music[key] = key === 'condition_notes' ? String(form.condition_description || '') : values[key];
@@ -18,7 +18,7 @@ export async function retainListingEditorMetadata({ client, item, form, photos, 
   // The atomic editor RPC has already saved exact localized eBay values.
   if (confirmedMusic?.media_grade) specifics[grades.media] = ebayMusicGrade(confirmedMusic.media_grade);
   if (confirmedMusic?.sleeve_grade) specifics[grades.sleeve] = ebayMusicGrade(confirmedMusic.sleeve_grade);
-  const next = { ...attrs, ...music, ebay_category_id: String(form.category_id || attrs.ebay_category_id || ''), ebay_category_name: String(form.category || (categoryChanged ? '' : attrs.ebay_category_name) || ''), ebay_condition_id: String(form.condition_id || (categoryChanged ? '' : attrs.ebay_condition_id) || ''), ebay_listing_media: photos, ebay_listing_options: options, ...(Object.keys(music).length ? { ...(confirmedMusic ? { ebay_item_specifics: Object.entries(specifics).map(([name, value]) => ({ name, value })) } : {}), _music_evidence: evidence, ...(Object.entries(music).some(([key, value]) => attrs[key] !== value) ? { _music_quick_sale: null } : {}) } : {}) };
+  const next = { ...attrs, ...music, ebay_category_id: String(form.category_id || ''), ebay_category_name: String(form.category || ''), ebay_condition_id: String(form.condition_id || ''), ebay_listing_media: photos, ebay_listing_options: options, ...(Object.keys(music).length ? { ...(confirmedMusic ? { ebay_item_specifics: Object.entries(specifics).map(([name, value]) => ({ name, value })) } : {}), _music_evidence: evidence, ...(Object.entries(music).some(([key, value]) => attrs[key] !== value) ? { _music_quick_sale: null } : {}) } : {}) };
   const notes = String(form.condition_description ?? ''), media = [...new Set([...itemPhotos(item).map(photo => photo.original), ...uploads])];
   const originals = new Set(itemPhotos(item).map(photo => photo.original));
   const needsWrite = !jsonEqual(next, attrs) || String(item.condition_notes || '') !== notes || uploads.some(url => !originals.has(url));
