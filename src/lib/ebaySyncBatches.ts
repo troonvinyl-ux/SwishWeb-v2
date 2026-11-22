@@ -10,8 +10,16 @@ export async function runEbaySyncBatches(options: EbayBatchRunnerOptions): Promi
     catch (error) { return result(error instanceof Error ? error.message : 'Sync could not be confirmed.'); }
     const data = response.data;
     const issues = Array.isArray(data?.issues) ? data.issues as EbaySyncProgress['issues'] : [];
-    const accountedPolicy = Boolean(data?.success === true && data.batchComplete === true && Number(data.failed) > 0 && Number(data.failed) === Number(data.blocked) && issues.length === Number(data.blocked) && issues.every(issue => String(issue.code) === '21920397'));
-    if (!data || data.success !== true || response.requiresReauth || (response.error && !accountedPolicy) || (Number(data.failed) > 0 && !accountedPolicy)) {
+    // The canonical Edge worker explicitly returns success:false for fully
+    // accounted no-write outcomes (provider removal or read-only timeout).
+    // Accept only those exact item-scoped codes and counts; uncertain writes,
+    // provider-wide failures and arbitrary batchComplete flags remain stops.
+    const accountedNoWrite = Boolean(data?.success === false && data.batchComplete === true
+      && !response.requiresReauth && Number.isSafeInteger(Number(data.failed)) && Number(data.failed) > 0
+      && Number(data.failed) === Number(data.blocked ?? 0) + Number(data.readSkipped ?? 0)
+      && issues.length === Number(data.failed)
+      && issues.every(issue => issue.code === '21920397' || issue.code === 'EBAY_ITEM_READ_TIMEOUT'));
+    if (!data || (data.success !== true && !accountedNoWrite) || response.requiresReauth || (response.error && !accountedNoWrite) || (Number(data.failed) > 0 && !accountedNoWrite)) {
       // The existing Edge Function may return HTTP 503 *after* confirming five
       // saved readbacks and failing a sixth. Preserve its explicitly reported
       // partial counters, rather than showing 0 failures after 108 successes.
@@ -44,11 +52,13 @@ export async function runEbaySyncBatches(options: EbayBatchRunnerOptions): Promi
       return result(response.error || (typeof data?.error === 'string' ? data.error : 'Sync was not confirmed. Refresh saved status before retrying.'), response.requiresReauth);
     }
     for (const key of ['processed','updated','failed','imagesFetched','titlesFixed','blocked'] as const) { const count = Number(data[key] || 0); if (!Number.isFinite(count) || count < 0) return result('Invalid sync counts returned.'); totals[key] += count; }
-    totals.issues.push(...issues); if (accountedPolicy) {totals.partial = true; previousIssues = true;}
+    totals.issues.push(...issues); if (accountedNoWrite) {totals.partial = true; previousIssues = true;}
     options.onProgress?.({...totals,issues:[...totals.issues]});
     if (options.isCurrent?.() === false) return result('Workspace changed; completed work is retained.');
     const next = data.nextAfterListingId;
-    if (next == null || next === '') return result(previousIssues ? 'Some listings were restricted by eBay policy 21920397. Review the reported issues.' : null);
+    if (next == null || next === '') return result(previousIssues
+      ? `${totals.updated} listing(s) reconciled; ${totals.failed} need attention (eBay policy 21920397 or timed-out read-only GetItem). Affected stock and photos were preserved. Review item IDs before retrying.`
+      : null);
     if (typeof next !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(next) || seen.has(next) || Number(data.processed) <= 0) return result('Sync continuation was invalid or repeated. Completed work is retained.');
     seen.add(next); afterListingId = next;
   }
