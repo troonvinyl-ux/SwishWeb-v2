@@ -17,10 +17,10 @@ export default function BarcodeCapture({ scope, disabled, onLead }: BarcodeCaptu
   const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { barcode: '' } });
   const read = useCallback((reading: BarcodeReading) => {
     if (disabled) return;
-    const code = normalizeProductBarcode(reading.code, reading.type);
+    const code = normalizeProductBarcode(reading.value, reading.format);
     if (code) { form.setValue('barcode', code, { shouldValidate: true }); void lookup.lookup(reading); }
   }, [disabled, form, lookup.lookup]);
-  const submit = form.handleSubmit(values => { if (!disabled) void lookup.lookup({ code: values.barcode, type: '' }); });
+  const submit = form.handleSubmit(values => { if (!disabled) void lookup.lookup({ value: values.barcode, format: '' }); });
   return <section className="space-y-4" aria-label="Scan barcode">
     <SharedCaptureCamera label="Scan barcode" detail="Point the camera at the product barcode" barcode scanning={!lookup.busy && !lookup.code} resolved={Boolean(lookup.code)} disabled={disabled || lookup.busy} onBarcode={read} />
     <div className="swish-card space-y-4 p-4"><h2 className="flex items-center gap-2 text-lg font-semibold"><ScanLine size={20} className="text-primary" />{lookup.busy ? 'Asking AI…' : lookup.products.length ? 'Choose the matching product' : lookup.code ? 'Barcode read' : 'Point the camera at the product barcode'}</h2><div role="status" aria-live="polite">{lookup.code && <p className="break-all font-semibold text-primary">Barcode {lookup.code} · Catalogue + AI</p>}{lookup.message && <p className="mt-2 leading-7 text-muted-foreground">{lookup.message}</p>}</div>
