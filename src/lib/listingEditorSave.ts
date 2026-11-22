@@ -58,14 +58,20 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   const specifics = Object.entries(specificsMap).map(([name, value]) => ({ name: name.trim(), value: String(value).trim() })).filter(value => value.name && value.value);
   if (specifics.length > 25 || new Set(specifics.map(value => value.name.toLowerCase())).size !== specifics.length || specifics.some(value => value.name.length > 65 || value.value.length > 65)) throw new Error('eBay specifics must be unique and no more than 65 characters per name/value. Edit the music specifics; no value was truncated.');
   const conditionNotes = String(form.condition_description ?? item.condition_notes ?? item.condition_grade ?? '');
-  const conditionId = String(form.condition_id || ebayConditionId(form.condition));
+  // A partially hydrated editor must not erase the selected eBay category or
+  // condition stored with the draft. Reuse the saved condition ID only for the
+  // same category; a category change requires a fresh compatible selection.
+  const savedCategoryId = String(attrs.ebay_category_id || item.ebay_category_id || '');
+  const categoryId = String(form.category_id || savedCategoryId || '').trim();
+  const categoryName = String(form.category || attrs.ebay_category_name || item.ebay_category_name || '').trim();
+  const conditionId = String(form.condition_id || (categoryId === savedCategoryId ? attrs.ebay_condition_id || item.ebay_condition_id : '') || ebayConditionId(form.condition));
   const description = musicValues ? syncMusicConditionText(String(form.description || ''), musicValues) : String(form.description || '');
   if (conditionNotes.length > 1000) throw new Error('Keep eBay condition notes to 1,000 characters.');
   const listingOptions = { listingType: form.listing_type === 'Chinese' ? 'Chinese' : 'FixedPriceItem', auctionDays: Number(form.auction_duration || 7), startPrice: String(form.start_price || price), reservePrice: String(form.reserve_price || ''), bestOfferEnabled: form.best_offer_enabled === true, dispatchDays: Number(form.dispatch_days || 3) };
   const response = await client.rpc('swish_save_listing_editor', {
     p_tenant_id: tenantId, p_listing_id: String(form.id),
-    p_listing_patch: { title, description, price, shipping_cost: shipping, floor_price: floor, ceiling_price: ceiling, category_id: form.category_id || null },
-    p_item_patch: { condition: String(form.condition || item.condition || ''), condition_grade: conditionNotes, condition_notes: conditionNotes, quantity, sku: String(form.sku || item.sku || ''), ebay_category_id: String(form.category_id || ''), ebay_category_name: String(form.category || attrs.ebay_category_name || ''), ebay_condition_id: conditionId, ebay_listing_media: photos, ebay_listing_options: listingOptions },
+    p_listing_patch: { title, description, price, shipping_cost: shipping, floor_price: floor, ceiling_price: ceiling, category_id: categoryId || null },
+    p_item_patch: { condition: String(form.condition || item.condition || ''), condition_grade: conditionNotes, condition_notes: conditionNotes, quantity, sku: String(form.sku || item.sku || ''), ebay_category_id: categoryId, ebay_category_name: categoryName, ebay_condition_id: conditionId, ebay_listing_media: photos, ebay_listing_options: listingOptions },
     p_specifics: specifics,
   });
   if (response.error) throw new Error(response.error.message);
@@ -88,7 +94,7 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
     numericMismatch('listing.shipping_cost', shipping, read.data.shipping_cost),
     numericMismatch('listing.floor_price', floor, read.data.floor_price),
     numericMismatch('listing.ceiling_price', ceiling, read.data.ceiling_price),
-    mismatch('listing.category_id', String(form.category_id || ''), String(read.data.category_id || '')),
+    mismatch('listing.category_id', categoryId, String(read.data.category_id || '')),
     mismatch('item.condition', String(form.condition || item.condition || ''), String(current.data.condition || '')),
     mismatch('item.condition_notes', conditionNotes, String(persistedNotes || '')),
     numericMismatch('item.quantity', quantity, current.data.quantity),
@@ -96,13 +102,13 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
     mismatch('item.attributes.ebay_item_specifics', normalizedSpecifics(specifics), normalizedSpecifics(asRecord(current.data.attributes).ebay_item_specifics)),
   ].filter((value): value is ReadbackMismatch => Boolean(value));
   if (atomicMismatches.length) throwReadbackMismatch('atomic save', form.id, atomicMismatches);
-  const retained = await retainListingEditorMetadata({ client, item: current.data, form: { ...form, condition_id: conditionId }, photos, uploads, options: listingOptions, confirmedMusic });
+  const retained = await retainListingEditorMetadata({ client, item: current.data, form: { ...form, category_id: categoryId, category: categoryName, condition_id: conditionId }, photos, uploads, options: listingOptions, confirmedMusic });
   const retainedAttrs = asRecord(retained.attributes);
   const retainedMismatches = [
     mismatch('item.condition', String(form.condition || item.condition || ''), String(retained.condition || '')),
     mismatch('item.condition_notes', conditionNotes, String(retained.condition_notes || '')),
-    mismatch('item.attributes.ebay_category_id', String(form.category_id || ''), String(retainedAttrs.ebay_category_id || '')),
-    mismatch('item.attributes.ebay_category_name', String(form.category || ''), String(retainedAttrs.ebay_category_name || '')),
+    mismatch('item.attributes.ebay_category_id', categoryId, String(retainedAttrs.ebay_category_id || '')),
+    mismatch('item.attributes.ebay_category_name', categoryName, String(retainedAttrs.ebay_category_name || '')),
     mismatch('item.attributes.ebay_condition_id', conditionId, String(retainedAttrs.ebay_condition_id || '')),
     mismatch('item.attributes.ebay_item_specifics', normalizedSpecifics(specifics), normalizedSpecifics(retainedAttrs.ebay_item_specifics)),
     mismatch('item.attributes.ebay_listing_media', photos, retainedAttrs.ebay_listing_media),
