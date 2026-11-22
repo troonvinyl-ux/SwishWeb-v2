@@ -15,10 +15,9 @@ const PRODUCTS: Record<string, { name: string; description: string }> = {
   clothing: { name: 'Threads Flip', description: 'Fashion identification, brand research, pricing and selling.' },
   surplus_flip: { name: 'Surplus Flip', description: 'Supplier manifests, job lots, product matching and resale.' },
 };
-const OWNER_EMAIL = 'troonvinyl@gmail.com';
 
 export default function Onboarding() {
-  const { user } = useAuth();
+  const { user, isPlatformOwner, isPlatformOwnerLoading } = useAuth();
   const navigate = useNavigate();
   const { tenantId } = useCurrentTenantId();
   const hostProduct = getHostProduct();
@@ -48,7 +47,7 @@ export default function Onboarding() {
     return () => { active = false; };
   }, [storageKey, user, tenantId]);
   const completed = Object.values(steps).filter(Boolean).length;
-  const isOwner = user?.email?.toLowerCase() === OWNER_EMAIL;
+  const isOwner = isPlatformOwner;
 
   const updateStep = (step: string) => {
     const next = { ...steps, [step]: true };
@@ -95,6 +94,7 @@ export default function Onboarding() {
     } finally { setFinishing(false); }
   };
 
+  if (isPlatformOwnerLoading) return <div role="status" className="swish-card p-6">Verifying account permissions…</div>;
   if (isOwner) {
     return <div className="max-w-2xl mx-auto swish-card p-8 space-y-4"><Sparkles className="w-8 h-8 swish-gold" /><h1 className="text-2xl font-bold">Master Admin access</h1><p className="text-sm text-muted-foreground">Owner accounts can manage product entry points and subscribers from the central admin area.</p><button className="btn-primary" onClick={() => navigate('/master-admin')}>Open Master Admin <ArrowRight className="w-4 h-4" /></button></div>;
   }
