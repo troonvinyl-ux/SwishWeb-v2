@@ -28,9 +28,12 @@ test('inventory search submits with keyboard or click and consumes changed query
   for (const literal of ['<form onSubmit={submitSearch} role="search"', 'type="submit"', 'aria-label="Search inventory"', 'aria-label="Close inventory search"', 'navigate(`/inventory?q=']) {
     assert.ok(header.includes(literal), 'Missing header search control ' + literal);
   }
-  assert.ok(inventory.includes('setSearch(externalSearch)'));
-  assert.ok(inventory.includes('allPages: true'));
-  assert.ok(source('src/hooks/useSupabaseQuery.ts').includes('q.range(start, start + pageSize - 1)'));
+  assert.ok(inventory.includes('setSearch({ scope, text: externalSearch })'));
+  assert.ok(inventory.includes('readNativeInventory'));
+  const read = source('src/lib/inventoryNativeRead.ts');
+  assert.ok(read.includes('swish_inventory_canonical_rows'));
+  assert.ok(read.includes('.range(offset, offset + PAGE_SIZE - 1)'));
+  assert.ok(read.includes('projectInventoryRows(rows, tenantId, specialistIds)'));
 });
 
 test('admin UI relies on trusted owner-role state, not email matching', () => {

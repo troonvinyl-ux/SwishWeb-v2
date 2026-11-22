@@ -64,8 +64,12 @@ test('real import uses one atomic canonical RPC with current-module verification
   const publish = await readFile('src/hooks/useListingEditorActions.ts', 'utf8');
   assert.match(publish, /hasLiveSibling\(siblings\.data \|\| \[\], id\)/);
   const inventory = await readFile('src/pages/Inventory.tsx', 'utf8');
-  assert.match(inventory, /checkSharedListingStatus/);
-  assert.match(inventory, /resolvedInventoryListings\(allListings\)/);
+  assert.match(inventory, /readNativeInventory/);
+  const nativeRead = await readFile('src/lib/inventoryNativeRead.ts', 'utf8');
+  assert.match(nativeRead, /swish_inventory_canonical_rows/);
+  const statusActions = await readFile('src/components/features/InventoryListingActions.tsx', 'utf8');
+  assert.match(statusActions, /checkSharedListingStatus/);
+  assert.match(statusActions, /reviseSharedListingPrice/);
   const importPage = await readFile('src/pages/EbayImport.tsx', 'utf8');
   assert.match(importPage, /EbaySellerDiscovery/);
 });

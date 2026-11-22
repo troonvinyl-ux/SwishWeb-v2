@@ -121,7 +121,7 @@ export function searchInventory(entries: readonly InventoryEntry[], query: strin
   return entries.filter(({ item, listing }) => {
     const attrs = object(item.attributes);
     return [item.canonical_title, item.inventory_id, item.sku, item.catalogue_number,
-      item.storage_location, attrs.numista_type_id, attrs.denomination, attrs.period,
+      item.storage_location, attrs.storage_location, attrs.numista_type_id, attrs.denomination, attrs.period,
       attrs.mint, attrs.folder_number, listing?.title, listing?.external_listing_id]
       .some(value => String(value ?? '').toLowerCase().includes(term));
   });
