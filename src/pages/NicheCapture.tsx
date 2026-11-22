@@ -383,7 +383,11 @@ export default function NicheCapture() {
         <Shirt className="h-7 w-7 shrink-0" style={{color:'#E91E8C'}}/>
       </header>
       <nav className="sticky top-[76px] z-10 -mx-4 flex gap-2 overflow-x-auto border-b px-4 py-3" style={{background:'#120B12',borderColor:'#301830'}}>
-        {['Identify','Value','Style','Sell','Insights'].map((label,index)=><button type="button" key={label} onClick={()=>index===0?undefined:navigate(index===1?'/opportunities':index===3?'/listings':'/insights')} className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold" style={{background:index===0?'#250014':'transparent',color:index===0?'#E91E8C':'#9A7090'}}>{label}</button>)}
+        <nav aria-label="Threads Flip workflow" className="flex flex-wrap gap-2">
+          <span aria-current="page" className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary">Identify</span>
+          <Link to="/listings" className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground">Listings</Link>
+          <Link to="/insights" className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground">Sales &amp; stock insights</Link>
+        </nav>
       </nav>
       <main className="mx-auto w-full max-w-3xl space-y-5 py-5">
         <section><p className="text-xs font-bold uppercase tracking-[.22em]" style={{color:'#E91E8C'}}>Threads Flip · Identify</p><h1 className="mt-2 text-3xl font-extrabold">Identify your item</h1><p className="mt-2 leading-relaxed" style={{color:'#9A7090'}}>Photograph the label and garment. Threads Flip will analyse the evidence and suggest details for you to review.</p></section>
