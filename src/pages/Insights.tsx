@@ -27,7 +27,7 @@ async function readAllRows(table: 'items' | 'orders' | 'sales', tenantId: string
       .order('id', { ascending: true });
     const { data, error } = await ordered.range(start, start + PAGE_SIZE - 1);
     if (error) throw new Error(`Could not read ${table}: ${error.message}`);
-    const page = (data || []) as InsightRow[];
+    const page = (data || []) as unknown as InsightRow[];
     result.push(...page);
     if (page.length < PAGE_SIZE) break;
   }
