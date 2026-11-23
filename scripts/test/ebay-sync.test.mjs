@@ -198,3 +198,13 @@ test('seller ID can be verified from the existing connector without reconnecting
   assert.match(hub, /No reconnection was needed/);
   assert.doesNotMatch(hub, /seller_account_id:\s*name/);
 });
+
+test('unknown seller-verification action is diagnosed as backend version drift, never a forced reconnect', async () => {
+  const hub = await readFile('src/pages/EbayHub.tsx','utf8');
+  assert.match(hub, /result\.error\.status === 400 && \/unknown action\/i/);
+  assert.match(hub, /SWISH backend update required:/);
+  assert.match(hub, /Your existing eBay connection was retained/);
+  assert.match(hub, /'swish-ebay-oauth', \{ action: 'verify_connected_identity', tenantId \}/);
+  assert.doesNotMatch(hub, /action: 'start_subscriber_authorization'/);
+  assert.doesNotMatch(hub, /update\(\{seller_account_id:/);
+});
