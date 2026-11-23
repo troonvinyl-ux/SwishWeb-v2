@@ -18,7 +18,7 @@ const positive = (value: unknown): boolean => Number.isFinite(Number(value)) && 
 export function coinItemDraftReadiness(item: Record<string, unknown>): CoinDraftReadiness {
   const attributes = record(item.attributes), scan = record(attributes.source_scan), metadata = record(scan.scan_metadata), images = record(scan.scan_images);
   const typeId = [attributes.numista_type_id, attributes.numista_number, attributes.numista_n, attributes.numista_reference, attributes.reference_url, metadata.numista_number, metadata.numista_reference, metadata.reference_url]
-    .map(parseNumistaNumber).find((value): value is number => Boolean(value));
+    .map(parseNumistaNumber).find((value): value is number => Boolean(value)) ?? null;
   const supplied = attributes.numista_number ?? attributes.numista_n ?? attributes.numista_type_id ?? metadata.numista_number;
   if (supplied && !typeId) return { ready: false, message: 'The saved Numista reference is invalid. Correct it or clear it for an unattributed draft.' };
   const permanentPhotos = [item.image_url, ...(Array.isArray(item.media) ? item.media : [])].filter(value => typeof value === 'string' && value.trim());
