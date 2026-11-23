@@ -27,6 +27,7 @@ export default function InventoryItem() {
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [valuing, setValuing] = useState(false);
   const [creatingCoinDraft, setCreatingCoinDraft] = useState(false);
+  const [excludingPolicyCoin, setExcludingPolicyCoin] = useState(false);
 
   const row = item as Record<string, unknown> | null;
   const attrs = row?.attributes && typeof row.attributes === 'object' && !Array.isArray(row.attributes)
@@ -161,12 +162,49 @@ export default function InventoryItem() {
     });
   };
 
-  const handleDelete = () => {
-    if (!id || !confirm('Delete this item? This cannot be undone.')) return;
-    del.mutate(id, {
-      onSuccess: () => { toast.success('Item deleted'); navigate('/inventory'); },
-      onError: (e) => toast.error(e.message),
-    });
+  const handleDelete = async () => {
+    if (!id || !tenantId || !confirm('Permanently delete this item from SWISH? This will NOT end anything on eBay. Published items require a verified eBay end and must retain sale history.')) return;
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is not connected.');
+      // Match the native app: the server checks all associated published
+      // listings, sales and orders before any permanent deletion.
+      const check = await client.rpc('swish_inventory_delete_issue', { p_tenant_id: tenantId, p_item_id: id });
+      if (check.error) throw new Error(check.error.message);
+      if (check.data !== null) throw new Error(typeof check.data === 'string' && check.data ? check.data : 'Deletion eligibility was not confirmed.');
+      del.mutate(id, {
+        onSuccess: () => { toast.success('Item deleted from SWISH only'); navigate('/inventory'); },
+        onError: (e) => toast.error(e.message),
+      });
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Deletion could not be verified.');
+    }
+  };
+
+  const handleExcludePolicyRemovedCoin = async () => {
+    if (!id || !row || !tenantId || excludingPolicyCoin) return;
+    const ebayId = String(attrs._ebay_item_id || attrs.ebay_item_id || '');
+    if (!/^\d{6,20}$/.test(ebayId)) { toast.error('This coin has no valid saved eBay listing number.'); return; }
+    if (!confirm('Check eBay policy removal for item ' + ebayId + '? If eBay confirms error 21920397, SWISH will move this coin to Held and permanently exclude it from eBay sync. This will NOT delete or end the eBay listing. Sale history is protected.')) return;
+    setExcludingPolicyCoin(true);
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is not connected.');
+      const result = await callEdgeFunction<{success:boolean;excluded?:boolean;message?:string;error?:string}>(
+        'swish-ebay-sync',
+        { tenantId, nicheId:'coins', mode:'exclude_policy_removed', itemId:id },
+        client,
+      );
+      if (result.error) throw new Error(result.error.message);
+      if (result.data?.success !== true || result.data.excluded !== true) throw new Error(result.data?.error || 'eBay policy removal was not confirmed.');
+      toast.success(result.data.message || 'Policy-removed coin excluded from SWISH eBay sync.');
+      await refetch();
+      navigate('/inventory');
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Policy removal could not be verified. Nothing was changed.');
+    } finally {
+      setExcludingPolicyCoin(false);
+    }
   };
 
   const handleValue = async () => {
@@ -274,7 +312,14 @@ export default function InventoryItem() {
                 </button>
               )}
               <button onClick={startEdit} className="btn-secondary"><Edit2 className="w-3.5 h-3.5" />Edit</button>
-              <button onClick={handleDelete} className="btn-danger"><Trash2 className="w-3.5 h-3.5" /></button>
+              {isCoin && /^\d{6,20}$/.test(String(attrs._ebay_item_id || attrs.ebay_item_id || '')) &&
+                row.status !== 'held' && (
+                <button type="button" onClick={() => void handleExcludePolicyRemovedCoin()} disabled={excludingPolicyCoin}
+                  className="btn-secondary" title="Only for an eBay policy-removed coin: verify error 21920397 and remove it from active SWISH inventory and future sync, without touching eBay.">
+                  <Trash2 className="w-3.5 h-3.5" />{excludingPolicyCoin ? 'Verifying eBay…' : 'Remove policy item locally'}
+                </button>
+              )}
+              <button onClick={() => void handleDelete()} className="btn-danger" title="Delete only when the backend confirms all eBay listings ended and sales history is protected"><Trash2 className="w-3.5 h-3.5" /></button>
             </>
           )}
         </div>
