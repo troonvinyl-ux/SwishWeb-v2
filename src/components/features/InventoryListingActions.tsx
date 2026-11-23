@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RefreshCw, CheckCircle2, AlertTriangle, Tag, Square } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ export function ListingStatusAction({ listing, tenantId, nicheId }: {
   useEffect(() => () => { scopeRef.current = ''; }, []);
   const current = state.scope === scope ? state : { scope, busy: false, notice: '', error: '' };
   const eligible = Boolean(user?.id && tenantId && listingId && /^\d{6,20}$/.test(ebayId));
+  const missingBinding = /Verify your own eBay seller account|Legacy tenant connections are not inherited/i.test(current.error);
   const check = async () => {
     if (!eligible || busyRef.current || !user?.id) return;
     busyRef.current = true;
@@ -51,7 +53,7 @@ export function ListingStatusAction({ listing, tenantId, nicheId }: {
         error instanceof Error ? error.message : 'Status is unconfirmed. No listing was resubmitted.' });
     } finally { busyRef.current = false; }
   };
-  return <div className="space-y-1">
+  return <div className="min-w-0 max-w-full space-y-1">
     <button type="button" disabled={!eligible || current.busy}
       title={eligible ? 'Read existing eBay listing status; does not submit an item' : 'No verified eBay item ID is saved yet'}
       onClick={() => void check()} className="swish-inventory-submit min-h-10 disabled:opacity-50"
@@ -60,7 +62,14 @@ export function ListingStatusAction({ listing, tenantId, nicheId }: {
     </button>
     {!eligible && <p className="text-xs text-muted-foreground">No linked eBay ID — review the draft, don't submit it again if already live.</p>}
     {current.notice && <p role="status" className="text-xs text-success"><CheckCircle2 size={13} className="inline mr-1"/>{current.notice}</p>}
-    {current.error && <p role="alert" className="text-xs text-destructive"><AlertTriangle size={13} className="inline mr-1"/>{current.error}</p>}
+    {current.error && <div role="alert" className="min-w-0 max-w-full rounded-md border border-destructive/30 p-2 text-xs text-destructive">
+      <p className="break-words"><AlertTriangle size={13} className="mr-1 inline"/>{missingBinding
+        ? 'This signed-in SWISH member has not yet verified their own eBay seller account.'
+        : current.error}</p>
+      {missingBinding && <Link to="/ebay" className="mt-2 inline-block font-semibold underline underline-offset-2">
+        Connect my eBay account
+      </Link>}
+    </div>}
   </div>;
 }
 export function InventoryPriceAction({ entry, tenantId, nicheId }: {
