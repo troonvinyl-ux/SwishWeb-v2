@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,14 @@ interface CaptureDraftReviewProps { draft: CaptureDraft; scope: CaptureScope; }
 export default function CaptureDraftReview({ draft, scope }: CaptureDraftReviewProps) {
   const navigate = useNavigate(), qc = useQueryClient(), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { title: draft.title, description: draft.description, price: draft.price && draft.price > 0 ? String(draft.price) : '', reviewed: false } });
+  useEffect(()=>{
+    const material=new Set(['title','description','price']);
+    const subscription=form.watch((_values,meta)=>{
+      if(meta.name && material.has(meta.name) && form.getValues('reviewed'))
+        form.setValue('reviewed',false,{shouldDirty:true});
+    });
+    return ()=>subscription.unsubscribe();
+  },[form]);
   const save = (list: boolean) => form.handleSubmit(async values => {
     if (busy) return;
     if (list && (!values.reviewed || !values.price)) { toast.error('Review identity, condition and price before continuing to publication.'); return; }
