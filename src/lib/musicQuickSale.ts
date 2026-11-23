@@ -1,5 +1,6 @@
 import { musicRequest, musicObject } from '@/lib/musicApi';
 import { musicInventoryAttributes, musicListingTitle } from '@/lib/musicListing';
+import { musicContentsEvidence } from '@/lib/listingEvidence';
 import { captureStrings, captureText } from '@/lib/captureRequest';
 import type { CaptureScope } from '@/types/capture';
 import type { MusicPrice, MusicSnapshot } from '@/types/music';
@@ -16,13 +17,22 @@ export function normalizeMusicPrice(raw:Record<string,unknown>,now=new Date().to
  return {market:round(market),quick:round(quick),minimum:round(quick*0.9),basis,confidence:captureText(valuation.valuationConfidence)||'unknown',explanation:[captureText(valuation.listingPriceRationale??recommendation.reasoning),supported?'Quick-sale adjustment: no more than 92.5% of the supported market estimate.':'The asking-price recommendation is an estimate, not a verified sale.','Optional minimum offer is 90% of the quick-sale price; adjust it for your costs.'].filter(Boolean).join(' '),warnings:captureStrings(valuation.valuationWarnings),researchedAt:now};
 }
 export function musicQuickSalePrompt(snapshot:MusicSnapshot):string {
- const v=snapshot.values;
+ const v=snapshot.values,contents=musicContentsEvidence(snapshot.release?.discCount,v.observed_disc_count,v.format);
  return `You are an experienced UK music and vinyl record reseller. I want to sell this exact release on eBay UK reasonably quickly, rather than wait months for the highest price.
+Physical copy contents: ${contents.disclosure}. If incomplete, do NOT value it as a complete set or assume any particular disc is missing. Only price incomplete-set comparables if truly supported; otherwise explain the valuation uncertainty.
 Verified seller-reviewed details: Artist: ${v.artist}; Title: ${v.release_title}; Discogs release ID: ${snapshot.release?.id??'unconfirmed'}; Label: ${v.label}; Catalogue number: ${v.catalogue_number}; Year: ${v.year}; Country: ${v.country}; Format: ${v.format}; Pressing/edition: ${v.edition}; Media condition: ${v.media_grade}; Sleeve condition: ${v.sleeve_grade}; Special characteristics: ${v.features}.
 Use only legitimately available market evidence from the existing authorised SWISH integrations. Estimate reasonable UK eBay value, recommend a quick-sale Buy It Now price, briefly explain it, state missing evidence and give a realistic optional Best Offer minimum, all in GBP. Prefer 5–10% below a supported valuation when appropriate; use judgement for rare items. Do not invent completed sales, sold prices, market observations or live listings. Label an AI-only estimate when verified comparisons are unavailable. Photos do not prove playback quality.`;
 }
 export async function researchMusicPrice(scope:CaptureScope,snapshot:MusicSnapshot,signal?:AbortSignal):Promise<MusicPrice> {
  if(!snapshot.release||!snapshot.values.reviewed)throw new Error('Confirm the individual release and review its details before pricing.');
- const data=await musicRequest(scope,'swish-market-value',{title:musicListingTitle(snapshot.values),specialistId:'vinyl_records',attributes:{...musicInventoryAttributes(snapshot),quick_sale_request:musicQuickSalePrompt(snapshot)},condition:`Media ${snapshot.values.media_grade||'ungraded'}; sleeve ${snapshot.values.sleeve_grade||'ungraded'}. ${snapshot.values.condition_notes}`,applyToItem:false,quickList:true},signal);
- return normalizeMusicPrice(data);
+ const data=await musicRequest(scope,'swish-market-value',{title:musicListingTitle(snapshot.values,snapshot.release),specialistId:'vinyl_records',attributes:{...musicInventoryAttributes(snapshot),quick_sale_request:musicQuickSalePrompt(snapshot)},condition:`Media ${snapshot.values.media_grade||'ungraded'}; sleeve ${snapshot.values.sleeve_grade||'ungraded'}. ${snapshot.values.condition_notes}`,applyToItem:false,quickList:true},signal);
+ const price=normalizeMusicPrice(data);
+ const contents=musicContentsEvidence(snapshot.release?.discCount,snapshot.values.observed_disc_count,snapshot.values.format);
+ if(contents.status==='incomplete'||contents.status==='unknown'){
+  // A general complete-release estimate must not be presented as a supported
+  // physical-copy valuation when quantity/completeness is unresolved.
+  return {...price,basis:'ai_only_estimate',confidence:'physical contents unverified',
+   warnings:[...price.warnings,`${contents.disclosure}. Do not assume a complete-set comparable or automatic quick-sale price is valid for this copy.`]};
+ }
+ return price;
 }
