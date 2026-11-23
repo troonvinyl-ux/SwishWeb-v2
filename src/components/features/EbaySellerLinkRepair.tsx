@@ -19,21 +19,22 @@ export default function EbaySellerLinkRepair({ tenantId }: { tenantId: string | 
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
 
-  const [running, setRunning] = useState(false);
+  const [runningScope, setRunningScope] = useState('');
+  const running = runningScope === scope;
   const [state, setState] = useState<{
     scope: string;
     progress: SellerBindingRepairProgress | null;
     finished: boolean;
     error: string;
   }>({ scope: '', progress: null, finished: false, error: '' });
-  useEffect(() => () => { scopeRef.current = ''; }, []);
+  useEffect(() => { scopeRef.current = scope; return () => { scopeRef.current = ''; }; }, [scope]);
 
   const shown = state.scope === scope ? state : { scope, progress: null, finished: false, error: '' };
   const allowed = Boolean(tenantId && user?.id && niche === 'coins');
   const run = async () => {
     if (!allowed || running || !tenantId || !user) return;
     const capturedScope = scope;
-    setRunning(true);
+    setRunningScope(capturedScope);
     setState({scope: capturedScope, progress: null, finished: false, error: ''});
     try {
       const client = await getSupabaseClientAsync();
@@ -60,7 +61,7 @@ export default function EbaySellerLinkRepair({ tenantId }: { tenantId: string | 
         });
       }
     } finally {
-      if (scopeRef.current === capturedScope) setRunning(false);
+      if (scopeRef.current === capturedScope) setRunningScope('');
     }
   };
 
