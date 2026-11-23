@@ -159,7 +159,7 @@ export async function discoverEbayInventory(client: SupabaseClient, userId: stri
 }
 export interface SellerBindingRepairProgress {
   section:string;page:number;totalPages:number;observed:number;
-  updated:number;alreadyLinked:number;unlinked:number;conflicts:number;verifiedSeller:string;
+  updated:number;alreadyLinked:number;unlinked:number;otherNiche:number;conflicts:number;verifiedSeller:string;
 }
 export async function repairVerifiedEbaySellerLinks(
  client:SupabaseClient,userId:string,tenantId:string,nicheId:SwishNicheId,
@@ -168,7 +168,7 @@ export async function repairVerifiedEbaySellerLinks(
  if(nicheId!=='coins')throw new Error('Open Coins to re-import and repair coin seller bindings.');
  await activateModuleScope(client,userId,tenantId,nicheId);
  let progress:SellerBindingRepairProgress={section:'',page:0,totalPages:0,observed:0,
-  updated:0,alreadyLinked:0,unlinked:0,conflicts:0,verifiedSeller:''};
+  updated:0,alreadyLinked:0,unlinked:0,otherNiche:0,conflicts:0,verifiedSeller:''};
  for(const section of ['ActiveList','SoldList','UnsoldList'] as const){
   let page:number|null=1;
   while(page!==null){
@@ -176,7 +176,7 @@ export async function repairVerifiedEbaySellerLinks(
    const next=await callEdgeFunction<{
     success?:boolean;error?:string;section?:string;page?:number;totalPages?:number;
     nextPage?:number|null;verifiedSeller?:string;observed?:number;
-    updated?:number;alreadyLinked?:number;unlinked?:number;conflicts?:number;
+    updated?:number;alreadyLinked?:number;unlinked?:number;otherNiche?:number;conflicts?:number;
    }>('swish-ebay-browse',{
     route:'repair_seller_links',tenantId,nicheId,section,page,
    },client);
@@ -195,6 +195,7 @@ export async function repairVerifiedEbaySellerLinks(
     updated:progress.updated+Number(next.data.updated||0),
     alreadyLinked:progress.alreadyLinked+Number(next.data.alreadyLinked||0),
     unlinked:progress.unlinked+Number(next.data.unlinked||0),
+    otherNiche:progress.otherNiche+Number(next.data.otherNiche||0),
     conflicts:progress.conflicts+Number(next.data.conflicts||0)};
    onProgress(progress);
    page=typeof next.data.nextPage==='number'?next.data.nextPage:null;
