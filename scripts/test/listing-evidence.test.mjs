@@ -58,6 +58,9 @@ test('web quick flow uses safe seller evidence and no new publication path',()=>
  assert.match(persistence,/protectMusicListingCopy/);
  assert.match(persistence,/swish_create_listing_draft/);
  assert.doesNotMatch(persistence,/swish-ebay-list/);
+ const pricing=readFileSync('src/lib/musicQuickSale.ts','utf8');
+ assert.match(pricing,/No complete-release automatic price for this physical copy/);
+ assert.match(pricing,/physical\.status==='incomplete'\|\|physical\.status==='unknown'/);
 });
 
 test('both review components revoke approval when material fields change',()=>{
