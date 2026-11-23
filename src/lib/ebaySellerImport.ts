@@ -183,9 +183,9 @@ export async function repairVerifiedEbaySellerLinks(
    if(next.error || next.data?.success!==true)
     throw new Error(next.data?.error||next.error?.message||'eBay seller binding repair could not be confirmed. Earlier pages remain saved; refresh before repeating.');
    if(next.data.section!==section || next.data.page!==page ||
-      !Number.isSafeInteger(next.data.totalPages) || next.data.totalPages!<0 ||
-      !Number.isSafeInteger(next.data.observed) ||
-      !Number.isSafeInteger(next.data.updated))
+      !Number.isSafeInteger(Number(next.data.totalPages)) || Number(next.data.totalPages)<0 ||
+      !Number.isSafeInteger(Number(next.data.observed)) ||
+      !Number.isSafeInteger(Number(next.data.updated)))
     throw new Error('The eBay re-import response was incomplete. Previously saved pages are retained.');
    const verifiedSeller=String(next.data.verifiedSeller||'');
    if(!verifiedSeller || (progress.verifiedSeller&&progress.verifiedSeller!==verifiedSeller))
