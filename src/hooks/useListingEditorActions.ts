@@ -77,14 +77,38 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       if (result.error) throw result.error;
       const externalId = String(result.data?.externalListingId || result.data?.external_listing_id || '');
       if (result.data?.success !== true || !/^\d+$/.test(externalId)) throw new Error(String(result.data?.error || 'eBay did not confirm a listing ID. Check status before trying again.'));
-      // eBay has accepted an ID, but that is not yet proof that the saved listing
-      // and its canonical stock item have both left Draft. Keep the editor locked
-      // until the existing status-only reconciliation confirms the full handoff.
+      // Match the native app: eBay acceptance is distinct from canonical stock
+      // reconciliation. The publish Edge function has already saved Active where
+      // possible; read that back first instead of requiring a second eBay call
+      // for every successful submission. Never replay AddFixedPriceItem.
       acceptedExternalId = externalId; setPendingExternalId(externalId);
-      const fresh = await checkSharedListingStatus({ client, userId, tenantId, nicheId, listingId: id });
-      if (fresh.status !== 'active' || String(fresh.external_listing_id) !== externalId) throw new Error('eBay accepted this listing, but SWISH did not retain the same live listing identity. Do not submit again; refresh status to reconcile it.');
-      draft.commit(fresh); setPendingExternalId(null); completeScanToLive(`${userId}:${tenantId}:${id}`, externalId);
-      toast.success('Listing is live on eBay and SWISH inventory is updated');
+      let fresh = await readSubmissionListing(client, tenantId, id);
+      if (String(fresh.external_listing_id || '') === externalId && fresh.status === 'active') {
+        const stock = await client.from('items').select('status,sold_at').eq('id', draft.item.id).eq('tenant_id', tenantId).single();
+        if (stock.error || !stock.data || stock.data.sold_at || !['listed', 'active'].includes(String(stock.data.status).toLowerCase())) {
+          try { fresh = await checkSharedListingStatus({ client, userId, tenantId, nicheId, listingId: id }); }
+          catch { /* Preserve accepted outcome; recovery remains available. */ }
+        }
+      } else {
+        // A delayed backend write may have recorded the external eBay ID.
+        // Recover by exact saved ID only, never by re-submitting.
+        if (String(fresh.external_listing_id || '') === externalId) {
+          try { fresh = await checkSharedListingStatus({ client, userId, tenantId, nicheId, listingId: id }); }
+          catch { /* Report pending reconciliation below. */ }
+        }
+      }
+      if (String(fresh.external_listing_id || '') !== externalId || fresh.status !== 'active') {
+        throw new Error('eBay accepted this listing, but SWISH has not yet confirmed Active status. Do not submit again; use Refresh status.');
+      }
+      const stock = await client.from('items').select('status,sold_at').eq('id', draft.item.id).eq('tenant_id', tenantId).single();
+      const reconciled = !stock.error && stock.data && !stock.data.sold_at && ['listed','active'].includes(String(stock.data.status).toLowerCase());
+      draft.commit(fresh);
+      if (reconciled) {
+        setPendingExternalId(null); completeScanToLive(`${userId}:${tenantId}:${id}`, externalId);
+        toast.success('Listing is live on eBay and SWISH inventory is updated');
+      } else {
+        toast.warning('eBay listing is Active, but SWISH stock reconciliation is pending. Refresh status; do not submit again.');
+      }
       void draft.refresh().catch(() => undefined);
     } catch (cause) {
       const detail = message(cause), safeError = acceptedExternalId
