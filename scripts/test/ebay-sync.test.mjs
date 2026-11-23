@@ -228,3 +228,21 @@ test('eBay member connection confirmation never trusts a pre-existing shared con
   assert.match(inventory, /Legacy tenant connections are not inherited/);
   assert.match(inventory, /to="\/ebay"/);
 });
+
+test('legacy eBay coin card offers local-only archive without changing account binding or marketplace status',async()=>{
+  const [actions,detail] = await Promise.all([
+    readFile('src/components/features/InventoryListingActions.tsx','utf8'),
+    readFile('src/pages/InventoryItem.tsx','utf8'),
+  ]);
+  assert.match(actions,/This record belongs to a previous or unverified eBay account/);
+  assert.match(actions,/Open inventory item for local-only archive/);
+  assert.match(actions,/listing\.item_id/);
+  assert.match(detail,/mode:'exclude_local_legacy'/);
+  assert.match(detail,/Archive locally \(SWISH only\)/);
+  assert.match(detail,/from\('listings'\)\.select\('external_listing_id,marketplace_id'\)/);
+  assert.ok(detail.includes(String.raw`if (!/^\d{6,20}$/.test(externalId)`));
+  assert.ok(!detail.includes(String.raw`if (!/^\\d{6,20}$/.test(externalId)`));
+  assert.match(detail,/This does NOT end, delete or verify the eBay listing/);
+  assert.match(detail,/response\.data\?\.archived!==true/);
+  assert.match(detail,/navigate\('\/inventory\?tab=live'\)/);
+});
