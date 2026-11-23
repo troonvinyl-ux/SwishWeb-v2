@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RefreshCw, CheckCircle2, AlertTriangle, Tag, Square } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertTriangle, Tag, Square, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getSupabaseClientAsync } from '@/lib/supabase';
+import { callEdgeFunction, getSupabaseClientAsync } from '@/lib/supabase';
 import { getActiveNicheId } from '@/lib/niche';
 import { checkSharedListingStatus, endSharedEbayListing } from '@/lib/listingStatusRecovery';
 import { recommendedInventoryPrice, type InventoryEntry } from '@/lib/inventoryNative';
@@ -79,6 +79,85 @@ export function ListingStatusAction({ listing, tenantId, nicheId }: {
     </div>}
   </div>;
 }
+/**
+ * Local-only removal of an historical eBay-linked coin.
+ *
+ * This uses the existing owner-checked exclude_local_legacy command. It does
+ * not contact eBay, end a listing, assign any member's eBay account or
+ * permanently erase protected seller/audit history. SWISH moves the physical
+ * item to Held and excludes it BEFORE subsequent GetItem sync reads.
+ */
+export function RemoveFromSwishAction({ entry, tenantId, nicheId }: {
+  entry: InventoryEntry; tenantId: string; nicheId: string;
+}) {
+  const { user } = useAuth(), refresh = useInventoryRefresh();
+  const { item, listing } = entry;
+  const itemId = String(item.id || entry.id || '');
+  const externalId = String(listing?.external_listing_id || '');
+  const scope = [user?.id, tenantId, nicheId, itemId, externalId].join(':');
+  const scopeRef = useRef(scope); scopeRef.current = scope;
+  const busyRef = useRef(false);
+  const [state, setState] = useState<{scope:string;busy:boolean;message:string;error:string}>({
+    scope:'',busy:false,message:'',error:'',
+  });
+  useEffect(() => () => { scopeRef.current=''; }, []);
+  const current = state.scope===scope ? state : {scope,busy:false,message:'',error:''};
+  // This rescue action applies to linked coins, never to orders, sold items,
+  // arbitrary listings or another niche. Owner/ledger checks run server-side.
+  const eligible = nicheId==='coins' && entry.tab==='live' &&
+    Boolean(user?.id && tenantId && itemId && /^\d{6,20}$/.test(externalId)) &&
+    !item.sold_at && !['sold','fulfilled','completed','held'].includes(String(item.status||'').toLowerCase());
+  const removeLocally = async () => {
+    if (!eligible || !user?.id || busyRef.current) return;
+    const confirmed = window.confirm(
+      'Remove this coin from SWISH Live inventory and future SWISH eBay sync?\n\n' +
+      'eBay item: ' + externalId + '\n\n' +
+      'NO request will be sent to eBay. SWISH will keep a hidden historical record rather than permanently destroy listing and account history. ' +
+      'The workspace owner/admin and sale-history checks must pass.'
+    );
+    if (!confirmed) return;
+    busyRef.current=true;
+    const captured=scope;
+    setState({scope:captured,busy:true,message:'',error:''});
+    try {
+      const client=await getSupabaseClientAsync();
+      if(!client)throw new Error('SWISH backend is unavailable.');
+      const result=await callEdgeFunction<{success?:boolean;archived?:boolean;externalListingId?:string;message?:string;error?:string}>(
+        'swish-ebay-sync', {tenantId,nicheId:'coins',mode:'exclude_local_legacy',itemId,externalListingId:externalId},client
+      );
+      if(result.error)throw new Error(result.error.message);
+      if(result.data?.success!==true || result.data.archived!==true ||
+         result.data.externalListingId!==externalId)
+        throw new Error(result.data?.error || 'Local removal was not confirmed. Nothing was changed on eBay.');
+      // Confirm both the Held state and the exact exclusion identity; without
+      // both we must not claim the following sync will skip this listing.
+      const readback=await client.from('items').select('id,status,attributes')
+        .eq('tenant_id',tenantId).eq('id',itemId).maybeSingle();
+      if(readback.error || !readback.data ||
+         String(readback.data.status).toLowerCase()!=='held' ||
+         String(readback.data.attributes?._swish_ebay_sync_excluded||'')!==externalId)
+        throw new Error('SWISH accepted local removal but the saved exclusion could not be confirmed. Refresh inventory before repeating.');
+      if(scopeRef.current!==captured || getActiveNicheId()!==nicheId)return;
+      await refresh();
+      if(scopeRef.current===captured)setState({scope:captured,busy:false,
+        message:'Removed from Live and future eBay sync. No eBay action was sent.',error:''});
+    }catch(cause){
+      if(scopeRef.current===captured)setState({scope:captured,busy:false,message:'',
+        error:cause instanceof Error?cause.message:'Local removal could not be verified.'});
+    }finally{busyRef.current=false;}
+  };
+  if(!eligible)return null;
+  return <div className="min-w-0 max-w-full space-y-1">
+    <button type="button" onClick={() => void removeLocally()} disabled={current.busy}
+      className="btn-secondary min-h-10 text-xs disabled:opacity-50"
+      title="Remove this coin from SWISH Live and eBay sync, with no eBay End/Delete call; retains a hidden history record">
+      <Trash2 size={15}/><span>{current.busy?'Removing locally…':'Remove from SWISH only'}</span>
+    </button>
+    {current.message && <p role="status" className="max-w-full break-words text-xs text-success">{current.message}</p>}
+    {current.error && <p role="alert" className="max-w-full break-words text-xs text-destructive">{current.error}</p>}
+  </div>;
+}
+
 export function InventoryPriceAction({ entry, tenantId, nicheId }: {
   entry: InventoryEntry; tenantId: string; nicheId: string;
 }) {
