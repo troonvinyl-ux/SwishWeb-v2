@@ -98,6 +98,14 @@ test('saved original media is accepted as both faces when an older item has no n
   assert.deepEqual(coinItemDraftReadiness(stored), { ready: true, typeId: 438449 });
 });
 
+test('saved malformed or conflicting Numista metadata fails closed rather than picking one reference', () => {
+  const source = coinItem().attributes.source_scan;
+  const malformed = coinItem({ attributes: { numista_type_id: '438449', numista_reference: 'https://numista.example/pieces438449.html', source_scan: source } });
+  assert.match(coinItemDraftReadiness(malformed).message, /reference is invalid/);
+  const conflicting = coinItem({ attributes: { numista_type_id: '438449', numista_reference: 'https://en.numista.com/catalogue/pieces438450.html', source_scan: source } });
+  assert.match(coinItemDraftReadiness(conflicting).message, /references conflict/);
+});
+
 test('coin preparation keeps Numista optional but validates real photos and measurements', () => {
   const flow = readFileSync('src/lib/quickCaptureFlow.ts', 'utf8');
   const persistence = readFileSync('src/lib/capturePersistence.ts', 'utf8');
