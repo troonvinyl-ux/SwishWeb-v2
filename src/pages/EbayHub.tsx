@@ -83,7 +83,7 @@ export default function EbayHub() {
       if (fresh.error || readEbayConnector(fresh.data?.[0])?.seller_account_id !== name) {
         throw new Error('eBay identity was verified but saved account readback is not confirmed. Reload account health before repeating.');
       }
-      toast.success('The shared eBay seller name was recovered. Your own member binding is checked separately.');
+      toast.success('The shared eBay seller name was recovered. No reconnection was needed. Your own member binding is checked separately.');
       void refreshMemberAccount();
     } catch (reason) {
       setSellerError(reason instanceof Error ? reason.message : 'Seller identity verification unavailable.');
