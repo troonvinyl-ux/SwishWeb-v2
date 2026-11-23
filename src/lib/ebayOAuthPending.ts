@@ -10,6 +10,13 @@ export function isEbayOAuthPending(userId: string, tenantId: string): boolean {
   const elapsed = Date.now() - started;
   return Number.isFinite(started) && elapsed >= 0 && elapsed < LIFETIME_MS;
 }
+/** Timestamp of the particular fresh eBay consent attempt. A pre-existing
+ * tenant connection or older member binding is NOT completion evidence. */
+export function ebayOAuthStartedAt(userId: string, tenantId: string): number | null {
+  if (!isEbayOAuthPending(userId, tenantId)) return null;
+  const started = Number(sessionStorage.getItem(ebayOAuthKey(userId, tenantId)));
+  return Number.isFinite(started) ? started : null;
+}
 export function beginEbayOAuth(userId: string, tenantId: string): void {
   sessionStorage.setItem(ebayOAuthKey(userId, tenantId), String(Date.now()));
 }
