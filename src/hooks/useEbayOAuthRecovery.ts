@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getSupabaseClient } from '@/lib/supabase';
-import { clearEbayOAuth, isEbayOAuthPending } from '@/lib/ebayOAuthPending';
+import { callEdgeFunction, getSupabaseClient } from '@/lib/supabase';
+import { clearEbayOAuth, ebayOAuthStartedAt, isEbayOAuthPending } from '@/lib/ebayOAuthPending';
 import { toast } from 'sonner';
 
 export function useEbayOAuthRecovery(tenantId: string | null) {
@@ -24,15 +24,23 @@ export function useEbayOAuthRecovery(tenantId: string | null) {
       }
       inFlight = true;
       try {
-        const { data, error } = await sb.from('marketplace_connectors').select('status').eq('tenant_id', tenantId).eq('marketplace_id', 'ebay').maybeSingle();
+        const started = ebayOAuthStartedAt(user.id, tenantId);
+        if (started == null) return;
+        // Poll the authenticated member binding, not a legacy tenant connector
+        // that could already be connected before this consent attempt began.
+        const { data, error } = await callEdgeFunction<{ success?:boolean;connected?:boolean;lastVerifiedAt?:string }>(
+          'swish-ebay-oauth', { action:'member_binding_status', tenantId }, sb,
+        );
         if (stopped) return;
-        if (error) { console.warn('[SWISH] Connector status unavailable:', error.message); return; }
-        if (data?.status !== 'connected') return;
+        if (error) { console.warn('[SWISH] Member binding confirmation unavailable:', error.message); return; }
+        const verifiedAt = Date.parse(data?.lastVerifiedAt || '');
+        if (data?.success !== true || data.connected !== true ||
+            !Number.isFinite(verifiedAt) || verifiedAt < started - 5000) return;
         clearEbayOAuth(user.id, tenantId); setWaiting(false);
         await Promise.all(['marketplace_connectors', 'items', 'listings', 'orders'].map(table => qc.invalidateQueries({ queryKey: [table] })));
         // An existing connected connector does not prove a re-authorisation
         // completed; do not report new consent success from the old status.
-        toast.message('Your eBay seller connection is active. Review account health for its current capabilities.');
+        toast.success('Your own eBay seller account was verified and linked to this SWISH member.');
       } catch (error) {
         console.warn('[SWISH] Connector status request failed:', error instanceof Error ? error.message : 'Network unavailable');
       } finally { inFlight = false; }
