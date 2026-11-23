@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getSupabaseClientAsync, callEdgeFunction, EdgeFunctionError } from '@/lib/supabase';
 import { activateModuleScope } from '@/lib/moduleScope';
@@ -14,6 +15,12 @@ import type { EbayAspect } from '@/lib/ebayMusicContract';
 
 export function useListingEditorActions(draft: ReturnType<typeof useListingEditorDraft>, userId: string | undefined, tenantId: string | null, uploads: string[], aspects: EbayAspect[] = []) {
   const saveMutation = useListingEditorSave(userId, tenantId), working = useRef(false);
+  const queries = useQueryClient();
+  const refreshInventory = () => Promise.all([
+    queries.invalidateQueries({ queryKey: ['canonical-inventory'] }),
+    queries.invalidateQueries({ queryKey: ['listings'] }),
+    queries.invalidateQueries({ queryKey: ['items'] }),
+  ]);
   const [publishing, setPublishing] = useState(false), [checking, setChecking] = useState(false), [error, setError] = useState<string | null>(null), [pendingExternalId, setPendingExternalId] = useState<string | null>(null);
   const busy = publishing || checking || saveMutation.isPending;
   const message = (cause: unknown) => cause instanceof EdgeFunctionError ? cause.displayMessage : cause instanceof Error ? cause.message : 'SWISH could not complete the request.';
@@ -109,6 +116,7 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       } else {
         toast.warning('eBay listing is Active, but SWISH stock reconciliation is pending. Refresh status; do not submit again.');
       }
+      void refreshInventory().catch(() => undefined);
       void draft.refresh().catch(() => undefined);
     } catch (cause) {
       const detail = message(cause), safeError = acceptedExternalId
@@ -129,7 +137,7 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       if (pendingExternalId && (fresh.status !== 'active' || String(fresh.external_listing_id) !== pendingExternalId)) {
         throw new Error(`eBay accepted listing ${pendingExternalId}, but SWISH has not yet retained its live identity and inventory state. Do not submit again; refresh status shortly.`);
       }
-      if (!draft.dirtyRef.current) draft.commit(fresh); await draft.refresh(); setError(null);
+      if (!draft.dirtyRef.current) draft.commit(fresh); await refreshInventory(); await draft.refresh(); setError(null);
       if (fresh.status === 'active' && fresh.external_listing_id) { setPendingExternalId(null); completeScanToLive(`${userId}:${tenantId}:${id}`, String(fresh.external_listing_id)); }
       toast.success(fresh.external_listing_id ? 'Existing eBay listing checked' : fresh.publish_claim_id ? 'SWISH still has a pending submission' : 'Saved status checked. Submit when ready.');
     } catch (cause) { setError(message(cause)); toast.error(message(cause)); }
