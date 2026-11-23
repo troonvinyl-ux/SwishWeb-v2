@@ -25,6 +25,9 @@ Use only legitimately available market evidence from the existing authorised SWI
 }
 export async function researchMusicPrice(scope:CaptureScope,snapshot:MusicSnapshot,signal?:AbortSignal):Promise<MusicPrice> {
  if(!snapshot.release||!snapshot.values.reviewed)throw new Error('Confirm the individual release and review its details before pricing.');
+ const physical=musicContentsEvidence(snapshot.release.discCount,snapshot.values.observed_disc_count,snapshot.values.format);
+ if(physical.status==='incomplete'||physical.status==='unknown')
+  throw new Error('No complete-release automatic price for this physical copy: '+physical.disclosure+'. Enter a supported manual price or confirm the physical contents first.');
  const data=await musicRequest(scope,'swish-market-value',{title:musicListingTitle(snapshot.values,snapshot.release),specialistId:'vinyl_records',attributes:{...musicInventoryAttributes(snapshot),quick_sale_request:musicQuickSalePrompt(snapshot)},condition:`Media ${snapshot.values.media_grade||'ungraded'}; sleeve ${snapshot.values.sleeve_grade||'ungraded'}. ${snapshot.values.condition_notes}`,applyToItem:false,quickList:true},signal);
  const price=normalizeMusicPrice(data);
  const contents=musicContentsEvidence(snapshot.release?.discCount,snapshot.values.observed_disc_count,snapshot.values.format);
