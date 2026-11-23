@@ -33,7 +33,7 @@ export default function EbaySellerDiscovery({ tenantId }: Props) {
       if(getActiveNicheId()!==niche)return;
       setRepairState({scope:scopeKey,summary:result,complete:true});
       await Promise.all(['items','listings','canonical-inventory'].map(queryKey=>qc.invalidateQueries({queryKey:[queryKey]})));
-      setNotice(`Verified seller ${result.verifiedSeller}: ${result.updated} linked coin records repaired; ${result.alreadyLinked} already correct; ${result.conflicts} ownership conflicts; ${result.unlinked} eBay records not in SWISH. No listings, prices, inventory status or photos were changed.`);
+      setNotice(`Verified seller ${result.verifiedSeller}: ${result.updated} linked coin records repaired; ${result.alreadyLinked} already correct; ${result.conflicts} ownership conflicts; ${result.unlinked} unlinked seller records; ${result.otherNiche} other-niche listings ignored. No listings, prices, inventory status or photos were changed.`);
     }catch(reason){setError(explanation(reason)+' Any earlier confirmed repair pages remain saved; you can safely re-run the same eBay read.');}
     finally{setRepairing(false);}
   };
@@ -93,7 +93,7 @@ export default function EbaySellerDiscovery({ tenantId }: Props) {
       </div>
       {shownRepair && <p role="status" className="text-xs text-muted-foreground">
         Seller: {shownRepair.summary.verifiedSeller} · {shownRepair.summary.section} page {shownRepair.summary.page}/{shownRepair.summary.totalPages} ·
-        {' '}{shownRepair.summary.updated} repaired · {shownRepair.summary.alreadyLinked} correct · {shownRepair.summary.conflicts} conflicts · {shownRepair.summary.unlinked} unlinked
+        {' '}{shownRepair.summary.updated} repaired · {shownRepair.summary.alreadyLinked} correct · {shownRepair.summary.conflicts} conflicts · {shownRepair.summary.unlinked} unlinked · {shownRepair.summary.otherNiche} other niches
         {shownRepair.complete?' · Finished':''}
       </p>}
     </div>}
