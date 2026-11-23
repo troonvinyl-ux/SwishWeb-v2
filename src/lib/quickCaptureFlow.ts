@@ -16,7 +16,7 @@ async function identifyCapture(options: PrepareCaptureOptions): Promise<Record<s
   if (reference) notes.push(`Seller supplied Numista ${reference.numistaN}: ${reference.url}. Compare BOTH original faces and physical measurements. This reference is a candidate, not a verified physical identity; report contradictions and never copy catalogue photos or descriptions.`);
   const payload: Record<string, unknown> = {
     ...prepared, ...(numistaImages.length ? { numistaImages } : {}), specialistId, captureMode: mode,
-    acquisitionContext: 'Universal Quick List. Identify from original photographs, compare any barcode lead with physical evidence. Keep uncertain identity, condition and catalogue references provisional.',
+    acquisitionContext: 'Universal Quick List. Identify the actual physical object, not what its artwork depicts: a book about Greek coins is a book, not a coin. Compare barcode leads with photos; keep uncertain identity, condition and catalogue references provisional.',
     knownAttributes: { weight: Number(answers.weight) || undefined, diameter: Number(answers.diameter) || undefined,
       ...(reference ? { numistaTypeId: reference.typeId, numistaReference: reference.url } : {}),
       customNotes: notes.join('\n'), existingAttributes: { ...answers, captureMode: mode, ...(options.lead ? { barcodeLead: options.lead } : {}) } },
