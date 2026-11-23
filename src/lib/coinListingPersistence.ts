@@ -17,10 +17,13 @@ const positive = (value: unknown): boolean => Number.isFinite(Number(value)) && 
  */
 export function coinItemDraftReadiness(item: Record<string, unknown>): CoinDraftReadiness {
   const attributes = record(item.attributes), scan = record(attributes.source_scan), metadata = record(scan.scan_metadata), images = record(scan.scan_images);
-  const typeId = [attributes.numista_type_id, attributes.numista_number, attributes.numista_n, attributes.numista_reference, attributes.reference_url, metadata.numista_number, metadata.numista_reference, metadata.reference_url]
-    .map(parseNumistaNumber).find((value): value is number => Boolean(value)) ?? null;
-  const supplied = attributes.numista_number ?? attributes.numista_n ?? attributes.numista_type_id ?? metadata.numista_number;
-  if (supplied && !typeId) return { ready: false, message: 'The saved Numista reference is invalid. Correct it or clear it for an unattributed draft.' };
+  const references = [attributes.numista_type_id, attributes.numista_number, attributes.numista_n, attributes.numista_reference, attributes.reference_url, metadata.numista_number, metadata.numista_reference, metadata.reference_url]
+    .filter(value => (typeof value === 'string' || typeof value === 'number') && String(value).trim());
+  const parsedReferences = references.map(parseNumistaNumber);
+  if (parsedReferences.some(value => value === null)) return { ready: false, message: 'The saved Numista reference is invalid. Correct it or clear it for an unattributed draft.' };
+  const identifiers = [...new Set(parsedReferences.filter((value): value is number => value !== null))];
+  if (identifiers.length > 1) return { ready: false, message: 'The saved Numista references conflict. Resolve them against both original faces before preparing a draft.' };
+  const typeId = identifiers[0] ?? null;
   const permanentPhotos = [item.image_url, ...(Array.isArray(item.media) ? item.media : [])].filter(value => typeof value === 'string' && value.trim());
   if ((!images.obverse || !images.reverse) && permanentPhotos.length < 2) return { ready: false, message: 'This saved coin is missing its obverse or reverse evidence. Reopen it and save both original faces before pulling a draft.' };
   const weight = item.weight_grams ?? attributes.supplied_weight_g ?? metadata.weight;
