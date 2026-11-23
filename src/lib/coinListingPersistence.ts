@@ -1,6 +1,7 @@
 import { assertCaptureScope, captureRecord, captureRequest, captureText } from '@/lib/captureRequest';
 import { getSpecialistIdsForNiche } from '@/lib/niche';
 import { parseNumistaNumber } from '@/lib/numistaCapture';
+import { unattributedCoinCopy } from '@/lib/listingEvidence';
 import type { CaptureScope } from '@/types/capture';
 
 type CoinDraftReadiness = { ready: true; typeId: number | null } | { ready: false; message: string };
@@ -49,8 +50,11 @@ export async function createCoinListingDraft(scope: CaptureScope, itemId: string
   const response = await captureRequest(scope, 'swish-list-generate', { item_id: itemId, tenant_id: scope.tenantId, marketplace_id: 'ebay' });
   const generated = captureRecord(response.listing);
   if (!captureText(generated.title)) throw new Error('The shared listing engine returned no coin draft. Your inventory item remains saved; retry this same item later.');
+  const attributes=record(stock.data.attributes),dimensions=record(stock.data.dimensions_mm);
+  const physicalCopy=!evidence.typeId?unattributedCoinCopy(stock.data.weight_grams??attributes.supplied_weight_g,dimensions.diameter??attributes.supplied_diameter_mm):null;
+  const draftCopy=physicalCopy?{...generated,...physicalCopy}:generated;
   await assertCaptureScope(scope);
-  const saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: itemId, p_marketplace_id: 'ebay', p_listing: generated, p_shipping_cost: 0, p_category_id: null });
+  const saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: itemId, p_marketplace_id: 'ebay', p_listing: draftCopy, p_shipping_cost: 0, p_category_id: null });
   if (saved.error || typeof saved.data !== 'string' || !saved.data) throw new Error(saved.error?.message || 'Coin draft creation was not confirmed. Inspect this item before retrying.');
   await assertCaptureScope(scope);
   const verified = await scope.client.from('listings').select('id,item_id,tenant_id,status,external_listing_id,publish_claim_id').eq('id', saved.data).eq('tenant_id', scope.tenantId).single();
