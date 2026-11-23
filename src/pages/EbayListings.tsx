@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTable } from '@/hooks/useSupabaseQuery';
 import { formatCurrency, formatDate, statusVariant, truncate } from '@/lib/utils';
-import { RefreshCw, Search, ExternalLink, Plus, Download } from 'lucide-react';
+import { RefreshCw, Search, ExternalLink, Plus } from 'lucide-react';
 import { useEbaySync } from '@/hooks/useEbaySync';
 import EbaySyncStatus from '@/components/features/EbaySyncStatus';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
@@ -36,14 +36,12 @@ export default function EbayListings() {
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => void syncListings()} disabled={syncing || !tenantId} className="btn-secondary min-h-11 disabled:opacity-50">
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Updating linked…' : 'Update linked'}
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Syncing…' : 'Sync'}
           </button>
-          <Link to="/ebay/import" className="btn-secondary min-h-11"><Download className="w-4 h-4" />Import existing eBay listings</Link>
           <Link to="/listings/new" className="btn-primary"><Plus className="w-3.5 h-3.5" />New Listing</Link>
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">Update linked checks listings SWISH already knows about. To find items created directly on eBay, choose Import existing eBay listings. No action here publishes another listing.</p>
       <EbaySyncStatus busy={syncing} progress={syncProgress} error={syncError} />
 
       <div className="flex gap-3 flex-wrap">

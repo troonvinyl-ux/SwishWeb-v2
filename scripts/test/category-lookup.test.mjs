@@ -44,23 +44,18 @@ test('Tunes search carries real music format and bounds the eBay query', () => {
   assert.equal(categorySearchQuery('Roman coin', 'coins'), 'Roman coin');
   assert.equal(categorySearchQuery('A'.repeat(150), 'tunes_flip', { format: 'CD' }).length, 100);
 });
-test('both new and saved listing editors use tenant/niche-scoped eBay category lookup', async () => {
-  const create = await readFile('src/pages/ListingNew.tsx', 'utf8');
-  const editor = await readFile('src/pages/ListingEditor.tsx', 'utf8');
-  const suggestionHook = await readFile('src/hooks/useListingCategorySuggestion.ts', 'utf8');
-  assert.match(create, /await lookupScopedListingCategory/);
-  assert.match(create, /const nicheId = getActiveNicheId\(\)/);
-  assert.match(create, /categoryTitleRef.current !== title/);
-  assert.match(create, /const mappedCategory = isCoinItem \? mapCoinCategory/);
-  assert.match(create, /inv.canonical_title/);
-  assert.doesNotMatch(create, /category: 'Coins: British'/);
-  assert.match(editor, /useListingCategorySuggestion/);
-  assert.match(editor, /category\.suggest\(\)/);
-  assert.match(suggestionHook, /await lookupScopedListingCategory/);
-  assert.match(suggestionHook, /const nicheId = getActiveNicheId\(\)/);
-  assert.match(suggestionHook, /getActiveNicheId\(\) === nicheId && draft\.revisionRef\.current === revision/);
-  assert.match(suggestionHook, /tenantId, nicheId, title/);
-  assert.doesNotMatch(suggestionHook, /route: 'get_category_suggestions'/);
+test('new and saved listing screens use the shared lookup; music avoids coin defaults', async () => {
+  for (const page of ['ListingNew', 'ListingEditor']) {
+    const source = await readFile(`src/pages/${page}.tsx`, 'utf8');
+    assert.match(source, /await lookupScopedListingCategory/);
+    assert.match(source, /const nicheId = getActiveNicheId\(\)/);
+    assert.match(source, /categoryTitleRef.current !== title/);
+    assert.doesNotMatch(source, /route: 'get_category_suggestions'/);
+  }
+  const source = await readFile('src/pages/ListingNew.tsx', 'utf8');
+  assert.match(source, /const mappedCategory = isCoinItem \? mapCoinCategory/);
+  assert.match(source, /inv.canonical_title/);
+  assert.doesNotMatch(source, /category: 'Coins: British'/);
 });
 
 const tunesCD = { nicheId: 'tunes_flip', title: 'Band album CD', attributes: { format: 'CD' } };
