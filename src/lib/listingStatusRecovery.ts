@@ -47,7 +47,7 @@ export async function endSharedEbayListing({ client, userId, tenantId, nicheId, 
   if (before.error || !before.data) throw new Error('The saved eBay listing is unavailable. No end request was sent.');
   const row = before.data;
   const externalId = String(row.external_listing_id || '');
-  if (!/^\\d{6,20}$/.test(externalId) || row.publish_claim_id) throw new Error('The listing identity or publication is not confirmed. Check status before ending.');
+  if (!/^\d{6,20}$/.test(externalId) || row.publish_claim_id) throw new Error('The listing identity or publication is not confirmed. Check status before ending.');
   if (!['active','live'].includes(String(row.status).toLowerCase())) throw new Error('This listing is no longer recorded as Active. Check its current eBay status.');
   const { data, error } = await callEdgeFunction<Record<string, unknown>>('swish-ebay-list', {
     route: 'end', tenantId, nicheId, listingId, itemId: row.item_id, externalListingId: externalId,
