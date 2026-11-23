@@ -6,6 +6,7 @@ import { getSupabaseClientAsync } from '@/lib/supabase';
 import { getActiveNicheId } from '@/lib/niche';
 import { checkSharedListingStatus } from '@/lib/listingStatusRecovery';
 import { discoverEbayInventory, importDiscoveredEbayListing, repairVerifiedEbaySellerLinks, type SellerDiscovery, type SellerBindingRepairProgress } from '@/lib/ebaySellerImport';
+/** Explicit, read-first eBay discovery; never publishes or guesses a draft-to-eBay identity. */
 
 interface Props { tenantId: string | null }
 const explanation = (error: unknown) => error instanceof Error ? error.message : 'Seller listings could not be checked.';
