@@ -269,7 +269,9 @@
 .swish-inventory-info { display:flex; align-items:center; gap:10px; margin:0 -1rem 12px; padding:14px 1rem; background:hsl(var(--secondary)); color:hsl(var(--muted-foreground)); font-size:12px; line-height:1.5; }
 .swish-inventory-info.is-live { color:#4ade80; background:rgb(34 197 94 / .08); }
 .swish-inventory-list { display:flex; flex-direction:column; gap:10px; }
-.swish-inventory-card { display:flex; align-items:center; gap:10px; min-width:0; padding:13px; border:1px solid hsl(var(--border)); border-left:5px solid hsl(var(--inventory-accent) / .65); border-radius:28px; background:hsl(var(--card)); }
+.swish-inventory-card { display:flex; flex-direction:column; align-items:stretch; gap:10px; min-width:0; padding:13px; border:1px solid hsl(var(--border)); border-left:5px solid hsl(var(--inventory-accent) / .65); border-radius:28px; background:hsl(var(--card)); }
+.swish-inventory-card > .swish-inventory-card-main { width:100%; flex:0 0 auto; }
+.swish-inventory-card > div:last-child { width:100%; min-width:0; }
 .swish-inventory-card-main { display:flex; align-items:center; gap:13px; flex:1; min-width:0; text-align:left; }
 .swish-inventory-thumb { display:flex; align-items:center; justify-content:center; flex:0 0 82px; width:82px; height:82px; overflow:hidden; border-radius:20px; background:hsl(var(--secondary)); color:hsl(var(--muted-foreground)); }
 .swish-inventory-thumb img { width:100%; height:100%; object-fit:cover; }
