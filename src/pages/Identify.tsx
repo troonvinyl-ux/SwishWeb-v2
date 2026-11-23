@@ -943,13 +943,13 @@ export default function Identify() {
           {savedInventoryId && (
             <button
               onClick={() => void handleCreateCoinDraft()}
-              disabled={draftBusy || !parseNumistaNumber(metadata.numista_number) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)}
+              disabled={draftBusy || (Boolean(metadata.numista_number?.trim()) && !parseNumistaNumber(metadata.numista_number)) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)}
               className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Tag className="w-4 h-4" />{draftBusy ? 'Pulling eBay draft…' : 'Pull eBay draft'}
             </button>
           )}
-          {(!parseNumistaNumber(metadata.numista_number) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)) && <p className="text-xs leading-5 text-muted-foreground">A valid Numista N#, actual weight and actual diameter are required before SWISH can pull a coin eBay draft.</p>}
+          {((Boolean(metadata.numista_number?.trim()) && !parseNumistaNumber(metadata.numista_number)) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)) && <p className="text-xs leading-5 text-muted-foreground">Actual measured weight and diameter are required. Numista N# is optional; if provided it must be valid.</p>}
           <button
             onClick={() => navigate(savedInventoryId ? `/inventory/${savedInventoryId}` : '/inventory')}
             className="btn-secondary w-full justify-center"
