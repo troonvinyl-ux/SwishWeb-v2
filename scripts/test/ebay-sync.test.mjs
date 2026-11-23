@@ -246,3 +246,28 @@ test('legacy eBay coin card offers local-only archive without changing account b
   assert.match(detail,/response\.data\?\.archived!==true/);
   assert.match(detail,/navigate\('\/inventory\?tab=live'\)/);
 });
+
+test('Coins Live has an explicit SWISH-only removal button that never calls eBay End',async()=>{
+ const [actions,card] = await Promise.all([
+  readFile('src/components/features/InventoryListingActions.tsx','utf8'),
+  readFile('src/components/features/InventoryCard.tsx','utf8'),
+ ]);
+ const begin=actions.indexOf('export function RemoveFromSwishAction(');
+ const end=actions.indexOf('export function InventoryPriceAction(',begin);
+ assert.ok(begin>0 && end>begin,'dedicated coin local-only action must exist');
+ const action=actions.slice(begin,end);
+ assert.match(card,/RemoveFromSwishAction entry=\{entry\}/);
+ assert.match(card,/nicheId === 'coins'/);
+ assert.match(action,/mode:'exclude_local_legacy'/);
+ assert.match(action,/Remove from SWISH only/);
+ assert.match(action,/eBay item: /);
+ assert.match(action,/NO request will be sent to eBay/);
+ assert.match(action,/result\.data\?\.archived!==true/);
+ assert.match(action,/_swish_ebay_sync_excluded/);
+ assert.match(action,/String\(readback\.data\.status\)\.toLowerCase\(\)!=='held'/);
+ assert.match(action,/await refresh\(\)/);
+ assert.doesNotMatch(action,/endSharedEbayListing/);
+ assert.doesNotMatch(action,/EndFixedPriceItem/);
+ assert.doesNotMatch(action,/\.from\('items'\)\.delete/);
+ assert.doesNotMatch(action,/\.from\('listings'\)\.delete/);
+});
