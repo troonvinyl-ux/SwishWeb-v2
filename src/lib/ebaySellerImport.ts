@@ -157,6 +157,55 @@ export async function discoverEbayInventory(client: SupabaseClient, userId: stri
     ),
   };
 }
+export interface SellerBindingRepairProgress {
+  section:string;page:number;totalPages:number;observed:number;
+  updated:number;alreadyLinked:number;unlinked:number;conflicts:number;verifiedSeller:string;
+}
+export async function repairVerifiedEbaySellerLinks(
+ client:SupabaseClient,userId:string,tenantId:string,nicheId:SwishNicheId,
+ onProgress:(progress:SellerBindingRepairProgress)=>void,
+):Promise<SellerBindingRepairProgress>{
+ if(nicheId!=='coins')throw new Error('Open Coins to re-import and repair coin seller bindings.');
+ await activateModuleScope(client,userId,tenantId,nicheId);
+ let progress:SellerBindingRepairProgress={section:'',page:0,totalPages:0,observed:0,
+  updated:0,alreadyLinked:0,unlinked:0,conflicts:0,verifiedSeller:''};
+ for(const section of ['ActiveList','SoldList','UnsoldList'] as const){
+  let page:number|null=1;
+  while(page!==null){
+   await verifyModuleScope(client,userId,tenantId,nicheId);
+   const next=await callEdgeFunction<{
+    success?:boolean;error?:string;section?:string;page?:number;totalPages?:number;
+    nextPage?:number|null;verifiedSeller?:string;observed?:number;
+    updated?:number;alreadyLinked?:number;unlinked?:number;conflicts?:number;
+   }>('swish-ebay-browse',{
+    route:'repair_seller_links',tenantId,nicheId,section,page,
+   },client);
+   if(next.error || next.data?.success!==true)
+    throw new Error(next.data?.error||next.error?.message||'eBay seller binding repair could not be confirmed. Earlier pages remain saved; refresh before repeating.');
+   if(next.data.section!==section || next.data.page!==page ||
+      !Number.isSafeInteger(next.data.totalPages) || next.data.totalPages!<0 ||
+      !Number.isSafeInteger(next.data.observed) ||
+      !Number.isSafeInteger(next.data.updated))
+    throw new Error('The eBay re-import response was incomplete. Previously saved pages are retained.');
+   const verifiedSeller=String(next.data.verifiedSeller||'');
+   if(!verifiedSeller || (progress.verifiedSeller&&progress.verifiedSeller!==verifiedSeller))
+    throw new Error('The verified seller account changed while importing. Stop and reopen the correct eBay account.');
+   progress={section,page,totalPages:next.data.totalPages,verifiedSeller,
+    observed:progress.observed+Number(next.data.observed||0),
+    updated:progress.updated+Number(next.data.updated||0),
+    alreadyLinked:progress.alreadyLinked+Number(next.data.alreadyLinked||0),
+    unlinked:progress.unlinked+Number(next.data.unlinked||0),
+    conflicts:progress.conflicts+Number(next.data.conflicts||0)};
+   onProgress(progress);
+   page=typeof next.data.nextPage==='number'?next.data.nextPage:null;
+   if(page!==null && (page<=progress.page||page>50))
+    throw new Error('eBay pagination did not advance safely. Completed pages remain saved.');
+  }
+ }
+ await verifyModuleScope(client,userId,tenantId,nicheId);
+ return progress;
+}
+
 /** A single explicit import; database RPC enforces same tenant + niche and atomic uniqueness. */
 export async function importDiscoveredEbayListing(client: SupabaseClient, userId: string, tenantId: string, nicheId: SwishNicheId, candidate: SellerEbayListing, existingItemId?: string) {
   if (!validatedSellerListing(candidate) || candidate.ebayStatus !== 'active') throw new Error('Only verified active seller listings may be imported.');
@@ -173,5 +222,13 @@ export async function importDiscoveredEbayListing(client: SupabaseClient, userId
   if (verified.error || !verified.data || verified.data.external_listing_id !== candidate.itemId || verified.data.item_id !== imported.data.itemId || verified.data.status !== 'active') {
     throw new Error('Import may have succeeded, but its canonical eBay identity was not confirmed. Refresh before retrying.');
   }
+  // A new or pre-existing listing is imported only after independently proving
+  // it belongs to THIS member's eBay seller account. Never use an eBay ID
+  // supplied by the browser as ownership evidence without a fresh seller read.
+  const binding=await callEdgeFunction<{success?:boolean;updated?:number;alreadyLinked?:number;conflicts?:number;error?:string}>(
+    'swish-ebay-browse',{route:'repair_seller_links',tenantId,nicheId,externalListingId:candidate.itemId},client);
+  if(binding.error||binding.data?.success!==true||
+     (Number(binding.data.updated||0)+Number(binding.data.alreadyLinked||0)!==1))
+    throw new Error('eBay listing was saved in SWISH, but seller ownership could not be verified. Use Re-import & Repair eBay Links; do not create a duplicate.');
   return { itemId: String(imported.data.itemId), listingId: String(imported.data.listingId), reused: Boolean(imported.data.existing) };
 }
