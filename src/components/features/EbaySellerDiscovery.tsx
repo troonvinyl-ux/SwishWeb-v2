@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import { getActiveNicheId } from '@/lib/niche';
 import { checkSharedListingStatus } from '@/lib/listingStatusRecovery';
-import { discoverEbayInventory, importDiscoveredEbayListing, type SellerDiscovery } from '@/lib/ebaySellerImport';
+import { discoverEbayInventory, importDiscoveredEbayListing, repairVerifiedEbaySellerLinks, type SellerDiscovery, type SellerBindingRepairProgress } from '@/lib/ebaySellerImport';
 
 interface Props { tenantId: string | null }
 const explanation = (error: unknown) => error instanceof Error ? error.message : 'Seller listings could not be checked.';
@@ -13,14 +13,32 @@ const explanation = (error: unknown) => error instanceof Error ? error.message :
 export default function EbaySellerDiscovery({ tenantId }: Props) {
   const { user } = useAuth(), qc = useQueryClient(), niche = getActiveNicheId();
   const [discovery, setDiscovery] = useState<SellerDiscovery | null>(null);
-  const [busy, setBusy] = useState(false), [importing, setImporting] = useState('');
+  const [busy, setBusy] = useState(false), [importing, setImporting] = useState(''), [repairing, setRepairing] = useState(false);
+  const [repairState, setRepairState] = useState<{scope:string;summary:SellerBindingRepairProgress;complete:boolean}|null>(null);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [scope, setScope] = useState('');
   const scopeKey = `${user?.id || ''}:${tenantId || ''}:${niche}`, relevant = scope === scopeKey;
+  const shownRepair = repairState?.scope===scopeKey ? repairState : null;
+  const repairAll = async () => {
+    if(busy||repairing||importing||!tenantId||!user||niche!=='coins')return;
+    setRepairing(true);setError('');setNotice('');setRepairState(null);
+    try{
+      const client=await getSupabaseClientAsync();
+      if(!client)throw new Error('SWISH backend is unavailable.');
+      const result=await repairVerifiedEbaySellerLinks(client,user.id,tenantId,niche,summary=>{
+        if(getActiveNicheId()===niche)setRepairState({scope:scopeKey,summary,complete:false});
+      });
+      if(getActiveNicheId()!==niche)return;
+      setRepairState({scope:scopeKey,summary:result,complete:true});
+      await Promise.all(['items','listings','canonical-inventory'].map(queryKey=>qc.invalidateQueries({queryKey:[queryKey]})));
+      setNotice(`Verified seller ${result.verifiedSeller}: ${result.updated} linked coin records repaired; ${result.alreadyLinked} already correct; ${result.conflicts} ownership conflicts; ${result.unlinked} eBay records not in SWISH. No listings, prices, inventory status or photos were changed.`);
+    }catch(reason){setError(explanation(reason)+' Any earlier confirmed repair pages remain saved; you can safely re-run the same eBay read.');}
+    finally{setRepairing(false);}
+  };
   const scan = async () => {
-    if (busy || importing || !tenantId || !user) return;
+    if (busy || repairing || importing || !tenantId || !user) return;
     setBusy(true); setError(''); setNotice(''); setDiscovery(null); setSelected({}); setCompleted(new Set());
     try {
       const client = await getSupabaseClientAsync();
@@ -33,7 +51,7 @@ export default function EbaySellerDiscovery({ tenantId }: Props) {
     finally { setBusy(false); }
   };
   const take = async (itemId: string) => {
-    if (!relevant || !discovery || !user || !tenantId || busy || importing || completed.has(itemId)) return;
+    if (!relevant || !discovery || !user || !tenantId || busy || repairing || importing || completed.has(itemId)) return;
     const candidate = discovery.candidates.find(row => row.listing.itemId === itemId);
     if (!candidate) return;
     const chosen = selected[itemId] || '';
@@ -62,8 +80,23 @@ export default function EbaySellerDiscovery({ tenantId }: Props) {
   return <section className="swish-card space-y-4 p-4 sm:p-5" aria-label="Discover listings from the connected eBay account">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-lg font-semibold">Import listings already on eBay</h2><p className="mt-1 text-sm text-muted-foreground">Read listings from your connected seller account, including records created outside SWISH. Imports go into the same inventory and stay in the correct specialist. This does not submit or relist anything.</p></div>
-      <button type="button" onClick={() => void scan()} disabled={!tenantId || !user || busy || Boolean(importing)} className="btn-secondary min-h-11"><RefreshCw size={18} className={busy ? 'animate-spin' : ''}/>{busy ? 'Checking eBay…' : 'Find unlinked eBay listings'}</button>
+      <button type="button" onClick={() => void scan()} disabled={!tenantId || !user || busy || repairing || Boolean(importing)} className="btn-secondary min-h-11"><RefreshCw size={18} className={busy ? 'animate-spin' : ''}/>{busy ? 'Checking eBay…' : 'Find unlinked eBay listings'}</button>
     </div>
+    {niche==='coins' && <div className="rounded-xl border border-border p-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-primary min-h-11" disabled={!user||!tenantId||busy||repairing||Boolean(importing)}
+          onClick={()=>void repairAll()}>
+          <RefreshCw size={17} className={repairing?'animate-spin':''}/>
+          {repairing?'Reading seller listings & repairing…':'Re-import & Repair eBay Links'}
+        </button>
+        <p className="text-xs text-muted-foreground flex-1">Automatically matches existing Coins by exact eBay item number and fills the verified member, account and binding IDs. Includes active, sold and unsold eBay pages. No relisting or manual row editing.</p>
+      </div>
+      {shownRepair && <p role="status" className="text-xs text-muted-foreground">
+        Seller: {shownRepair.summary.verifiedSeller} · {shownRepair.summary.section} page {shownRepair.summary.page}/{shownRepair.summary.totalPages} ·
+        {' '}{shownRepair.summary.updated} repaired · {shownRepair.summary.alreadyLinked} correct · {shownRepair.summary.conflicts} conflicts · {shownRepair.summary.unlinked} unlinked
+        {shownRepair.complete?' · Finished':''}
+      </p>}
+    </div>}
     {error && <p role="alert" className="text-sm text-destructive flex gap-2"><AlertCircle size={18}/>{error}</p>}
     {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
     {relevant && discovery && <div className="space-y-3">
