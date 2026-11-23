@@ -28,10 +28,11 @@ const { coinItemDraftReadiness, createCoinListingDraft } = load('src/lib/coinLis
 const faces = [{ slotId: 'obverse' }, { slotId: 'reverse' }];
 const complete = { numista_number: 'N#438449', weight: '28.28', diameter: '38.61' };
 
-test('coin drafts require a seller-entered Numista number before the shared draft route', () => {
+test('unattributed coin drafts may proceed without Numista, but malformed supplied IDs still fail', () => {
   const missing = coinDraftReadiness({ ...complete, numista_number: '' }, faces);
-  assert.equal(missing.ready, false);
-  assert.match(missing.message, /Numista N#/);
+  assert.equal(missing.ready, true);
+  assert.equal(missing.typeId, null);
+  assert.equal(assertCoinDraftReady({ ...complete, numista_number: '' }, faces), null);
   assert.throws(() => assertCoinDraftReady({ ...complete, numista_number: '438449?' }, faces), /Numista N#/);
 });
 
@@ -84,10 +85,12 @@ test('coin pull uses the shared generator and canonical draft RPC only after ret
   assert.deepEqual(draft, { listingId: 'coin-listing', reused: false });
   assert.equal((await createCoinListingDraft(scope, 'coin-fixture')).reused, true);
   const missingReference = coinItem({ attributes: { source_scan: coinItem().attributes.source_scan } });
-  assert.match(coinItemDraftReadiness(missingReference).message, /Numista N#/);
-  const unsafeClient = coinClient(missingReference);
-  await assert.rejects(() => createCoinListingDraft({ ...scope, client: unsafeClient }, 'coin-fixture'), /Numista N#/);
-  assert.equal(unsafeClient.generatorCalls.length, 0);
+  assert.deepEqual(coinItemDraftReadiness(missingReference), { ready: true, typeId: null });
+  const unattributedClient = coinClient(missingReference);
+  const unattributed = await createCoinListingDraft({ ...scope, client: unattributedClient }, 'coin-fixture');
+  assert.equal(unattributed.listingId, 'coin-listing');
+  assert.equal(unattributedClient.generatorCalls.length, 1);
+  assert.equal((await createCoinListingDraft({ ...scope, client: unattributedClient }, 'coin-fixture')).reused, true);
 });
 
 test('saved original media is accepted as both faces when an older item has no named scan-image map', () => {
@@ -95,7 +98,7 @@ test('saved original media is accepted as both faces when an older item has no n
   assert.deepEqual(coinItemDraftReadiness(stored), { ready: true, typeId: 438449 });
 });
 
-test('coin preparation blocks before identification and draft creation when Numista evidence is incomplete', () => {
+test('coin preparation keeps Numista optional but validates real photos and measurements', () => {
   const flow = readFileSync('src/lib/quickCaptureFlow.ts', 'utf8');
   const persistence = readFileSync('src/lib/capturePersistence.ts', 'utf8');
   const workspace = readFileSync('src/components/features/QuickCaptureWorkspace.tsx', 'utf8');
