@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
-import { ListingStatusAction, InventoryPriceAction } from '@/components/features/InventoryListingActions';
+import { ListingStatusAction, InventoryPriceAction, EndEbayListingAction } from '@/components/features/InventoryListingActions';
 import { asRecord } from '@/lib/itemPhotos';
 import type { InventoryEntry } from '@/lib/inventoryNative';
 
@@ -85,6 +85,7 @@ export default function Listings() {
                         <Link to={`/listings/${l.id}`} className="btn-secondary py-1 px-2 text-xs">View listing</Link>
                         <Link to={`/listings/${l.id}/edit`} className="btn-ghost py-1 px-2 text-xs">Edit</Link>
                         {tenantId && <ListingStatusAction listing={l} tenantId={tenantId} nicheId={niche}/>}
+                        {tenantId && <EndEbayListingAction listing={l} tenantId={tenantId} nicheId={niche}/> }
                         {tenantId && ['active', 'live'].includes(String(l.status || '').toLowerCase()) && (() => {
                           const item = asRecord(l.items);
                           const entry: InventoryEntry = { id: String(l.item_id || item.id || ''), item, listing: l,
