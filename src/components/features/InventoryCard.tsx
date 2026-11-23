@@ -4,7 +4,7 @@ import { asRecord } from '@/lib/itemPhotos';
 import { selectedInventoryPrice, type InventoryEntry } from '@/lib/inventoryNative';
 import { formatCurrency } from '@/lib/utils';
 import CoinPresentation from '@/components/features/CoinPresentation';
-import { InventoryPriceAction, ListingStatusAction } from '@/components/features/InventoryListingActions';
+import { InventoryPriceAction, ListingStatusAction, RemoveFromSwishAction } from '@/components/features/InventoryListingActions';
 
 export default function InventoryCard({ entry, tenantId, nicheId }: {
   entry: InventoryEntry; tenantId: string; nicheId: string;
@@ -60,6 +60,9 @@ export default function InventoryCard({ entry, tenantId, nicheId }: {
         <ListingStatusAction listing={listing} tenantId={tenantId} nicheId={nicheId}/>}
       {tab === 'live' && listing &&
         <InventoryPriceAction entry={entry} tenantId={tenantId} nicheId={nicheId}/>}
+      {tab === 'live' && listing && nicheId === 'coins' &&
+        <RemoveFromSwishAction entry={entry} tenantId={tenantId} nicheId={nicheId}/>}
+
       {tab === 'live' && ebayUrl && <a className="swish-inventory-submit is-live min-h-10" href={ebayUrl}
         target="_blank" rel="noreferrer" aria-label="View linked eBay listing"><Store size={16}/><span>eBay</span></a>}
     </div>
