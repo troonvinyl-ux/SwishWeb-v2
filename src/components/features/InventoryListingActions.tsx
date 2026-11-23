@@ -104,9 +104,15 @@ export function RemoveFromSwishAction({ entry, tenantId, nicheId }: {
   const current = state.scope===scope ? state : {scope,busy:false,message:'',error:''};
   // This rescue action applies to linked coins, never to orders, sold items,
   // arbitrary listings or another niche. Owner/ledger checks run server-side.
-  const eligible = nicheId==='coins' && entry.tab==='live' &&
-    Boolean(user?.id && tenantId && itemId && /^\d{6,20}$/.test(externalId)) &&
-    !item.sold_at && !['sold','fulfilled','completed','held'].includes(String(item.status||'').toLowerCase());
+  // Always show the recovery control on the Coins Live card. Historical
+  // coin item states can be inconsistent while the canonical listing is Live.
+  // Never silently hide removal: the server validates sale and order history.
+  const eligible = Boolean(user?.id && tenantId && itemId && /^\d{6,20}$/.test(externalId));
+  const unavailableReason = !user?.id || !tenantId
+    ? 'Sign in to your SWISH workspace to remove this coin locally.'
+    : !itemId ? 'The SWISH inventory item ID is missing.'
+    : !/^\d{6,20}$/.test(externalId) ? 'No valid linked eBay listing number was saved.'
+    : '';
   const removeLocally = async () => {
     if (!eligible || !user?.id || busyRef.current) return;
     const confirmed = window.confirm(
@@ -146,13 +152,13 @@ export function RemoveFromSwishAction({ entry, tenantId, nicheId }: {
         error:cause instanceof Error?cause.message:'Local removal could not be verified.'});
     }finally{busyRef.current=false;}
   };
-  if(!eligible)return null;
-  return <div className="min-w-0 max-w-full space-y-1">
-    <button type="button" onClick={() => void removeLocally()} disabled={current.busy}
-      className="btn-secondary min-h-10 text-xs disabled:opacity-50"
+  return <div className="min-w-0 max-w-full space-y-1" data-swish-local-removal="coins">
+    <button type="button" onClick={() => void removeLocally()} disabled={!eligible || current.busy}
+      className="swish-inventory-submit min-h-10 text-xs disabled:opacity-50"
       title="Remove this coin from SWISH Live and eBay sync, with no eBay End/Delete call; retains a hidden history record">
       <Trash2 size={15}/><span>{current.busy?'Removing locally…':'Remove from SWISH only'}</span>
     </button>
+    {unavailableReason && <p role="status" className="max-w-full break-words text-xs text-warning">{unavailableReason}</p>}
     {current.message && <p role="status" className="max-w-full break-words text-xs text-success">{current.message}</p>}
     {current.error && <p role="alert" className="max-w-full break-words text-xs text-destructive">{current.error}</p>}
   </div>;
