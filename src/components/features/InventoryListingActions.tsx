@@ -32,6 +32,7 @@ export function ListingStatusAction({ listing, tenantId, nicheId }: {
   const current = state.scope === scope ? state : { scope, busy: false, notice: '', error: '' };
   const eligible = Boolean(user?.id && tenantId && listingId && /^\d{6,20}$/.test(ebayId));
   const missingBinding = /Verify your own eBay seller account|Legacy tenant connections are not inherited/i.test(current.error);
+  const previousBinding = /This record belongs to a previous or unverified eBay account/i.test(current.error);
   const check = async () => {
     if (!eligible || busyRef.current || !user?.id) return;
     busyRef.current = true;
@@ -64,10 +65,16 @@ export function ListingStatusAction({ listing, tenantId, nicheId }: {
     {current.notice && <p role="status" className="text-xs text-success"><CheckCircle2 size={13} className="inline mr-1"/>{current.notice}</p>}
     {current.error && <div role="alert" className="min-w-0 max-w-full rounded-md border border-destructive/30 p-2 text-xs text-destructive">
       <p className="break-words"><AlertTriangle size={13} className="mr-1 inline"/>{missingBinding
-        ? 'This signed-in SWISH member has not yet verified their own eBay seller account.'
+        ? 'This SWISH member has not yet verified their own eBay seller account.'
+        : previousBinding
+        ? 'This historical eBay listing belongs to a different or unverified account binding. SWISH will not transfer it automatically.'
         : current.error}</p>
       {missingBinding && <Link to="/ebay" className="mt-2 inline-block font-semibold underline underline-offset-2">
         Connect my eBay account
+      </Link>}
+      {previousBinding && listing.item_id && <Link to={'/inventory/' + encodeURIComponent(String(listing.item_id))}
+        className="mt-2 inline-block font-semibold underline underline-offset-2">
+        Open inventory item for local-only archive
       </Link>}
     </div>}
   </div>;
