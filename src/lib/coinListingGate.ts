@@ -13,14 +13,13 @@ function positiveMeasurement(value: string | undefined): boolean {
 }
 
 /**
- * A coin draft is only useful when it is anchored to a seller-supplied Numista
- * entry and the physical coin has the two comparison measurements. This gate is
- * used both by the screen and immediately before the shared draft RPC, so a UI
- * change cannot create an unreferenced coin listing.
+ * A Numista reference is optional for an honest unattributed draft. Physical
+ * evidence remains required; a provided but malformed reference is rejected.
+ * Neither missing attribution nor seller review proves authenticity.
  */
 export function coinDraftReadiness(answers: Record<string, string>, photos: CapturePhoto[]): CoinDraftReadiness {
   const typeId = parseNumistaNumber(answers.numista_number);
-  if (!typeId) return { ready: false, typeId: null, message: 'Enter a valid Numista N# before pulling a coin eBay draft.' };
+  if (answers.numista_number?.trim() && !typeId) return { ready: false, typeId: null, message: 'The supplied Numista N# is invalid. Correct it or clear it to prepare an unattributed coin draft.' };
   const faces = new Set(photos.map(photo => photo.slotId));
   if (!faces.has('obverse') || !faces.has('reverse')) return { ready: false, typeId, message: 'Photograph both the obverse and reverse before pulling a coin eBay draft.' };
   if (!positiveMeasurement(answers.weight)) return { ready: false, typeId, message: 'Enter the actual coin weight in grams before pulling a coin eBay draft.' };
@@ -28,9 +27,9 @@ export function coinDraftReadiness(answers: Record<string, string>, photos: Capt
   return { ready: true, typeId, message: null };
 }
 
-export function assertCoinDraftReady(answers: Record<string, string>, photos: CapturePhoto[]): number {
+export function assertCoinDraftReady(answers: Record<string, string>, photos: CapturePhoto[]): number | null {
   const readiness = coinDraftReadiness(answers, photos);
-  if (!readiness.ready || !readiness.typeId) throw new Error(readiness.message || 'Coin listing evidence is incomplete.');
+  if (!readiness.ready) throw new Error(readiness.message || 'Coin listing evidence is incomplete.');
   return readiness.typeId;
 }
 

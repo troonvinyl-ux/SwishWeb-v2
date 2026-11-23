@@ -18,6 +18,16 @@ export function useMusicSession() {
  const format=form.watch('format'),slots=musicPhotoSlots(format),activeSlot=slots.find(slot=>slot.id===selected)||slots[0];
  useEffect(()=>()=>{photoRef.current.forEach(photo=>URL.revokeObjectURL(photo.preview));},[]);
  const unreview=useCallback(()=>{form.setValue('reviewed',false);form.setValue('pressing_reviewed',false);},[form]);
+ // Seller review is tied to material listing values, not a one-time checkbox.
+ useEffect(()=>{
+  const fields=new Set(['title','description','price','artist','release_title','format',
+    'catalogue_number','observed_disc_count','condition_notes','media_grade',
+    'sleeve_grade','play_tested','features','matrix_runout']);
+  const subscription=form.watch((_values,meta)=>{
+   if(meta.name && fields.has(meta.name) && form.getValues('reviewed'))unreview();
+  });
+  return ()=>subscription.unsubscribe();
+ },[form,unreview]);
  const applyFields=useCallback((incoming:MusicFields)=>{
   const next=mergeMusicFields(fieldRef.current,incoming);fieldRef.current=next;setFields(next);
   for(const[key,field]of Object.entries(next))if(key in MUSIC_DEFAULTS)form.setValue(key as keyof MusicValues,field.value,{shouldValidate:false});

@@ -1,23 +1,29 @@
 import { assertCaptureScope, captureRecord, captureRequest, captureText } from '@/lib/captureRequest';
 import { getSpecialistIdsForNiche } from '@/lib/niche';
 import { parseNumistaNumber } from '@/lib/numistaCapture';
+import { unattributedCoinCopy } from '@/lib/listingEvidence';
 import type { CaptureScope } from '@/types/capture';
 
-type CoinDraftReadiness = { ready: true; typeId: number } | { ready: false; message: string };
+type CoinDraftReadiness = { ready: true; typeId: number | null } | { ready: false; message: string };
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const positive = (value: unknown): boolean => Number.isFinite(Number(value)) && Number(value) > 0;
 
 /**
  * Coin listings use the existing shared draft path, but only after the saved
- * inventory record proves a seller-entered Numista N#, both faces and actual
- * measurements. A recognition candidate by itself cannot open a draft.
+ * inventory record proves both original faces and seller measurements.
+ * A Numista reference is optional but malformed or conflicting saved references
+ * cannot be silently turned into a catalogue attribution.
  */
 export function coinItemDraftReadiness(item: Record<string, unknown>): CoinDraftReadiness {
   const attributes = record(item.attributes), scan = record(attributes.source_scan), metadata = record(scan.scan_metadata), images = record(scan.scan_images);
-  const typeId = [attributes.numista_type_id, attributes.numista_number, attributes.numista_n, attributes.numista_reference, attributes.reference_url, metadata.numista_number, metadata.numista_reference, metadata.reference_url]
-    .map(parseNumistaNumber).find((value): value is number => Boolean(value));
-  if (!typeId) return { ready: false, message: 'Enter and save a valid Numista N# before pulling a coin eBay draft.' };
+  const references = [attributes.numista_type_id, attributes.numista_number, attributes.numista_n, attributes.numista_reference, attributes.reference_url, metadata.numista_number, metadata.numista_reference, metadata.reference_url]
+    .filter(value => (typeof value === 'string' || typeof value === 'number') && String(value).trim());
+  const parsedReferences = references.map(parseNumistaNumber);
+  if (parsedReferences.some(value => value === null)) return { ready: false, message: 'The saved Numista reference is invalid. Correct it or clear it for an unattributed draft.' };
+  const identifiers = [...new Set(parsedReferences.filter((value): value is number => value !== null))];
+  if (identifiers.length > 1) return { ready: false, message: 'The saved Numista references conflict. Resolve them against both original faces before preparing a draft.' };
+  const typeId = identifiers[0] ?? null;
   const permanentPhotos = [item.image_url, ...(Array.isArray(item.media) ? item.media : [])].filter(value => typeof value === 'string' && value.trim());
   if ((!images.obverse || !images.reverse) && permanentPhotos.length < 2) return { ready: false, message: 'This saved coin is missing its obverse or reverse evidence. Reopen it and save both original faces before pulling a draft.' };
   const weight = item.weight_grams ?? attributes.supplied_weight_g ?? metadata.weight;
@@ -47,8 +53,11 @@ export async function createCoinListingDraft(scope: CaptureScope, itemId: string
   const response = await captureRequest(scope, 'swish-list-generate', { item_id: itemId, tenant_id: scope.tenantId, marketplace_id: 'ebay' });
   const generated = captureRecord(response.listing);
   if (!captureText(generated.title)) throw new Error('The shared listing engine returned no coin draft. Your inventory item remains saved; retry this same item later.');
+  const attributes=record(stock.data.attributes),dimensions=record(stock.data.dimensions_mm);
+  const physicalCopy=!evidence.typeId?unattributedCoinCopy(stock.data.weight_grams??attributes.supplied_weight_g,dimensions.diameter??attributes.supplied_diameter_mm):null;
+  const draftCopy=physicalCopy?{...generated,...physicalCopy}:generated;
   await assertCaptureScope(scope);
-  const saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: itemId, p_marketplace_id: 'ebay', p_listing: generated, p_shipping_cost: 0, p_category_id: null });
+  const saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: itemId, p_marketplace_id: 'ebay', p_listing: draftCopy, p_shipping_cost: 0, p_category_id: null });
   if (saved.error || typeof saved.data !== 'string' || !saved.data) throw new Error(saved.error?.message || 'Coin draft creation was not confirmed. Inspect this item before retrying.');
   await assertCaptureScope(scope);
   const verified = await scope.client.from('listings').select('id,item_id,tenant_id,status,external_listing_id,publish_claim_id').eq('id', saved.data).eq('tenant_id', scope.tenantId).single();
