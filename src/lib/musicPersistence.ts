@@ -2,6 +2,7 @@ import { assertCaptureScope, captureRecord } from '@/lib/captureRequest';
 import { persistCapturePhotos } from '@/lib/capturePersistence';
 import { musicRequest } from '@/lib/musicApi';
 import { musicInventoryAttributes, musicListingDescription, musicListingTitle, musicSpecifics } from '@/lib/musicListing';
+import { musicContentsEvidence, protectMusicListingCopy } from '@/lib/listingEvidence';
 import { isFreshMusicRelease } from '@/lib/musicRelease';
 import { recordMusicTiming } from '@/lib/musicTiming';
 import { linkScanToLive } from '@/lib/scanToLiveTiming';
@@ -12,7 +13,11 @@ export async function saveMusicCapture({scope,snapshot,checkpoint,draft,progress
  if(snapshot.release&&!isFreshMusicRelease(snapshot.release))throw new Error('Refresh and confirm the expired catalogue selection before saving.');
  if(draft&&!v.reviewed)throw new Error('Review the release, contents and generated details before creating a draft.');
  const price=v.price?Number(v.price):null;if(price!==null&&(!Number.isFinite(price)||price<=0))throw new Error('Enter a positive price or leave it blank.');
- const attributes=musicInventoryAttributes(snapshot),title=v.title||musicListingTitle(v)||'Unidentified music — review required',description=v.description||musicListingDescription(snapshot);
+ const attributes=musicInventoryAttributes(snapshot);
+ const contents=musicContentsEvidence(snapshot.release?.discCount,v.observed_disc_count,v.format);
+ const composed=protectMusicListingCopy(v.title||musicListingTitle(v,snapshot.release)||'Unidentified music — review required',
+  v.description||musicListingDescription(snapshot),contents);
+ const title=composed.title,description=composed.description;
  if(new TextEncoder().encode(JSON.stringify(attributes)).length>90000)throw new Error('Music details exceed the safe metadata limit. Shorten the notes; photos are stored separately.');
  progress('Saving this physical music item…');
  const existing=await scope.client.from('items').select('id,tenant_id,specialist_id').eq('id',checkpoint.itemId).eq('tenant_id',scope.tenantId).maybeSingle();
