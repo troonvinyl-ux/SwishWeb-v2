@@ -28,6 +28,7 @@ export default function InventoryItem() {
   const [valuing, setValuing] = useState(false);
   const [creatingCoinDraft, setCreatingCoinDraft] = useState(false);
   const [excludingPolicyCoin, setExcludingPolicyCoin] = useState(false);
+  const [archivingLegacyCoin, setArchivingLegacyCoin] = useState(false);
 
   const row = item as Record<string, unknown> | null;
   const attrs = row?.attributes && typeof row.attributes === 'object' && !Array.isArray(row.attributes)
@@ -207,6 +208,42 @@ export default function InventoryItem() {
     }
   };
 
+  // An ended or policy-removed legacy listing may no longer return GetItem,
+  // and the imported item may not contain an _ebay_item_id attribute. Resolve
+  // the saved listing relationship before requesting a LOCAL-ONLY archive.
+  const handleArchiveLegacyCoin = async () => {
+    if (!id || !row || !tenantId || !user?.id || archivingLegacyCoin) return;
+    setArchivingLegacyCoin(true);
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is not connected.');
+      const linked = await client.from('listings').select('external_listing_id,marketplace_id')
+        .eq('tenant_id', tenantId).eq('item_id', id).in('marketplace_id',['ebay','ebay_gb']).limit(20);
+      if (linked.error) throw new Error('Could not verify the saved eBay listing for this coin.');
+      const linkedIds = [...new Set((linked.data || []).map(entry => String(entry.external_listing_id || '')).filter(Boolean))];
+      const attributeId = String(attrs._ebay_item_id || attrs.ebay_item_id || '');
+      const externalId = linkedIds.length === 1 ? linkedIds[0] : '';
+      if (!/^\\d{6,20}$/.test(externalId) || (attributeId && attributeId !== externalId)) {
+        throw new Error('Multiple or inconsistent eBay listing numbers. Review the saved records before archiving.');
+      }
+      if (!window.confirm(`Archive this coin locally in SWISH and exclude eBay item ${externalId} from future SWISH sync? This does NOT end, delete or verify the eBay listing. The original seller binding and historical record remain unchanged. This action is for a workspace owner or administrator only.`)) return;
+      const response = await callEdgeFunction<{success?:boolean;archived?:boolean;message?:string;error?:string}>(
+        'swish-ebay-sync',
+        {tenantId,nicheId:'coins',mode:'exclude_local_legacy',itemId:id,externalListingId:externalId},client,
+      );
+      if(response.error) throw new Error(response.error.message);
+      if(response.data?.success!==true||response.data.archived!==true)
+        throw new Error(response.data?.error || 'Local archive was not confirmed. Nothing changed on eBay.');
+      toast.success(response.data.message || 'Coin archived locally; no eBay action was performed.');
+      await refetch();
+      navigate('/inventory?tab=live');
+    } catch(cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Local archive could not be confirmed.');
+    } finally {
+      setArchivingLegacyCoin(false);
+    }
+  };
+
   const handleValue = async () => {
     if (!id || !row) return;
     const tenantId = String(row.tenant_id || '');
@@ -312,6 +349,12 @@ export default function InventoryItem() {
                 </button>
               )}
               <button onClick={startEdit} className="btn-secondary"><Edit2 className="w-3.5 h-3.5" />Edit</button>
+              {isCoin && row.status !== 'held' && ['active','listed','identified','review'].includes(String(row.status || '').toLowerCase()) && (
+                <button type="button" onClick={() => void handleArchiveLegacyCoin()} disabled={archivingLegacyCoin}
+                  className="btn-secondary" title="Archive a legacy eBay-linked coin in SWISH only; does not call eBay or overwrite account bindings, and protects sales and orders.">
+                  <Package className="w-3.5 h-3.5" />{archivingLegacyCoin ? 'Archiving locally…' : 'Archive locally (SWISH only)'}
+                </button>
+              )}
               {isCoin && /^\d{6,20}$/.test(String(attrs._ebay_item_id || attrs.ebay_item_id || '')) &&
                 row.status !== 'held' && (
                 <button type="button" onClick={() => void handleExcludePolicyRemovedCoin()} disabled={excludingPolicyCoin}
