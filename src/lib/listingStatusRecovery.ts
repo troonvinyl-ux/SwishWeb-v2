@@ -37,3 +37,27 @@ export async function checkSharedListingStatus({ client, userId, tenantId, niche
   assertInventoryReconciled(fresh);
   return fresh;
 }
+
+/** Native-equivalent End flow: one explicit server End request, then scoped
+ * readback. Never mark Ended locally from a button click or uncertain response. */
+export async function endSharedEbayListing({ client, userId, tenantId, nicheId, listingId }: StatusRecoveryInput): Promise<Record<string, unknown>> {
+  await activateModuleScope(client, userId, tenantId, nicheId);
+  const before = await client.from('listings').select('id,item_id,status,external_listing_id,publish_claim_id,items!inner(tenant_id,specialist_id)')
+    .eq('id', listingId).eq('tenant_id', tenantId).eq('marketplace_id', 'ebay').eq('items.tenant_id', tenantId).single();
+  if (before.error || !before.data) throw new Error('The saved eBay listing is unavailable. No end request was sent.');
+  const row = before.data;
+  const externalId = String(row.external_listing_id || '');
+  if (!/^\\d{6,20}$/.test(externalId) || row.publish_claim_id) throw new Error('The listing identity or publication is not confirmed. Check status before ending.');
+  if (!['active','live'].includes(String(row.status).toLowerCase())) throw new Error('This listing is no longer recorded as Active. Check its current eBay status.');
+  const { data, error } = await callEdgeFunction<Record<string, unknown>>('swish-ebay-list', {
+    route: 'end', tenantId, nicheId, listingId, itemId: row.item_id, externalListingId: externalId,
+  }, client);
+  if (error) throw new Error('The eBay end outcome could not be confirmed. Check the existing listing before retrying: ' + error.message);
+  if (data?.success !== true || data?.confirmed !== true || String(data.externalListingId || '') !== externalId)
+    throw new Error(String(data?.error || 'eBay did not confirm the end. No local status was assumed.'));
+  const result = await client.from('listings').select('*,items!inner(tenant_id,status,sold_at)')
+    .eq('id', listingId).eq('tenant_id', tenantId).eq('marketplace_id','ebay').eq('items.tenant_id',tenantId).single();
+  if (result.error || !result.data || result.data.status !== 'ended' || String(result.data.external_listing_id) !== externalId)
+    throw new Error('eBay confirmed Ended but SWISH saved status is still pending. Refresh status; do not end twice.');
+  return result.data as Record<string, unknown>;
+}
