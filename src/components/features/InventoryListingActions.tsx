@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, CheckCircle2, AlertTriangle, Tag } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertTriangle, Tag, Square } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabaseClientAsync } from '@/lib/supabase';
 import { getActiveNicheId } from '@/lib/niche';
-import { checkSharedListingStatus } from '@/lib/listingStatusRecovery';
+import { checkSharedListingStatus, endSharedEbayListing } from '@/lib/listingStatusRecovery';
 import { recommendedInventoryPrice, type InventoryEntry } from '@/lib/inventoryNative';
 import { reviseSharedListingPrice } from '@/lib/inventoryPriceRevision';
 
@@ -113,5 +113,37 @@ export function InventoryPriceAction({ entry, tenantId, nicheId }: {
     {(current.error || blocked) && <p role="alert" className="text-xs text-destructive">
       {current.error || 'Price revision outcome is uncertain. Check live eBay details before retrying; nothing was resent.'}
     </p>}
+  </div>;
+}
+
+/** Explicit end is the same scoped Edge route used by native SWISH.
+ * Only confirmed Ended readbacks cause cache invalidation. */
+export function EndEbayListingAction({ listing, tenantId, nicheId }: {
+  listing: Record<string, unknown>; tenantId: string; nicheId: string;
+}) {
+  const { user } = useAuth(), refresh = useInventoryRefresh();
+  const [ending, setEnding] = useState(false), [message, setMessage] = useState('');
+  const busyRef = useRef(false);
+  const id = String(listing.id || '');
+  const externalId = String(listing.external_listing_id || '');
+  if (!['active', 'live'].includes(String(listing.status || '').toLowerCase()) || !/^\d{6,20}$/.test(externalId)) return null;
+  const end = async () => {
+    if (!user?.id || !tenantId || busyRef.current) return;
+    busyRef.current = true; setEnding(true); setMessage('');
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is unavailable.');
+      await endSharedEbayListing({ client, userId: user.id, tenantId, nicheId, listingId: id });
+      await refresh();
+      setMessage('eBay confirmed Ended; inventory status refreshed.');
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'eBay End not confirmed; status was retained.');
+    } finally { busyRef.current = false; setEnding(false); }
+  };
+  return <div className="space-y-1">
+    <button type="button" disabled={ending} onClick={() => void end()}
+      title="End this existing eBay item; never delete SWISH inventory"
+      className="btn-ghost min-h-10 text-xs disabled:opacity-50"><Square size={13}/>{ending ? 'Ending…' : 'End on eBay'}</button>
+    {message && <p role="status" className="text-xs text-muted-foreground">{message}</p>}
   </div>;
 }
