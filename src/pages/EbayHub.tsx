@@ -8,6 +8,7 @@ import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEbayHubActions } from '@/hooks/useEbayHubActions';
 import EbaySyncStatus from '@/components/features/EbaySyncStatus';
+import EbaySellerLinkRepair from '@/components/features/EbaySellerLinkRepair';
 import { formatDateTime } from '@/lib/utils';
 import { readEbayConnector, ebayConnectorHeading } from '@/types/marketplace';
 
@@ -107,6 +108,8 @@ export default function EbayHub() {
       <div className="flex flex-wrap gap-2">{isConnected && !account?.seller_account_id?.trim() && <button type="button" className="btn-secondary min-h-11 disabled:opacity-50" disabled={checkingSeller || syncing || connecting} onClick={() => void verifyLinkedSeller()}>{checkingSeller ? 'Verifying seller…' : 'Verify seller ID'}</button>}<button type="button" onClick={() => { void query.refetch(); void refreshMemberAccount(); }} disabled={!tenantId || query.isFetching || connecting || syncing} className="btn-secondary min-h-11 disabled:opacity-50">Refresh status</button>{isConnected && <button type="button" onClick={() => void sync()} disabled={syncing || connecting || !tenantId || !memberVerified} title={!memberVerified ? 'First verify your own eBay seller account' : 'Synchronise listings in your verified workspace'} className="btn-primary min-h-11 disabled:opacity-50"><RefreshCw className="h-4 w-4" />{syncing ? 'Syncing…' : 'Sync now'}</button>}<button type="button" onClick={() => void connect()} disabled={connecting || syncing || tenantLoading || !tenantId} className={`${isConnected ? 'btn-secondary' : 'btn-primary'} min-h-11 disabled:opacity-50`}><Link2 className="h-4 w-4" />{connecting ? 'Checking authorisation…' : memberVerified ? 'Re-authorise my eBay' : 'Connect my eBay account'}</button></div>
     </div>}</section>
     {sellerError && <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/40 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{sellerError}</span></p>}
+    {/* This action must be directly accessible on the actual eBay Hub; the live Import page may still be CSV-only. */}
+    <EbaySellerLinkRepair tenantId={tenantId} />
     <EbaySyncStatus busy={syncing} progress={syncProgress} error={syncError} />
     <section><h2 className="mb-4 text-lg font-semibold">Seller workspace</h2><nav aria-label="eBay sections" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{QUICK_LINKS.map(link => <Link key={link.to} to={link.to} className="swish-card flex min-h-14 items-center p-4 font-medium hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{link.label}</Link>)}</nav></section>
     {account && !error && <aside className="swish-card p-6"><h2 className="text-lg font-semibold">Account details</h2><dl className="mt-4 grid gap-4 sm:grid-cols-3">{[['Status', account.status], ['Connected', account.connected_at ? formatDateTime(account.connected_at) : 'Not recorded'], ['Last sync', account.last_sync_at ? formatDateTime(account.last_sync_at) : 'Not recorded']].map(([label, value]) => <div key={label}><dt className="text-sm text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}</dl></aside>}
