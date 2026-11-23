@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { callEdgeFunction, getSupabaseClientAsync } from '@/lib/supabase';
@@ -22,15 +22,20 @@ const QUICK_LINKS = [
 export default function EbayHub() {
   const { tenantId, isLoading: tenantLoading, error: tenantError } = useCurrentTenantId();
   const { user } = useAuth();
+  const memberScope = [user?.id,tenantId].join(':');
+  const memberScopeRef = useRef(memberScope);
+  memberScopeRef.current = memberScope;
   const [memberAccount, setMemberAccount] = useState<{connected:boolean;seller:string;error:string}|null>(null);
   const refreshMemberAccount = useCallback(async () => {
     if (!tenantId || !user?.id) { setMemberAccount(null); return; }
+    const capturedScope = [user.id,tenantId].join(':');
     try {
       const client = await getSupabaseClientAsync();
       if (!client) throw new Error('SWISH backend unavailable.');
       const response = await callEdgeFunction<{success?:boolean;connected?:boolean;sellerAccountId?:string}>(
         'swish-ebay-oauth', {action:'member_binding_status',tenantId},client,
       );
+      if (memberScopeRef.current !== capturedScope) return;
       if (response.error) throw response.error;
       if (response.data?.success !== true) throw new Error('Member eBay binding could not be confirmed.');
       setMemberAccount({
@@ -39,10 +44,11 @@ export default function EbayHub() {
         error:'',
       });
     } catch (cause) {
+      if (memberScopeRef.current !== capturedScope) return;
       setMemberAccount({ connected:false,seller:'',error:cause instanceof Error?cause.message:'Member connection status unavailable.' });
     }
   },[tenantId,user?.id]);
-  useEffect(() => { void refreshMemberAccount(); },[refreshMemberAccount]);
+  useEffect(() => { setMemberAccount(null); void refreshMemberAccount(); },[refreshMemberAccount]);
   const query = useTable('marketplace_connectors', {
     select: 'status,seller_account_id,access_token_expires_at,connected_at,last_sync_at',
     filter: { tenant_id: tenantId, marketplace_id: 'ebay' }, enabled: Boolean(tenantId), limit: 1,
