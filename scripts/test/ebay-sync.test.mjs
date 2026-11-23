@@ -208,3 +208,23 @@ test('unknown seller-verification action is diagnosed as backend version drift, 
   assert.doesNotMatch(hub, /action: 'start_subscriber_authorization'/);
   assert.doesNotMatch(hub, /update\(\{seller_account_id:/);
 });
+
+test('eBay member connection confirmation never trusts a pre-existing shared connector',async()=>{
+  const [oauth, pending, hub, inventory] = await Promise.all([
+    readFile('src/hooks/useEbayOAuthRecovery.ts','utf8'),
+    readFile('src/lib/ebayOAuthPending.ts','utf8'),
+    readFile('src/pages/EbayHub.tsx','utf8'),
+    readFile('src/components/features/InventoryListingActions.tsx','utf8'),
+  ]);
+  assert.match(oauth, /action:'member_binding_status'/);
+  assert.match(oauth, /lastVerifiedAt/);
+  assert.match(oauth, /verifiedAt < started - 5000/);
+  assert.doesNotMatch(oauth, /from\('marketplace_connectors'\)\.select\('status'\)/);
+  assert.match(pending, /export function ebayOAuthStartedAt/);
+  assert.match(hub, /Signed-in member:/);
+  assert.match(hub, /memberVerified/);
+  assert.match(hub, /Connect my eBay account/);
+  assert.match(hub, /memberScopeRef\.current !== capturedScope/);
+  assert.match(inventory, /Legacy tenant connections are not inherited/);
+  assert.match(inventory, /to="\/ebay"/);
+});
