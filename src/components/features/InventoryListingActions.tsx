@@ -132,8 +132,8 @@ export function RemoveFromSwishAction({ entry, tenantId, nicheId }: {
         'swish-ebay-sync', {tenantId,nicheId:'coins',mode:'exclude_local_legacy',itemId,externalListingId:externalId},client
       );
       if(result.error)throw new Error(result.error.message);
-      if(result.data?.success!==true || result.data.archived!==true ||
-         result.data.externalListingId!==externalId)
+      if(result.data?.success!==true || result.data?.archived!==true ||
+         result.data?.externalListingId!==externalId)
         throw new Error(result.data?.error || 'Local removal was not confirmed. Nothing was changed on eBay.');
       // Confirm both the Held state and the exact exclusion identity; without
       // both we must not claim the following sync will skip this listing.
