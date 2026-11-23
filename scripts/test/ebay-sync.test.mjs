@@ -288,3 +288,23 @@ test('Coins Live removal control is never silently hidden by historical item sta
   assert.match(action,/mode:'exclude_local_legacy'/);
   assert.doesNotMatch(action,/endSharedEbayListing/);
 });
+
+test('one-click verified eBay re-import repairs linked coin ownership instead of creating duplicates',async()=>{
+ const [importFlow,ui]=await Promise.all([
+  readFile('src/lib/ebaySellerImport.ts','utf8'),
+  readFile('src/components/features/EbaySellerDiscovery.tsx','utf8'),
+ ]);
+ assert.match(importFlow,/export async function repairVerifiedEbaySellerLinks\(/);
+ assert.match(importFlow,/route:'repair_seller_links'/);
+ assert.match(importFlow,/for\(const section of \['ActiveList','SoldList','UnsoldList'\]/);
+ assert.match(importFlow,/await activateModuleScope/);
+ assert.match(importFlow,/await verifyModuleScope/);
+ assert.match(importFlow,/verifiedSeller/);
+ assert.match(importFlow,/externalListingId:candidate\.itemId/);
+ assert.match(importFlow,/Number\(binding\.data\.updated\|\|0\)\+Number\(binding\.data\.alreadyLinked\|\|0\)!==1/);
+ assert.match(ui,/Re-import & Repair eBay Links/);
+ assert.match(ui,/repairVerifiedEbaySellerLinks\(/);
+ assert.match(ui,/result\.conflicts/);
+ assert.match(ui,/result\.alreadyLinked/);
+ assert.match(ui,/result\.unlinked/);
+});
