@@ -271,3 +271,20 @@ test('Coins Live has an explicit SWISH-only removal button that never calls eBay
  assert.doesNotMatch(action,/\.from\('items'\)\.delete/);
  assert.doesNotMatch(action,/\.from\('listings'\)\.delete/);
 });
+
+test('Coins Live removal control is never silently hidden by historical item status',async()=>{
+  const source=await readFile('src/components/features/InventoryListingActions.tsx','utf8');
+  const start=source.indexOf('export function RemoveFromSwishAction(');
+  const stop=source.indexOf('export function InventoryPriceAction(',start);
+  assert.ok(start>0&&stop>start);
+  const action=source.slice(start,stop);
+  assert.match(action,/data-swish-local-removal="coins"/);
+  assert.match(action,/Remove from SWISH only/);
+  assert.doesNotMatch(action,/if\(!eligible\)return null/);
+  assert.doesNotMatch(action,/!item\.sold_at/);
+  assert.doesNotMatch(action,/entry\.tab==='live'/);
+  assert.match(action,/disabled=\{!eligible \|\| current\.busy\}/);
+  assert.match(action,/unavailableReason/);
+  assert.match(action,/mode:'exclude_local_legacy'/);
+  assert.doesNotMatch(action,/endSharedEbayListing/);
+});
