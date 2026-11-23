@@ -308,3 +308,20 @@ test('one-click verified eBay re-import repairs linked coin ownership instead of
  assert.match(ui,/result\.alreadyLinked/);
  assert.match(ui,/result\.unlinked/);
 });
+
+test('coin eBay seller repair is directly reachable on the primary Hub, not only the CSV importer',async()=>{
+  const [hub, app, repair] = await Promise.all([
+    readFile('src/pages/EbayHub.tsx','utf8'),
+    readFile('src/App.tsx','utf8'),
+    readFile('src/components/features/EbaySellerLinkRepair.tsx','utf8'),
+  ]);
+  assert.match(app, /<Route path="\/ebay" element=\{<EbayHub \/>\}/);
+  assert.match(hub, /<EbaySellerLinkRepair tenantId=\{tenantId\} \/>/);
+  assert.match(repair, /data-swish-ebay-repair="coins"/);
+  assert.match(repair, /data-testid="ebay-seller-binding-repair"/);
+  assert.match(repair, /Re-import & Repair eBay Links/);
+  assert.match(repair, /repairVerifiedEbaySellerLinks\(/);
+  assert.match(repair, /niche !== 'coins'/);
+  assert.match(repair, /No CSV upload/);
+  assert.doesNotMatch(repair, /EndFixedPriceItem|AddFixedPriceItem|\.from\('items'\)\.insert/);
+});
