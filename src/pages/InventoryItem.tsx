@@ -223,7 +223,7 @@ export default function InventoryItem() {
       const linkedIds = [...new Set((linked.data || []).map(entry => String(entry.external_listing_id || '')).filter(Boolean))];
       const attributeId = String(attrs._ebay_item_id || attrs.ebay_item_id || '');
       const externalId = linkedIds.length === 1 ? linkedIds[0] : '';
-      if (!/^\\d{6,20}$/.test(externalId) || (attributeId && attributeId !== externalId)) {
+      if (!/^\d{6,20}$/.test(externalId) || (attributeId && attributeId !== externalId)) {
         throw new Error('Multiple or inconsistent eBay listing numbers. Review the saved records before archiving.');
       }
       if (!window.confirm(`Archive this coin locally in SWISH and exclude eBay item ${externalId} from future SWISH sync? This does NOT end, delete or verify the eBay listing. The original seller binding and historical record remain unchanged. This action is for a workspace owner or administrator only.`)) return;
@@ -232,7 +232,7 @@ export default function InventoryItem() {
         {tenantId,nicheId:'coins',mode:'exclude_local_legacy',itemId:id,externalListingId:externalId},client,
       );
       if(response.error) throw new Error(response.error.message);
-      if(response.data?.success!==true||response.data.archived!==true)
+      if(response.data?.success!==true||response.data?.archived!==true)
         throw new Error(response.data?.error || 'Local archive was not confirmed. Nothing changed on eBay.');
       toast.success(response.data.message || 'Coin archived locally; no eBay action was performed.');
       await refetch();
