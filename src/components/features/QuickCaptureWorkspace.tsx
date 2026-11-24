@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, AlertCircle, Camera, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +20,7 @@ import NumistaReferenceEntry from '@/components/features/NumistaReferenceEntry';
 import '@/components/features/captureCamera.css';
 interface QuickCaptureWorkspaceProps { nicheId: SwishNicheId; }
 export default function QuickCaptureWorkspace({ nicheId }: QuickCaptureWorkspaceProps) {
-  const { user } = useAuth(), { tenantId } = useCurrentTenantId(), flow = useQuickCapture(nicheId);
+  const navigate = useNavigate(), { user } = useAuth(), { tenantId } = useCurrentTenantId(), flow = useQuickCapture(nicheId);
   const locked = flow.busy || flow.captureLocked, evidence = useCaptureEvidence(nicheId, flow.sessionId, locked);
   const { profile, form, activeSlot, slots, photos, missing, captureMode } = evidence;
   const answers = form.watch(), coinReadiness = nicheId === 'coins' ? coinDraftReadiness(answers, photos) : null;
@@ -34,7 +34,8 @@ export default function QuickCaptureWorkspace({ nicheId }: QuickCaptureWorkspace
     const answers = { notes: session.notes, studio_missing_views: missingViews.join(', ') }; form.reset(answers);
     if (nicheId !== 'coins') void flow.next({ photos: session.photos.map(photo => ({ ...photo, preview: '' })), specialistId: evidence.specialistId, mode: evidence.mode, answers });
   });
-  const next = form.handleSubmit(answers => { if (!missing.length) void flow.next({ photos: slots.flatMap(slot => photos.filter(photo => photo.slotId === slot.id)), specialistId: evidence.specialistId, mode: evidence.mode, answers, lead: evidence.lead }); });
+  useEffect(() => { if (flow.draft) navigate(`/listings/${flow.draft.listingId}/edit`, { replace: true }); }, [flow.draft?.listingId, navigate]);
+  const next = form.handleSubmit(answers => { if (photos.length && (!coinReadiness || coinReadiness.ready)) void flow.next({ photos, specialistId: evidence.specialistId, mode: evidence.mode, answers: { ...answers, studio_missing_views: missing.map(slot => slot.label).join(', ') }, lead: evidence.lead }); });
   if (profile.isPending) return <section role="status" className="swish-card p-6">Loading specialist capture…</section>;
   if (profile.error || !profile.data || !activeSlot) return <section role="alert" className="swish-card space-y-4 p-6"><h1 className="text-xl font-semibold">Scanner configuration unavailable</h1><p>{profile.error?.message || 'No registered evidence views returned.'}</p><Button variant="outline" onClick={() => void profile.refetch()}>Retry</Button></section>;
   const name = PRODUCTS.find(product => product.id === nicheId)?.shortName || 'Quick List';
@@ -47,7 +48,7 @@ export default function QuickCaptureWorkspace({ nicheId }: QuickCaptureWorkspace
       <details className="swish-card p-4"><summary className="min-h-12 cursor-pointer py-2 font-semibold">More options</summary><div className="mt-4 space-y-4">{!photos.length && <div className="flex flex-wrap gap-2" aria-label="Specialist">{getSpecialistIdsForNiche(nicheId).map(id => <Button key={id} type="button" variant="outline" className="min-h-12" disabled={locked} aria-pressed={evidence.specialistId === id} onClick={() => { evidence.setSpecialistId(id); evidence.setSelected(''); }}>{id.replace(/_/g, ' ')}</Button>)}</div>}{!photos.length && profile.data.modes.length > 1 && <div className="flex flex-wrap gap-2" aria-label="Specialist capture mode">{profile.data.modes.map(value => <Button key={value.id} type="button" variant="outline" className="min-h-12" aria-pressed={evidence.mode === value.id} disabled={locked} onClick={() => evidence.setMode(value.id)}>{value.label}</Button>)}</div>}<CaptureObservations fields={profile.data.fields.filter(field => nicheId !== 'coins' || !['weight', 'diameter', 'numista_number'].includes(field.key))} form={form} disabled={locked} nicheId={nicheId} /></div></details>
       {nicheId === 'tunes_flip' && evidence.mode === 'cd_box_set' && <div><label htmlFor="disc-count" className="mb-2 block">Discs physically present</label><input id="disc-count" type="number" min="1" max="5" className="input-field" disabled={locked} {...form.register('observed_disc_count')} /></div>}
       {(['numista_number', 'weight', 'diameter'] as const).map(key => form.formState.errors[key] ? <p key={key} role="alert" className="text-destructive">{form.formState.errors[key]?.message}</p> : null)}
-      <div className="capture-next"><p className="mb-3 leading-7 text-muted-foreground" role="status">{flow.busy ? flow.message || 'Preparing your listing…' : missing.length ? `Still needed: ${missing.map(slot => slot.label).join(', ')}.` : coinReadiness?.message || 'Next prepares your listing for review.'}</p><Button type="button" disabled={flow.busy || missing.length > 0 || !scope || Boolean(coinReadiness && !coinReadiness.ready)} onClick={() => void next()}>{flow.busy ? 'Preparing your listing…' : flow.error ? 'Retry preparation' : 'Next'}<ArrowRight size={20} className="ml-2" /></Button></div>
+      <div className="capture-next"><p className="mb-3 leading-7 text-muted-foreground" role="status">{flow.busy ? flow.message || 'Preparing your listing…' : coinReadiness?.message || (missing.length ? `Recommended evidence: ${missing.map(slot => slot.label).join(', ')}. A partial draft can still be prepared; unknowns need review.` : 'Build prepares market value, category, specifics and an editable listing. Nothing is published.')}</p><Button type="button" disabled={flow.busy || !photos.length || !scope || Boolean(coinReadiness && !coinReadiness.ready)} onClick={() => void next()}>{flow.busy ? 'Preparing your listing…' : flow.error ? 'Retry preparation' : 'Build listing'}<ArrowRight size={20} className="ml-2" /></Button></div>
     </>}
     <Button type="button" variant="ghost" className="min-h-12" disabled={flow.busy} onClick={flow.reset}>New item</Button>
   </div>;

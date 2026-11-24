@@ -363,7 +363,7 @@ export default function NicheCapture() {
 
         const enrichment = await enrichScannedItemForListing({
           client: sb, userId: user.id, tenantId, nicheId: canonicalNiche!, itemId: id,
-          specialistId: canonicalSpecialistId, title: draftTitle, attributes, condition: f('condition'), imageUrls,
+          specialistId: canonicalSpecialistId, title: draftTitle, attributes, condition: f('condition'), imageUrls: mediaUrls,
         });
         const generated = await callEdgeFunction<Record<string, unknown>>('swish-list-generate', {
           item_id: id, tenant_id: tenantId, marketplace_id: 'ebay',

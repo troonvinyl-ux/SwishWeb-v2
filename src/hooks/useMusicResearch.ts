@@ -51,12 +51,14 @@ export function useMusicResearch(session: ReturnType<typeof useMusicSession>, sc
  },onError:(cause:Error)=>{if(latest.current.scope?.isCurrent())report(cause);}});
  const mutation=useRef(identify);mutation.current=identify;
  useEffect(()=>{
-  if(locked)return;generation.current++;controller.current?.abort();setRelease(null);setMatches([]);setTiming(null);setError('');setWarnings([]);
+  if(locked)return;generation.current++;controller.current?.abort();setMatches([]);setTiming(null);setError('');setWarnings([]);
+  // Retaking evidence never overwrites the seller-selected catalogue release.
+  // The session invalidates physical review; catalogue facts remain reference data.
   const source=latest.current.session;
   for(const[key,field]of Object.entries(source.fields)){
-   if(field.source!=='user'&&key in MUSIC_DEFAULTS)source.form.setValue(key as keyof MusicValues,MUSIC_DEFAULTS[key as keyof MusicValues]);
+   if(field.source!=='user'&&field.source!=='discogs'&&key in MUSIC_DEFAULTS)source.form.setValue(key as keyof MusicValues,MUSIC_DEFAULTS[key as keyof MusicValues]);
   }
-  source.setFields(previous=>Object.fromEntries(Object.entries(previous).filter(([,field])=>field.source==='user')));
+  source.setFields(previous=>Object.fromEntries(Object.entries(previous).filter(([,field])=>field.source==='user'||field.source==='discogs')));
   if(!session.photos.length){setMessage('Add a front-cover photograph or search manually.');return;}
   const timer=setTimeout(()=>{if(latest.current.scope?.isCurrent())mutation.current.mutate();},1500);
   return()=>{clearTimeout(timer);generation.current++;controller.current?.abort();};
