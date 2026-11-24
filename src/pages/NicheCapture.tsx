@@ -3,12 +3,13 @@ import { useNicheAccess } from '@/hooks/useNicheAccess';
 import NicheAccessStatus from '@/components/features/NicheAccessStatus';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useInsert } from '@/hooks/useSupabaseQuery';
-import { getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
+import { callEdgeFunction, getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { SCAN_PROFILES } from '@/lib/sharedScanFlow';
 import { prepareScanPhotos, scanPhotoStoragePath } from '@/lib/sharedScanPhotos';
 import { getDefaultSpecialistForNiche, normaliseNicheId } from '@/lib/niche';
+import { enrichScannedItemForListing } from '@/lib/scanListingEnrichment';
 import { ArrowLeft, Save, Package, Shirt, Bike, Coins, Wrench, Gamepad2, Gem, FlaskConical, Monitor, Hammer, Sparkles, Camera, CheckCircle2, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -55,6 +56,7 @@ export default function NicheCapture() {
   const Icon = config.icon;
   const scanProfile = canonicalNicheId ? SCAN_PROFILES[canonicalNicheId] : undefined;
   const [form, setForm] = useState<Record<string,string>>({status:'review'});
+  const [preparingListing, setPreparingListing] = useState(false);
   const [evidencePhotos, setEvidencePhotos] = useState<Record<string,File>>({});
   const [evidencePreviews, setEvidencePreviews] = useState<Record<string,string>>({});
   useEffect(() => () => { Object.values(evidencePreviews).forEach(url => URL.revokeObjectURL(url)); }, [evidencePreviews]);
@@ -326,45 +328,68 @@ export default function NicheCapture() {
       warnings:(niche === 'clothing' ? clothingIdentified : evidenceIdentified) ? ['AI-suggested attributes require user confirmation; identity and authenticity are not guaranteed.'] : ['Manual review required: no verified niche-specific AI identification has been run.', ...(!f('title').trim() ? ['Identity and title still need confirmation before listing.'] : [])],
       tags:[canonicalSpecialistId],
     };
+    setPreparingListing(true);
     insert.mutate(row,{onSuccess:async(saved)=>{
       const id=(saved as Record<string,unknown>)?.id as string | undefined;
-      if (!id) { toast.error('Inventory response did not include an item ID. Please check inventory before trying again.'); return; }
-      if (niche !== 'clothing') {
+      if (!id) { toast.error('Inventory response did not include an item ID. Please check inventory before trying again.'); setPreparingListing(false); return; }
+      try {
         const mediaUrls:string[] = [];
         let uploadFailures = 0;
-        for (const [slot,file] of Object.entries(evidencePhotos)) {
-          const path = scanPhotoStoragePath(id, slot, file);
-          const {error:uploadError} = await sb.storage.from('item-images').upload(path,file,{contentType:file.type || 'image/jpeg'});
-          if (uploadError) { uploadFailures++; continue; }
-          const {data:urlData} = sb.storage.from('item-images').getPublicUrl(path);
-          if (urlData?.publicUrl) mediaUrls.push(urlData.publicUrl);
+        if (niche !== 'clothing') {
+          for (const [slot,file] of Object.entries(evidencePhotos)) {
+            const path = scanPhotoStoragePath(id, slot, file);
+            const {error:uploadError} = await sb.storage.from('item-images').upload(path,file,{contentType:file.type || 'image/jpeg'});
+            if (uploadError) { uploadFailures++; continue; }
+            const {data:urlData} = sb.storage.from('item-images').getPublicUrl(path);
+            if (urlData?.publicUrl) mediaUrls.push(urlData.publicUrl);
+          }
+        } else {
+          const photoSlots = [['brand','brand-label'],['garment','garment-front'],['detail','care-label-detail']] as const;
+          for (const [slot, label] of photoSlots) {
+            const file = clothingPhotos[slot];
+            if (!file) continue;
+            const path = scanPhotoStoragePath(id, label, file);
+            const { error: uploadError } = await sb.storage.from('item-images').upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
+            if (uploadError) { uploadFailures++; continue; }
+            const { data: publicUrl } = sb.storage.from('item-images').getPublicUrl(path);
+            if (publicUrl?.publicUrl) mediaUrls.push(publicUrl.publicUrl);
+          }
         }
         if (mediaUrls.length) {
           const {error:mediaError} = await sb.from('items').update({media:mediaUrls}).eq('id',id).eq('tenant_id',tenantId);
-          if (mediaError) toast.error('Item saved, but photo links could not be attached: '+mediaError.message);
+          if (mediaError) throw new Error('Item saved, but photo links could not be attached: '+mediaError.message);
         }
-        if (uploadFailures) toast.error(`Item saved, but ${uploadFailures} photo(s) failed to upload. Please check the item before listing.`);
-      }
-      if (niche === 'clothing') {
-        const photoSlots = [['brand','brand-label'],['garment','garment-front'],['detail','care-label-detail']] as const;
-        const mediaUrls: string[] = [];
-        for (const [slot, label] of photoSlots) {
-          const file = clothingPhotos[slot];
-          if (!file) continue;
-          const path = scanPhotoStoragePath(id, label, file);
-          const { error: uploadError } = await sb.storage.from('item-images').upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
-          if (uploadError) { toast.error(`Item saved, but ${label} photo upload failed: ${uploadError.message}`); continue; }
-          const { data: publicUrl } = sb.storage.from('item-images').getPublicUrl(path);
-          if (publicUrl?.publicUrl) mediaUrls.push(publicUrl.publicUrl);
+        if (uploadFailures) throw new Error(`Item saved, but ${uploadFailures} photo(s) failed to upload. Open the item and attach the missing originals before listing.`);
+
+        const enrichment = await enrichScannedItemForListing({
+          client: sb, userId: user.id, tenantId, nicheId: canonicalNiche!, itemId: id,
+          specialistId: canonicalSpecialistId, title: draftTitle, attributes, condition: f('condition'), imageUrls,
+        });
+        const generated = await callEdgeFunction<Record<string, unknown>>('swish-list-generate', {
+          item_id: id, tenant_id: tenantId, marketplace_id: 'ebay',
+        }, sb);
+        if (generated.error || !generated.data?.listing || typeof generated.data.listing !== 'object') {
+          throw new Error(generated.error?.displayMessage || String(generated.data?.error || 'Item saved, but an eBay draft could not be generated.'));
         }
-        if (mediaUrls.length) {
-          const { error: mediaError } = await sb.from('items').update({ media: mediaUrls }).eq('id',id).eq('tenant_id',tenantId);
-          if (mediaError) toast.error('Item saved, but photo links could not be attached: '+mediaError.message);
-        }
-      }
-      toast.success(clothingIdentified ? 'Threads Flip item saved for review' : 'Saved to specialist inventory — review required');
-      navigate('/inventory/'+id);
-    },onError:e=>toast.error(e.message)});
+        const draft = await sb.rpc('swish_create_listing_draft', {
+          p_tenant_id: tenantId, p_item_id: id, p_marketplace_id: 'ebay', p_listing: generated.data.listing,
+          p_shipping_cost: 0, p_category_id: enrichment.category?.id || null,
+        });
+        if (draft.error || typeof draft.data !== 'string' || !draft.data) throw new Error(draft.error?.message || 'Item saved, but the eBay draft was not confirmed.');
+        const notices = [
+          enrichment.marketError ? 'Market research needs review' : '',
+          enrichment.categoryError ? 'eBay category needs review' : '',
+          enrichment.specificsError ? 'Item specifics need review' : '',
+          enrichment.missingRequired.length ? `${enrichment.missingRequired.length} required eBay specific${enrichment.missingRequired.length === 1 ? '' : 's'} still need confirmation` : '',
+        ].filter(Boolean);
+        toast.success(notices.length ? `Draft prepared — ${notices.join(' · ')}` : 'Market value, eBay category and evidence-backed item specifics prepared for review');
+        navigate(`/listings/${draft.data}/edit`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Item saved, but listing preparation could not be completed.';
+        toast.error(message);
+        navigate('/inventory/'+id);
+      } finally { setPreparingListing(false); }
+    },onError:e=>{ setPreparingListing(false); toast.error(e.message); }});
   };
   if (tenantLoading || entitlementsLoading) return <NicheAccessStatus loading onRetry={() => void refetchEntitlements()} />;
   if (entitlementsError || !tenantId) return <NicheAccessStatus error={entitlementsError} onRetry={() => void refetchEntitlements()} />;
@@ -433,7 +458,8 @@ export default function NicheCapture() {
         <section className="space-y-3 rounded-3xl border p-4 sm:p-5" style={{background:'#160E16',borderColor:'#301830'}}>
           <h2 className="text-lg font-bold">3. Purchase and value details</h2><div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{[['cost','Purchase cost (£)'],['valuation','Estimated value (£)'],['sale_price','Planned listing price (£)']].map(([key,label])=><div key={key}><label className="mb-1 block text-sm" style={{color:'#9A7090'}}>{label}</label><input className="input-field mt-1" type="number" min="0" step="0.01" value={f(key)} onChange={e=>setF(key,e.target.value)}/></div>)}</div><p className="text-xs" style={{color:'#9A7090'}}>Values entered here are estimates, not verified sold-comparable valuations.</p>
         </section>
-        <div className="flex flex-wrap justify-between gap-3"><Link to="/inventory" className="btn-secondary"><Package className="h-4 w-4"/>Wardrobe / Inventory</Link><button className="btn-primary" onClick={save} disabled={insert.isPending || tenantLoading || !tenantId || !clothingIdentified}><Save className="h-4 w-4"/>{insert.isPending?'Saving…':!clothingIdentified?'Identify photos to continue':'Save item for review'}</button></div>
+        <p className="text-xs" style={{color:'#9A7090'}}>Saving prepares a private eBay draft with live market research, a category suggestion and only evidence-backed item specifics. It never publishes your item.</p>
+        <div className="flex flex-wrap justify-between gap-3"><Link to="/inventory" className="btn-secondary"><Package className="h-4 w-4"/>Wardrobe / Inventory</Link><button className="btn-primary" onClick={save} disabled={insert.isPending || preparingListing || tenantLoading || !tenantId || !clothingIdentified}><Save className="h-4 w-4"/>{insert.isPending || preparingListing?'Preparing draft…':!clothingIdentified?'Identify photos to continue':'Prepare listing for review'}</button></div>
       </main>
     </div>;
   }
@@ -452,7 +478,7 @@ export default function NicheCapture() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{config.fields.map(field=><div key={field.key}><label className="text-xs text-muted-foreground">{field.label}</label>{field.type==='select'?<select className="input-field mt-1" value={f(field.key)} onChange={e=>setF(field.key,e.target.value)}><option value="">Select…</option>{(field.options||[]).map(option=><option key={option} value={option}>{option}</option>)}</select>:<input className="input-field mt-1" type={field.type||'text'} value={f(field.key)} onChange={e=>setF(field.key,e.target.value)} placeholder={field.placeholder||field.label}/>}</div>)}</div>
       <div><label className="text-xs text-muted-foreground">Description / notes</label><textarea className="input-field mt-1" rows={4} value={f('description')} onChange={e=>setF('description',e.target.value)} placeholder="Visible details, label text, measurements, included accessories and evidence…"/></div>
     </div>
-    <div className="swish-card p-4 space-y-3"><h2 className="font-semibold">2. Purchase and value details</h2><div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{[['cost','Purchase cost (£)'],['valuation','Estimated value (£)'],['sale_price','Planned listing price (£)']].map(([key,label])=><div key={key}><label className="text-xs text-muted-foreground">{label}</label><input className="input-field mt-1" type="number" min="0" step="0.01" value={f(key)} onChange={e=>setF(key,e.target.value)}/></div>)}</div><p className="text-xs text-muted-foreground">Values entered here are user estimates, not verified sold-comparable valuations.</p></div>
-    <div className="flex flex-wrap justify-between gap-3"><Link to="/inventory" className="btn-secondary"><Package className="w-4 h-4"/>Inventory</Link><button className="btn-primary" onClick={save} disabled={insert.isPending || tenantLoading || !tenantId}><Save className="w-4 h-4"/>{insert.isPending?'Saving…':niche==='coins'?'Open coin capture':'Save for review'}</button></div>
+    <div className="swish-card p-4 space-y-3"><h2 className="font-semibold">2. Purchase and value details</h2><div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{[['cost','Purchase cost (£)'],['valuation','Estimated value (£)'],['sale_price','Planned listing price (£)']].map(([key,label])=><div key={key}><label className="text-xs text-muted-foreground">{label}</label><input className="input-field mt-1" type="number" min="0" step="0.01" value={f(key)} onChange={e=>setF(key,e.target.value)}/></div>)}</div><p className="text-xs text-muted-foreground">After saving, SWISH AI requests live market research, an eBay leaf category and its current item-specific rules. It only carries forward values supported by your photos or confirmed fields.</p></div>
+    <div className="flex flex-wrap justify-between gap-3"><Link to="/inventory" className="btn-secondary"><Package className="w-4 h-4"/>Inventory</Link><button className="btn-primary" onClick={save} disabled={insert.isPending || preparingListing || tenantLoading || !tenantId}><Save className="w-4 h-4"/>{insert.isPending || preparingListing?'Preparing draft…':niche==='coins'?'Open coin capture':'Prepare listing for review'}</button></div>
   </div>;
 }

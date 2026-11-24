@@ -50,11 +50,14 @@ test('each active scanner route has an explicit scoped flow that saves evidence 
   assert.ok(app.includes('path="/capture" element={<Navigate to='));
   assert.match(coin, /coinAllowed/);
   // Other niche scan routes persist the current tenant's items and original
-  // images; they do not pretend to have created a marketplace listing.
+  // images, then prepare a shared draft for seller review without publishing.
   assert.match(capture, /useInsert\('items', tenantId\)/);
   assert.match(capture, /swish-identify/);
   assert.match(capture, /storage\.from\('item-images'\)\.upload/);
   assert.match(capture, /\.eq\('tenant_id',tenantId\)/);
+  assert.match(capture, /enrichScannedItemForListing/);
+  assert.match(capture, /swish-list-generate/);
+  assert.match(capture, /swish_create_listing_draft/);
   assert.doesNotMatch(capture, /route: 'publish'/);
   // The shared quick-capture service is separately tested for durable photos,
   // generation, and draft RPC, without asserting it replaces all niche flows.

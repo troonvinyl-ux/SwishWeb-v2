@@ -1,5 +1,5 @@
 import { asRecord } from '@/lib/itemPhotos';
-export interface EbayAspect { name: string; values: string[]; selectionOnly: boolean; }
+export interface EbayAspect { name: string; values: string[]; selectionOnly: boolean; required: boolean; }
 export interface EbayCondition { id: string; label: string; }
 export const EBAY_MUSIC_GRADES = [
   ['M', 'Mint (M)'], ['NM', 'Near Mint (NM or M-)'], ['EX', 'Excellent (EX)'],
@@ -68,7 +68,17 @@ export function ebayConditionId(value: unknown): string {
 }
 export function normalizeEbayAspects(input: unknown): EbayAspect[] {
   if (!Array.isArray(input)) return [];
-  return input.map(raw => { const row = asRecord(raw), constraint = asRecord(row.aspectConstraint); return { name: String(row.localizedAspectName || row.aspectName || row.name || '').trim(), values: (Array.isArray(row.aspectValues) ? row.aspectValues.map(value => String(asRecord(value).localizedValue || '')) : Array.isArray(row.values) ? row.values.map(String) : []).filter(Boolean), selectionOnly: (constraint.aspectMode || row.mode) === 'SELECTION_ONLY' }; }).filter(row => row.name);
+  return input.map(raw => {
+    const row = asRecord(raw), constraint = asRecord(row.aspectConstraint);
+    return {
+      name: String(row.localizedAspectName || row.aspectName || row.name || '').trim(),
+      values: (Array.isArray(row.aspectValues) ? row.aspectValues.map(value => String(asRecord(value).localizedValue || '')) : Array.isArray(row.values) ? row.values.map(String) : []).filter(Boolean),
+      selectionOnly: (constraint.aspectMode || row.mode) === 'SELECTION_ONLY',
+      // eBay's Sell Metadata response marks leaf-category requirements here.
+      // Missing/unknown metadata stays false; publication still validates live.
+      required: constraint.aspectRequired === true || row.required === true,
+    };
+  }).filter(row => row.name);
 }
 export function musicGradeAspects(format: unknown): { media: string; sleeve: string } {
   const text = String(format ?? '');

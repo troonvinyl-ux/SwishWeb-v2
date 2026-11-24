@@ -40,7 +40,12 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   const parsed = form.music_values ? musicFormSchema.safeParse(form.music_values) : null;
   if (parsed && !parsed.success) throw new Error(parsed.error.issues[0]?.message || 'Check the edited music details.');
   const musicValues = parsed?.success ? parsed.data as MusicValues : null;
-  let specificsMap = listingSpecifics(attrs.ebay_item_specifics);
+  // A scan may prepare evidence-backed specifics before the seller opens the
+  // editor. Prefer the seller's in-editor changes when present, while retaining
+  // existing specifics for older drafts that have not been opened yet.
+  let specificsMap = Object.prototype.hasOwnProperty.call(form, 'item_specifics')
+    ? listingSpecifics(form.item_specifics)
+    : listingSpecifics(attrs.ebay_item_specifics);
   if (item.specialist_id === 'vinyl_records') {
     if (musicValues) {
       const names = musicGradeAspects(musicValues.format);
