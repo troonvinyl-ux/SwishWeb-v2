@@ -7,6 +7,7 @@ import {
   LogOut, ChevronDown, ChevronRight, Zap, RefreshCw, AlertCircle, ClipboardList, Sparkles, Crown
 } from 'lucide-react';
 import { useState } from 'react';
+import { SwishFlipMark } from '@/components/brand/SwishFlipMark';
 
 interface NavItemDef {
   label: string;
@@ -36,38 +37,18 @@ const EBAY_ITEMS: NavItemDef[] = [
 const NAV_SECTIONS: NavSection[] = [
   {
     items: [
-      { label: 'Command Centre', to: '/command-centre', icon: Terminal },
+      { label: 'Dashboard', to: '/dashboard', icon: Terminal },
     ],
   },
   {
-    label: 'Stock',
+    label: 'Workspace',
     items: [
+      { label: 'Scan & Identify', to: '/identify', icon: Coins },
       { label: 'Inventory', to: '/inventory', icon: Package },
-      { label: 'Identify / Scan', to: '/identify', icon: Coins },
-      { label: 'Acquisitions', to: '/acquisitions', icon: ShoppingBag },
-      { label: 'Opportunities', to: '/opportunities', icon: Lightbulb },
-      { label: 'Review Required', to: '/review-required', icon: AlertCircle },
-    ],
-  },
-  {
-    label: 'Selling',
-    items: [
       { label: 'Listings', to: '/listings', icon: Tag },
       { label: 'Orders', to: '/orders', icon: ShoppingCart },
-      { label: 'Dispatch', to: '/dispatch', icon: Truck },
-      { label: 'Repricing', to: '/repricing', icon: RefreshCw },
-    ],
-  },
-  {
-    label: 'Insights',
-    items: [
-      { label: 'Insights', to: '/insights', icon: TrendingUp },
-    ],
-  },
-  {
-    label: 'Tasks',
-    items: [
-      { label: 'Tasks', to: '/tasks', icon: CheckSquare },
+      { label: 'Analytics', to: '/insights', icon: TrendingUp },
+      { label: 'Settings & Account', to: '/settings', icon: Settings },
     ],
   },
 ];
@@ -86,14 +67,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex flex-col h-full bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))]">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 h-14 border-b border-[hsl(var(--sidebar-border))] shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <Zap className="w-4 h-4 text-primary-foreground" />
-        </div>
-        <span className="text-lg font-bold swish-gold tracking-tight" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
-          SWISH
-        </span>
-        <span className="text-xs text-muted-foreground ml-auto">Web</span>
+      <div className="flex items-center gap-2.5 px-4 h-[72px] border-b border-[hsl(var(--sidebar-border))] shrink-0">
+        <Link to="/dashboard" aria-label="SWISHFlip dashboard" className="min-w-0"><SwishFlipMark descriptor /></Link>
       </div>
 
       {/* Active specialist workspace */}

@@ -1,163 +1,131 @@
-import {
-  ArrowRight, Bike, BookOpen, BrainCircuit, Camera, ChartNoAxesColumnIncreasing,
-  CheckCircle2, Coins, Crown, Gamepad2, LogIn, Shirt, Smartphone,
-  Sparkles, Tag, Trophy, Wrench, Watch, Gem, ShoppingCart, Heart,
-} from 'lucide-react';
-import coinArtwork from '@/assets/niches/coin-flipper.svg';
-import mxArtwork from '@/assets/niches/mx-flipper.svg';
-import bikeArtwork from '@/assets/niches/bike-flipper.svg';
-import threadsArtwork from '@/assets/niches/threads-flip.svg';
-import cardArtwork from '@/assets/niches/card-flipper.svg';
-import antiqueArtwork from '@/assets/niches/antique-flipper.svg';
-import fossilArtwork from '@/assets/niches/fossil-flipper.svg';
-import beautyArtwork from '@/assets/niches/beauty-flipper.svg';
-import techArtwork from '@/assets/niches/tech-flipper.svg';
-import swishHero from '@/assets/swish-hero.svg';
+import { ArrowRight, ArrowUpRight, BarChart3, Boxes, Camera, Check, ChevronRight, CircleHelp, Coins, Disc3, Gem, Landmark, Menu, MonitorSmartphone, PanelsTopLeft, ScanLine, Shirt, Sparkles, Stamp, Store, Wrench } from 'lucide-react';
+import { PRODUCTS, type ProductId } from '@/lib/productContext';
+import { SwishFlipMark } from '@/components/brand/SwishFlipMark';
+import { SWISHFLIP, WORKSPACE_ACCENTS } from '@/lib/swishflipBrand';
 
-type Niche = {
-  name: string;
-  slug: string;
-  eyebrow: string;
-  description: string;
-  tagline: string;
-  icon: typeof Coins;
-  button: string;
-  color: string;
-  glow: string;
-  artwork: string;
+const workspaceIcons: Record<ProductId, typeof Coins> = {
+  coins: Coins, tunes_flip: Disc3, antiques: Landmark, clothing: Shirt, tech: MonitorSmartphone, trading_cards: PanelsTopLeft,
+  bicycles: Wrench, motocross: Wrench, fossils: Gem, beauty: Sparkles, stamps: Stamp, collectibles: Boxes, surplus_flip: Boxes,
 };
 
-const niches: Niche[] = [
-  { name: 'Coin Flipper', slug: 'coins', eyebrow: 'ANCIENT · ISLAMIC · WORLD', description: 'Specialist coin identification, research and collection tools', tagline: 'A dedicated app for coin people.', icon: Coins, button: 'Enter Coins', color: 'from-amber-800 via-stone-950 to-black', glow: 'group-hover:shadow-amber-500/20', artwork: coinArtwork },
-  { name: 'MX Flipper', slug: 'mx', eyebrow: 'DIRT BIKES · PARTS · GEAR', description: 'Bike, parts and gear recognition built around motocross', tagline: 'A dedicated app for MX enthusiasts.', icon: Wrench, button: 'Enter MX', color: 'from-orange-700 via-red-950 to-black', glow: 'group-hover:shadow-orange-500/20', artwork: mxArtwork },
-  { name: 'Bike Flipper', slug: 'bikes', eyebrow: 'BICYCLES · PARTS · UPGRADES', description: 'Understand bikes, components, condition and value', tagline: 'A dedicated app for cyclists and traders.', icon: Bike, button: 'Enter Bikes', color: 'from-green-700 via-emerald-950 to-black', glow: 'group-hover:shadow-green-500/20', artwork: bikeArtwork },
-  { name: 'Threads Flip', slug: 'threads', eyebrow: 'CLOTHING · STREETWEAR · BRANDS', description: 'Fashion, brands, styles and resale knowledge in one place', tagline: 'A dedicated app for clothing specialists.', icon: Shirt, button: 'Enter Threads', color: 'from-pink-700 via-fuchsia-950 to-black', glow: 'group-hover:shadow-pink-500/20', artwork: threadsArtwork },
-  { name: 'Card Flipper', slug: 'cards', eyebrow: 'TRADING CARDS · TCG · SPORTS', description: 'Trading cards, sets, condition and collector knowledge', tagline: 'A dedicated app for card collectors.', icon: Gamepad2, button: 'Enter Cards', color: 'from-violet-700 via-purple-950 to-black', glow: 'group-hover:shadow-violet-500/20', artwork: cardArtwork },
-  { name: 'Antique Flipper', slug: 'antiques', eyebrow: 'ANTIQUES · VINTAGE · COLLECTABLES', description: 'Recognise antiques, learn their history and assess value', tagline: 'A dedicated app for antique hunters.', icon: Watch, button: 'Enter Antiques', color: 'from-yellow-800 via-amber-950 to-black', glow: 'group-hover:shadow-yellow-500/20', artwork: antiqueArtwork },
-  { name: 'Fossil Flipper', slug: 'fossils', eyebrow: 'FOSSILS · MINERALS · SPECIMENS', description: 'Fossils, minerals and specimen identification and research', tagline: 'A dedicated app for fossil enthusiasts.', icon: Gem, button: 'Enter Fossils', color: 'from-cyan-700 via-sky-950 to-black', glow: 'group-hover:shadow-cyan-500/20', artwork: fossilArtwork },
-  { name: 'Beauty Flipper', slug: 'beauty', eyebrow: 'COSMETICS · FRAGRANCE · SKINCARE', description: 'Beauty, fragrance and skincare product knowledge', tagline: 'A dedicated app for beauty resellers.', icon: Heart, button: 'Enter Beauty', color: 'from-rose-700 via-pink-950 to-black', glow: 'group-hover:shadow-rose-500/20', artwork: beautyArtwork },
-  { name: 'Tech Flipper', slug: 'electronics', eyebrow: 'PHONES · CONSOLES · GADGETS', description: 'Phones, consoles and gadgets with practical valuation help', tagline: 'A dedicated app for tech specialists.', icon: Smartphone, button: 'Enter Tech', color: 'from-blue-700 via-indigo-950 to-black', glow: 'group-hover:shadow-blue-500/20', artwork: techArtwork },
-  { name: 'Surplus Flip', slug: 'surplus', eyebrow: 'JOB LOTS · PALLETS · RETURNS', description: 'Turn manifests and mixed stock into sellable listings', tagline: 'A dedicated app for surplus traders.', icon: ShoppingCart, button: 'Enter Surplus', color: 'from-teal-700 via-emerald-950 to-black', glow: 'group-hover:shadow-teal-500/20', artwork: techArtwork },
-  { name: 'Tunes Flip', slug: 'tunes', eyebrow: 'VINYL · CDS · CASSETTES · PRESSINGS', description: 'Identify releases, pressings and condition evidence', tagline: 'A dedicated app for music collectors.', icon: Sparkles, button: 'Enter Tunes', color: 'from-purple-700 via-violet-950 to-black', glow: 'group-hover:shadow-purple-500/20', artwork: swishHero },
-  { name: 'Collectibles Flipper', slug: 'collectibles', eyebrow: 'TOYS · COMICS · GAMES · MEMORABILIA', description: 'Research editions, completeness and condition before listing', tagline: 'A dedicated app for collectible hunters.', icon: Trophy, button: 'Enter Collectibles', color: 'from-orange-700 via-amber-950 to-black', glow: 'group-hover:shadow-orange-500/20', artwork: swishHero },
-];
-
-const existingEntryRoutes: Record<string, string> = {
-  coins: '/coins', mx: '/mx', bikes: '/bikes', threads: '/threads',
-  cards: '/cards', antiques: '/antiques', fossils: '/fossils', beauty: '/beauty',
-  surplus: '/surplus', electronics: '/electronics', tunes: '/tunes', collectibles: '/collectibles',
+const workspaceRoutes: Record<ProductId, string> = {
+  coins: '/coins', tunes_flip: '/tunes', antiques: '/antiques', clothing: '/threads', tech: '/tech', trading_cards: '/cards',
+  bicycles: '/bikes', motocross: '/mx', fossils: '/fossils', beauty: '/beauty', stamps: '/stamps', collectibles: '/collectibles', surplus_flip: '/surplus',
 };
 
-const features = [
-  { icon: BrainCircuit, title: 'AI IDENTIFICATION', subtitle: 'Photos, video & real-world data' },
-  { icon: ChartNoAxesColumnIncreasing, title: 'LIVE MARKET VALUES', subtitle: 'eBay & sales history' },
-  { icon: Tag, title: 'PROFIT CALCULATORS', subtitle: 'Know what items are worth' },
-  { icon: BookOpen, title: 'EXPERT GUIDES', subtitle: 'Learn & improve' },
+const featuredWorkspaceIds = new Set<ProductId>(['coins', 'tunes_flip', 'antiques', 'collectibles']);
+
+const faqs = [
+  ['Does SWISHFlip replace specialist knowledge?', 'No. SWISH AI structures the evidence, research and draft creation; the reseller remains in control of the final identification, condition, pricing and publication.'],
+  ['Does it use one account across specialist workspaces?', 'Yes. Authorised workspaces use the existing shared customer identity, subscription and inventory architecture.'],
+  ['Are listings automatically published?', 'No. SWISHFlip prepares evidence-led listing drafts. Publication follows the existing seller review and marketplace confirmation flow.'],
+  ['Which marketplaces are supported?', 'The connected eBay workflow remains the marketplace engine. Additional marketplaces are only presented when they are genuinely available to the signed-in account.'],
 ];
+
+function WorkflowStep({ number, title, detail, icon: Icon }: { number: string; title: string; detail: string; icon: typeof Camera }) {
+  return <div className="relative flex gap-4 border-l border-white/15 pl-5 last:border-l-0 lg:block lg:border-l-0 lg:px-5">
+    <div className="absolute -left-[11px] top-0 grid h-5 w-5 place-items-center rounded-full border border-[#F4C65D]/60 bg-[#071C26] text-[9px] font-bold text-[#F4C65D] lg:static lg:mb-5 lg:h-9 lg:w-9 lg:text-xs">{number}</div>
+    <div><Icon className="mb-3 hidden h-6 w-6 text-[#19B5AC] lg:block" /><h3 className="font-heading text-base font-bold text-[#F5F8FA]">{title}</h3><p className="mt-1 text-sm leading-6 text-[#91A6B2]">{detail}</p></div>
+  </div>;
+}
 
 export default function SwishFlipHome() {
-  return (
-    <main className="min-h-screen overflow-hidden bg-[#07080c] text-white">
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#08090d]/95 shadow-xl shadow-black/30 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <a href="/" aria-label="SWISHFLIP home" className="flex shrink-0 flex-col leading-none">
-            <span className="text-3xl font-black italic tracking-[-.08em] sm:text-4xl">SWISH<span className="text-yellow-300">FLIP</span><sup className="ml-1 text-yellow-300">↗</sup></span>
-            <span className="mt-1 text-[9px] font-bold tracking-[.24em] text-slate-300 sm:text-[10px]">IDENTIFY · VALUE · FLIP · PROFIT</span>
-          </a>
-          <nav className="hidden items-center gap-5 lg:flex">
-            <a href="/" className="border-b-2 border-yellow-300 px-1 py-3 text-sm font-bold text-yellow-200">⌂ Home</a>
-            <a href="#niches" className="px-1 py-3 text-sm font-semibold text-slate-200 transition hover:text-yellow-200">Niches</a>
-            <a href="#how-it-works" className="px-1 py-3 text-sm font-semibold text-slate-200 transition hover:text-yellow-200">How It Works</a>
-            <a href="#pricing" className="px-1 py-3 text-sm font-semibold text-slate-200 transition hover:text-yellow-200">Pricing</a>
-            <a href="#community" className="px-1 py-3 text-sm font-semibold text-slate-200 transition hover:text-yellow-200">Community</a>
-          </nav>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <a href="/coins" className="hidden items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-bold transition hover:border-yellow-300/60 sm:inline-flex"><LogIn className="h-4 w-4" /> Login</a>
-            <a href="#niches" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-b from-yellow-200 to-yellow-400 px-4 py-3 text-sm font-black text-black shadow-lg shadow-yellow-500/20 transition hover:brightness-110 sm:px-6">Get Started <ArrowRight className="h-4 w-4" /></a>
+  return <main className="min-h-screen overflow-hidden bg-[#071C26] text-[#F5F8FA]">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071C26]/95 backdrop-blur">
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
+        <a href="/" aria-label="SWISHFlip home"><SwishFlipMark descriptor /></a>
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Public navigation">
+          <a className="text-sm font-medium text-[#F5F8FA] transition hover:text-[#F4C65D]" href="#workflow">How it works</a>
+          <a className="text-sm font-medium text-[#F5F8FA] transition hover:text-[#F4C65D]" href="#workspaces">Specialist workspaces</a>
+          <a className="text-sm font-medium text-[#F5F8FA] transition hover:text-[#F4C65D]" href="#plans">Plans</a>
+          <a className="text-sm font-medium text-[#F5F8FA] transition hover:text-[#F4C65D]" href="#faq">FAQs</a>
+        </nav>
+        <div className="flex items-center gap-3">
+          <a href="/coins" className="hidden rounded-lg px-4 py-2.5 text-sm font-semibold text-[#F5F8FA] transition hover:bg-white/5 sm:block">Sign in</a>
+          <a href="/coins" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#F4C65D] px-4 py-2.5 text-sm font-bold text-[#071C26] transition hover:brightness-105">Get started <ArrowRight className="h-4 w-4" /></a>
+          <Menu className="h-5 w-5 text-[#F5F8FA] lg:hidden" aria-label="Menu" />
+        </div>
+      </div>
+    </header>
+
+    <section className="relative isolate overflow-hidden border-b border-white/10">
+      <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_76%_8%,rgba(25,181,172,.23),transparent_30%),radial-gradient(circle_at_64%_72%,rgba(244,198,93,.12),transparent_32%),linear-gradient(125deg,#071C26_0%,#102D39_57%,#071C26_100%)]" />
+      <div className="absolute right-[-18rem] top-[-14rem] -z-10 h-[42rem] w-[42rem] rounded-full border border-[#19B5AC]/15" />
+      <div className="absolute right-[-11rem] top-[-7rem] -z-10 h-[29rem] w-[29rem] rounded-full border border-[#F4C65D]/15" />
+      <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:py-24 lg:grid-cols-[1.08fr_.92fr] lg:px-8 lg:py-28">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#19B5AC]/40 bg-[#19B5AC]/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[.14em] text-[#8EE6DE]"><Sparkles className="h-3.5 w-3.5" /> {SWISHFLIP.intelligence}</div>
+          <h1 className="font-heading mt-6 text-4xl font-extrabold leading-[1.08] tracking-[-.04em] sm:text-5xl lg:text-6xl">Turn what you have<br />into <span className="text-[#F4C65D]">what it’s worth.</span></h1>
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-[#D9E5E9]">Identify items. Discover supported value. Create professional listings. Manage your entire resale business — all in one intelligent platform.</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href="/coins" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-[#F4C65D] px-5 text-sm font-bold text-[#071C26] transition hover:brightness-105">Get started <ArrowRight className="h-4 w-4" /></a>
+            <a href="#workflow" className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-[#91A6B2]/55 px-5 text-sm font-semibold text-[#F5F8FA] transition hover:border-[#F4C65D] hover:text-[#F4C65D]">See how it works <ChevronRight className="h-4 w-4" /></a>
+          </div>
+          <div className="mt-9 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-3 text-sm text-[#D9E5E9] sm:grid-cols-3">
+            {['Evidence-led identification', 'Specialist research', 'Customer-approved publishing'].map(text => <span key={text} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#F4C65D]" />{text}</span>)}
           </div>
         </div>
-      </header>
 
-      <section className="relative isolate border-b border-white/10">
-        <div className="absolute inset-0 -z-20 bg-[radial-gradient(ellipse_at_65%_15%,rgba(250,204,21,.18),transparent_45%),linear-gradient(120deg,#09090b,#12121a_55%,#08090d)]" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/95 via-black/75 to-black/45" />
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_25%,rgba(250,204,21,.18),transparent_50%)]" />
-        <div className="mx-auto grid max-w-[1500px] items-center gap-6 px-4 py-8 sm:px-8 sm:py-12 md:grid-cols-[1.15fr_.85fr] md:py-16">
-          <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.22em] text-yellow-200"><Sparkles className="h-4 w-4" /> Specialist apps · Shared learning engine</div>
-            <h1 className="max-w-3xl text-[2.65rem] font-black italic leading-[.95] tracking-[-.045em] sm:text-6xl lg:text-7xl xl:text-8xl">YOUR NICHE.<br/><span className="text-yellow-300">YOUR APP.</span></h1>
-            <p className="mt-5 text-base font-black uppercase tracking-[.18em] text-white sm:text-xl">Specialist tools powered by shared intelligence</p>
-            <div className="mt-6 grid max-w-2xl grid-cols-5 gap-1 sm:gap-3">
-              {[
-                { icon: Camera, title: 'IDENTIFY', sub: 'with AI' },
-                { icon: ChartNoAxesColumnIncreasing, title: 'REAL MARKET', sub: 'data' },
-                { icon: Tag, title: 'VALUE', sub: 'with confidence' },
-                { icon: ShoppingCart, title: 'LIST & SELL', sub: 'faster' },
-                { icon: Trophy, title: 'BIGGER', sub: 'opportunities' },
-              ].map(({icon: Icon,title,sub}) => <div key={title} className="border-r border-white/15 px-1 text-center last:border-0"><Icon className="mx-auto mb-2 h-6 w-6 text-yellow-200 sm:h-7 sm:w-7"/><p className="text-[8px] font-black sm:text-xs">{title}</p><p className="text-[9px] text-slate-300 sm:text-xs">{sub}</p></div>)}
-            </div>
-          </div>
-          <div className="hidden md:block">
-            <div className="rounded-2xl border border-yellow-200/30 bg-black/35 p-5 shadow-2xl shadow-black/50 backdrop-blur-sm">
-              <p className="text-xs font-black uppercase tracking-[.2em] text-yellow-200">Built around your niche</p>
-              <div className="mt-4 space-y-4">
-                {[
-                  ['01','Your app understands your category','Specialist workflows and recognition'],
-                  ['02','Learn from shared intelligence','Predictions improve as knowledge grows'],
-                  ['03','Automate the repetitive work','Less admin. More time for your expertise.'],
-                ].map(([number,title,sub])=><div key={number} className="flex items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-yellow-300/25 bg-yellow-300/10 text-sm font-black text-yellow-200">{number}</span><span><span className="block font-extrabold">{title}</span><span className="text-sm text-slate-300">{sub}</span></span><CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-lime-300"/></div>)}
+        <div className="relative mx-auto w-full max-w-md self-center">
+          <div className="rounded-[2rem] border border-white/20 bg-[#071C26] p-3 shadow-2xl shadow-black/40">
+            <div className="overflow-hidden rounded-[1.45rem] border border-white/10 bg-[#102D39]">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><SwishFlipMark compact /><span className="text-xs font-semibold tracking-wide text-[#F4C65D]">SWISH AI</span></div>
+              <div className="p-5">
+                <div className="relative grid aspect-[5/4] place-items-center overflow-hidden rounded-xl border border-[#19B5AC]/35 bg-[radial-gradient(circle_at_50%_44%,rgba(244,198,93,.15),transparent_28%),linear-gradient(135deg,#102D39,#071C26)]">
+                  <div className="absolute inset-5 border-2 border-dashed border-[#F4C65D]/70" />
+                  <ScanLine className="h-20 w-20 text-[#F4C65D]" strokeWidth={1.25} />
+                  <span className="absolute bottom-4 rounded-full bg-[#19B5AC]/20 px-3 py-1 text-xs font-semibold text-[#A5F2EC]">Guided evidence capture</span>
+                </div>
+                <div className="mt-4 rounded-xl border border-[#19B5AC]/35 bg-[#071C26]/70 p-4"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.12em] text-[#8EE6DE]"><Sparkles className="h-3.5 w-3.5" /> SWISH intelligence</div><p className="mt-2 font-heading text-base font-bold">Capture the next evidence view</p><p className="mt-1 text-sm leading-6 text-[#91A6B2]">The selected specialist workspace asks for the details needed to support identification and valuation.</p></div>
+                <a href="/identify" className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#F4C65D] px-4 text-sm font-bold text-[#071C26]">Open the live scanner <ArrowUpRight className="h-4 w-4" /></a>
               </div>
             </div>
           </div>
+          <div className="absolute -bottom-5 -left-8 hidden rounded-lg border border-[#F4C65D]/40 bg-[#102D39] px-4 py-3 shadow-xl lg:block"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#F4C65D]">One workflow</p><p className="mt-1 text-sm font-semibold">Scan · Identify · Value · Sell</p></div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="niches" className="mx-auto max-w-[1500px] px-4 py-7 sm:px-6 sm:py-9">
-        <div className="mb-5 flex items-end justify-between gap-3">
-          <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-yellow-300">Find your specialist app</p><h2 className="mt-1 text-2xl font-black sm:text-3xl">One app designed for your world</h2></div>
-          <p className="hidden text-right text-xs text-slate-400 sm:block">Purpose-built experience · Shared learning engine</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {niches.map((niche) => {
-            const Icon = niche.icon;
-            return <a key={niche.slug} href={existingEntryRoutes[niche.slug] || '/workspace/coins'} aria-label={`Enter ${niche.name}`} className={`group relative isolate flex min-h-[285px] flex-col overflow-hidden rounded-2xl border border-white/25 bg-gradient-to-br ${niche.color} p-4 shadow-lg transition duration-300 hover:-translate-y-1 hover:border-white/60 hover:shadow-2xl ${niche.glow} focus:outline-none focus:ring-2 focus:ring-yellow-300 sm:min-h-[320px]`}>
-              <img
-                src={niche.artwork}
-                alt=""
-                aria-hidden="true"
-                loading="lazy"
-                decoding="async"
-                className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-90 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
-              />
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-black via-black/55 to-black/5 transition duration-300 group-hover:from-black/90 group-hover:via-black/45" />
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-30 mix-blend-screen" style={{ background: 'radial-gradient(ellipse at 80% 10%, rgba(255,255,255,.32), transparent 45%)' }} />
-              <div className="pointer-events-none absolute -right-5 -top-6 -z-10 rotate-[-12deg] opacity-[.16] transition duration-500 group-hover:scale-110 group-hover:opacity-30"><Icon className="h-44 w-44 sm:h-52 sm:w-52"/></div>
-              <div className="flex items-start justify-between gap-3"><span className="rounded-full border border-white/20 bg-black/35 px-2.5 py-1 text-[9px] font-black tracking-[.12em] text-white/90">{niche.eyebrow}</span><Icon className="h-6 w-6 shrink-0 drop-shadow-lg"/></div>
-              <div className="mt-auto pt-8">
-                <p className="mb-1 text-[10px] font-bold italic text-white/70">{niche.tagline}</p>
-                <h3 className="text-3xl font-black italic leading-none tracking-[-.04em] drop-shadow-lg sm:text-4xl 2xl:text-4xl">{niche.name.toUpperCase()}</h3>
-                <p className="mt-2 text-xs font-semibold text-white/85">{niche.description}</p>
-                <span className="mt-4 flex items-center justify-between rounded-xl border border-white/30 bg-gradient-to-r from-yellow-100 to-yellow-400 px-4 py-3 text-sm font-black text-black shadow-lg transition group-hover:brightness-110"><span>{niche.button}</span><ArrowRight className="h-4 w-4 transition group-hover:translate-x-1"/></span>
-              </div>
+    <section id="workflow" className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-24">
+      <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#19B5AC]">The SWISHFlip workflow</p><h2 className="font-heading mt-3 text-3xl font-bold tracking-[-.03em] sm:text-4xl">From unknown item to a customer-approved listing.</h2><p className="mt-4 text-base leading-7 text-[#91A6B2]">The platform retains your original evidence, shows the source behind verified information, and separates AI suggestions from seller decisions.</p></div>
+      <div className="mt-10 grid gap-7 lg:grid-cols-5 lg:gap-0">
+        <WorkflowStep number="1" title="Scan" detail="Capture photos, barcode data and known details." icon={Camera} />
+        <WorkflowStep number="2" title="Identify" detail="Use niche-aware guidance and specialist references." icon={ScanLine} />
+        <WorkflowStep number="3" title="Value" detail="Review supported ranges, comparables and uncertainty." icon={BarChart3} />
+        <WorkflowStep number="4" title="Sell" detail="Prepare accurate, reviewable marketplace drafts." icon={Store} />
+        <WorkflowStep number="5" title="Manage" detail="Track inventory, listings, sales and actions." icon={Boxes} />
+      </div>
+    </section>
+
+    <section id="workspaces" className="border-y border-white/10 bg-[#102D39]/55">
+      <div className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-24">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#F4C65D]">Specialist workspaces</p><h2 className="font-heading mt-3 text-3xl font-bold tracking-[-.03em] sm:text-4xl">One platform. Every kind of reseller.</h2><p className="mt-4 text-base leading-7 text-[#91A6B2]">Each workspace uses the same customer account, inventory architecture and marketplace engine — with the specialist context your category needs.</p></div><a href="/coins" className="inline-flex items-center gap-2 text-sm font-semibold text-[#F4C65D] hover:text-[#F5F8FA]">Choose a workspace <ArrowRight className="h-4 w-4" /></a></div>
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {PRODUCTS.map(workspace => {
+            const Icon = workspaceIcons[workspace.id];
+            const presentation = WORKSPACE_ACCENTS[workspace.id];
+            const featured = featuredWorkspaceIds.has(workspace.id);
+            return <a href={workspaceRoutes[workspace.id]} key={workspace.id} className="group min-h-[178px] rounded-xl border border-white/10 bg-[#071C26]/75 p-5 transition hover:-translate-y-0.5 hover:border-[#F4C65D]/60 hover:bg-[#071C26]" style={{ boxShadow: featured ? `inset 0 1px 0 ${presentation?.accent ?? SWISHFLIP.colors.teal}33` : undefined }}>
+              <div className="flex items-start justify-between gap-3"><span className="grid h-10 w-10 place-items-center rounded-lg border" style={{ color: presentation?.accent, borderColor: `${presentation?.accent ?? SWISHFLIP.colors.teal}55`, background: `${presentation?.accent ?? SWISHFLIP.colors.teal}15` }}><Icon className="h-5 w-5" /></span>{featured && <span className="rounded-full bg-[#F4C65D]/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[#F4C65D]">Featured</span>}</div>
+              <h3 className="font-heading mt-6 text-lg font-bold">{workspace.name}</h3><p className="mt-2 text-sm leading-6 text-[#91A6B2]">{workspace.description}</p><span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold" style={{ color: presentation?.accent }}>Open workspace <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" /></span>
             </a>;
           })}
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="how-it-works" className="mx-auto max-w-[1500px] px-4 pb-4 sm:px-6">
-        <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-r from-[#15161c] to-[#08090d] md:grid-cols-4">
-          {features.map(({icon:Icon,title,subtitle},i)=><div key={title} className={`flex items-center gap-3 border-white/10 p-4 sm:p-5 ${i%2===0?'border-r':''} ${i<2?'border-b md:border-b-0':''} ${i===1?'md:border-r':''} ${i===2?'md:border-r':''}`}><Icon className="h-7 w-7 shrink-0 text-yellow-200 sm:h-9 sm:w-9"/><div><p className="text-[10px] font-black sm:text-xs">{title}</p><p className="mt-1 text-[10px] leading-4 text-slate-400 sm:text-xs">{subtitle}</p></div></div>)}
-        </div>
-      </section>
+    <section className="mx-auto grid max-w-7xl gap-8 px-5 py-16 lg:grid-cols-[.85fr_1.15fr] lg:px-8 lg:py-24">
+      <div className="rounded-xl border border-[#19B5AC]/30 bg-[#102D39] p-7"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#8EE6DE]">Built for operations</p><h2 className="font-heading mt-3 text-2xl font-bold tracking-[-.03em]">A reseller platform, not just a listing generator.</h2><p className="mt-4 leading-7 text-[#91A6B2]">SWISHFlip connects the work around every listing: evidence capture, inventory, marketplace status, sales, profitability and the next best action.</p><a href="/coins" className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#19B5AC]/60 px-4 text-sm font-semibold text-[#A5F2EC] transition hover:bg-[#19B5AC] hover:text-[#071C26]">Explore the platform <ArrowRight className="h-4 w-4" /></a></div>
+      <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-[#102D39]/55 p-5"><Boxes className="h-6 w-6 text-[#F4C65D]" /><h3 className="font-heading mt-4 font-bold">Shared inventory</h3><p className="mt-2 text-sm leading-6 text-[#91A6B2]">Keep photographs, stock locations, costs and sales history in one record.</p></div><div className="rounded-xl border border-white/10 bg-[#102D39]/55 p-5"><Store className="h-6 w-6 text-[#F4C65D]" /><h3 className="font-heading mt-4 font-bold">Marketplace integrity</h3><p className="mt-2 text-sm leading-6 text-[#91A6B2]">Listings only change state after a verified marketplace outcome.</p></div><div className="rounded-xl border border-white/10 bg-[#102D39]/55 p-5"><BarChart3 className="h-6 w-6 text-[#19B5AC]" /><h3 className="font-heading mt-4 font-bold">Evidence-led valuation</h3><p className="mt-2 text-sm leading-6 text-[#91A6B2]">Separate comparable sales, asking prices and uncertainty before setting a price.</p></div><div className="rounded-xl border border-white/10 bg-[#102D39]/55 p-5"><Sparkles className="h-6 w-6 text-[#19B5AC]" /><h3 className="font-heading mt-4 font-bold">SWISH AI</h3><p className="mt-2 text-sm leading-6 text-[#91A6B2]">A shared intelligence engine that becomes more useful as specialist workflows improve.</p></div></div>
+    </section>
 
-      <section id="pricing" className="mx-auto max-w-[1500px] px-4 pb-8 pt-3 sm:px-6">
-        <a id="community" href="/coins" className="group flex items-center justify-between gap-4 rounded-2xl border border-yellow-200/40 bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-400 p-4 text-black shadow-xl shadow-yellow-500/10 transition hover:brightness-105 sm:px-7 sm:py-5">
-          <span className="flex items-center gap-4"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-black/10"><Crown className="h-8 w-8"/></span><span><span className="block text-xl font-black sm:text-2xl">GET SWISHFLIP PRO</span><span className="mt-1 block text-xs font-semibold sm:text-sm">Unlock your niche app · Smarter predictions · Routine tasks automated</span></span></span>
-          <ArrowRight className="h-7 w-7 shrink-0 transition group-hover:translate-x-1"/>
-        </a>
-      </section>
-      <footer className="border-t border-white/10 px-5 py-5 text-center text-xs text-slate-500">© {new Date().getFullYear()} SWISHFLIP · Identify · Value · Flip · Profit</footer>
-    </main>
-  );
+    <section id="plans" className="border-y border-white/10 bg-[#102D39]/55"><div className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-24"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#F4C65D]">Plans</p><h2 className="font-heading mt-3 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Start with your resale business today. Scale when you need to.</h2><p className="mt-4 text-base leading-7 text-[#91A6B2]">Plan access and usage allowances are enforced by your account. Existing subscriptions are not changed by this presentation.</p></div><div className="mt-10 grid gap-3 md:grid-cols-4">
+      {[['Discover', 'Try the guided workflow', 'Limited identification'], ['Specialist', '£9.99 / month', 'One specialist workspace'], ['Professional', '£19.99 / month', 'For regular resellers'], ['Business', '£39.99 / month', 'For higher-volume operations']].map(([name, price, detail], index) => <div key={name} className={`rounded-xl border p-5 ${index === 1 ? 'border-[#F4C65D] bg-[#071C26]' : 'border-white/10 bg-[#071C26]/60'}`}><p className="font-heading text-lg font-bold">{name}</p><p className="mt-5 text-xl font-bold text-[#F4C65D]">{price}</p><p className="mt-2 min-h-12 text-sm leading-6 text-[#91A6B2]">{detail}</p><a href="/coins" className="mt-5 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#F5F8FA] hover:text-[#F4C65D]">Get started <ArrowRight className="h-4 w-4" /></a></div>)}
+    </div></div></section>
+
+    <section id="faq" className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-24"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#19B5AC]">Frequently asked questions</p><h2 className="font-heading mt-3 text-3xl font-bold tracking-[-.03em] sm:text-4xl">Clear about what the platform does — and what it doesn’t.</h2></div><div className="mt-10 grid gap-3 lg:grid-cols-2">{faqs.map(([question, answer]) => <details key={question} className="group rounded-xl border border-white/10 bg-[#102D39]/55 p-5"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-heading font-bold"><span>{question}</span><CircleHelp className="h-5 w-5 shrink-0 text-[#19B5AC] transition group-open:rotate-180" /></summary><p className="mt-4 text-sm leading-7 text-[#91A6B2]">{answer}</p></details>)}</div></section>
+
+    <section className="border-t border-white/10 bg-[linear-gradient(115deg,#071C26,#102D39)]"><div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-5 py-12 lg:flex-row lg:items-center lg:px-8"><div><SwishFlipMark descriptor /><p className="mt-4 text-base text-[#D9E5E9]">{SWISHFLIP.secondarySlogan}</p></div><a href="/coins" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-[#F4C65D] px-5 text-sm font-bold text-[#071C26] transition hover:brightness-105">Start with SWISHFlip <ArrowRight className="h-4 w-4" /></a></div></section>
+    <footer className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-7 text-xs text-[#91A6B2] sm:flex-row sm:items-center sm:justify-between lg:px-8"><span>© {new Date().getFullYear()} SWISHFlip</span><span>{SWISHFLIP.intelligence}</span></footer>
+  </main>;
 }
-
