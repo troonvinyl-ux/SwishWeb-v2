@@ -15,7 +15,7 @@ export function useMusicSale(scope:CaptureScope|null,snapshot:MusicSnapshot) {
  const [pricing,setPricing]=useState<MusicPrice|null>(null),[message,setMessage]=useState(''),[error,setError]=useState(''),[locked,setLocked]=useState(false),[saveTiming,setSaveTiming]=useState<number|null>(null);
  const saving=useRef(false),checkpoint=useRef<MusicSaveCheckpoint>({itemId:crypto.randomUUID()}),latest=useRef({scope,snapshot});latest.current={scope,snapshot};
  const v=snapshot.values;
- const pricingKey=JSON.stringify({release:snapshot.release?.id,artist:v.artist,title:v.release_title,format:v.format,label:v.label,catalogue:v.catalogue_number,year:v.year,country:v.country,media:v.media_grade,sleeve:v.sleeve_grade,notes:v.condition_notes,features:v.features,edition:v.edition,reviewed:v.reviewed});
+ const pricingKey=JSON.stringify({release:snapshot.release?.id,artist:v.artist,title:v.release_title,format:v.format,label:v.label,catalogue:v.catalogue_number,year:v.year,country:v.country,media:v.media_grade,sleeve:v.sleeve_grade,notes:v.condition_notes,features:v.features,edition:v.edition,observedDiscCount:v.observed_disc_count,expectedDiscCount:snapshot.release?.discCount,playTested:v.play_tested,reviewed:v.reviewed});
  const currentKey=useRef(pricingKey);currentKey.current=pricingKey;
  useEffect(()=>{setPricing(null);},[pricingKey]);
  const price=useMutation({retry:false,mutationFn:async()=>{

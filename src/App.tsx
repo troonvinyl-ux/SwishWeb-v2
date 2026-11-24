@@ -50,7 +50,10 @@ import AuthorizedModule from '@/components/features/AuthorizedModule';
 import { getHostProduct, getRouteProduct } from '@/lib/productContext';
 import { normaliseNicheId } from '@/lib/niche';
 import { isSwishHomeRoute } from '@/lib/homeRouting';
+import { ListingStudioProvider } from '@/contexts/ListingStudioContext';
+import StudioReview from '@/pages/StudioReview';
 
+const ListingStudio = lazy(() => import('@/pages/ListingStudio'));
 const TunesCapture = lazy(() => import('@/pages/TunesCapture'));
 
 const currentHostname = window.location.hostname.toLowerCase().replace(/^www\./, '').split(':')[0];
@@ -65,7 +68,7 @@ function AppRoutes() {
   if (isSwishHomeRoute(currentHostname, location.pathname, Boolean(hostProduct))) return <SwishFlipHome />;
   if (currentHostname.endsWith('.swishflip.co.uk') && !hostProduct) return <NicheComingSoon />;
   const preferredNiche = String(localStorage.getItem('swish_active_niche') || user?.user_metadata?.preferred_niche || 'coins');
-  const workspaceNiche = normaliseNicheId(location.pathname.match(/^\/(?:workspace|scan)\/([^/]+)/)?.[1]);
+  const workspaceNiche = normaliseNicheId(location.pathname.match(/^\/(?:workspace|scan|studio|quick-list)\/([^/]+)/)?.[1]);
   const safeNiche = hostProduct?.id || workspaceNiche || getRouteProduct(location.pathname)?.id || normaliseNicheId(preferredNiche) || 'coins';
   const needsOnboarding = !isOwner && user?.user_metadata?.onboarding_status === 'started';
   const entryWorkspace = needsOnboarding ? '/onboarding' : `/workspace/${safeNiche}`;
@@ -75,11 +78,11 @@ function AppRoutes() {
   // Hostnames select presentation, never grant backend authorization.
   if (hostProduct && !isOwner) {
     const path = location.pathname;
-    const commonAllowed = path === '/' || path === '/onboarding' || path.startsWith('/workspace/') || path === '/identify' || path === '/capture' || path === '/antique-capture' || path.startsWith('/identify/') || path.startsWith('/scan/') || path.startsWith('/inventory') || path.startsWith('/listings') || path.startsWith('/orders') || path.startsWith('/dispatch') || path.startsWith('/repricing') || path.startsWith('/insights') || path.startsWith('/money') || path.startsWith('/ebay') || path.startsWith('/settings') || path === '/404';
+    const commonAllowed = path === '/' || path === '/onboarding' || path.startsWith('/workspace/') || path === '/identify' || path === '/capture' || path === '/antique-capture' || path.startsWith('/identify/') || path.startsWith('/scan/') || path.startsWith('/studio') || path.startsWith('/quick-list/') || path.startsWith('/inventory') || path.startsWith('/listings') || path.startsWith('/orders') || path.startsWith('/dispatch') || path.startsWith('/repricing') || path.startsWith('/insights') || path.startsWith('/money') || path.startsWith('/ebay') || path.startsWith('/settings') || path === '/404';
     const coinOnly = path.startsWith('/acquisitions') || path.startsWith('/opportunities') || path.startsWith('/review-required') || path.startsWith('/audit') || path.startsWith('/tools') || path.startsWith('/command-centre') || path.startsWith('/dashboard') || path.startsWith('/tasks');
     if (!commonAllowed || (hostProduct.id !== 'coins' && coinOnly)) return <Navigate to={`/workspace/${hostProduct.id}`} replace />;
   }
-  const moduleRequired = !['/onboarding', '/niches', '/master-admin', '/master-admin/', '/ebay/admin', '/404'].includes(location.pathname);
+  const moduleRequired = !location.pathname.startsWith('/studio') && !['/onboarding', '/niches', '/master-admin', '/master-admin/', '/ebay/admin', '/404'].includes(location.pathname);
   return <AppLayout key={`${user.id}:${safeNiche}`}><ErrorBoundary name="router"><AuthorizedModule nicheId={safeNiche} enabled={moduleRequired}><Routes>
     <Route path="/" element={<Navigate to={entryWorkspace} replace />} />
     {ENTRY_PATHS.map(path => <Route key={path} path={path} element={<Navigate to={entryWorkspace} replace />} />)}
@@ -92,8 +95,11 @@ function AppRoutes() {
     <Route path="/stock-check" element={<NotFound />} />
     <Route path="/inventory/new" element={<InventoryNew />} />
     <Route path="/inventory/:id" element={<InventoryItem />} />
-    <Route path="/identify" element={<Navigate to={`/scan/${safeNiche}`} replace />} />
-    <Route path="/capture" element={<Navigate to={`/scan/${safeNiche}`} replace />} />
+    <Route path="/studio" element={<Suspense fallback={<div role="status">Opening Listing Studio…</div>}><ListingStudio /></Suspense>} />
+    <Route path="/studio/:niche" element={<Suspense fallback={<div role="status">Opening Listing Studio…</div>}><ListingStudio /></Suspense>} />
+    <Route path="/quick-list/:niche" element={<StudioReview />} />
+    <Route path="/identify" element={<Navigate to={`/studio/${safeNiche}`} replace />} />
+    <Route path="/capture" element={<Navigate to="/studio" replace />} />
     <Route path="/antique-capture" element={<Navigate to="/scan/antiques" replace />} />
     <Route path="/identify/coins" element={<Navigate to="/scan/coins" replace />} />
     <Route path="/deep-id-lab" element={<Identify />} />
@@ -143,5 +149,5 @@ function AppRoutes() {
   </Routes></AuthorizedModule></ErrorBoundary></AppLayout>;
 }
 
-const App = () => <QueryClientProvider client={queryClient}><TooltipProvider><Toaster /><Sonner position="bottom-right" /><BrowserRouter><ErrorBoundary name="app"><AuthProvider><AppRoutes /></AuthProvider></ErrorBoundary></BrowserRouter></TooltipProvider></QueryClientProvider>;
+const App = () => <QueryClientProvider client={queryClient}><TooltipProvider><Toaster /><Sonner position="bottom-right" /><BrowserRouter><ErrorBoundary name="app"><AuthProvider><ListingStudioProvider><AppRoutes /></ListingStudioProvider></AuthProvider></ErrorBoundary></BrowserRouter></TooltipProvider></QueryClientProvider>;
 export default App;

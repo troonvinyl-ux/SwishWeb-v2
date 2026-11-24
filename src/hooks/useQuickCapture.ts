@@ -15,7 +15,7 @@ export function useQuickCapture(nicheId: SwishNicheId) {
   const checkpoint = useRef<CaptureCheckpoint>({}), lock = useRef(false), mounted = useRef(true);
   const key = `${user?.id}:${tenantId}:${nicheId}:${sessionId}`, current = useRef(key); current.current = key;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  useEffect(() => { checkpoint.current = {}; setDraft(null); setError(''); setMessage(''); }, [key]);
+  useEffect(() => { lock.current = false; checkpoint.current = {}; setDraft(null); setError(''); setMessage(''); }, [key]);
   const preparation = useMutation({ mutationKey: ['quick_capture', key], retry: false,
     mutationFn: async (input: CaptureInput) => {
       const client = await getSupabaseClientAsync();
