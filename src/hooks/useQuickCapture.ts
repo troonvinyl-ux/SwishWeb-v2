@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { getSupabaseClientAsync } from '@/lib/supabase';
-import { prepareQuickCapture } from '@/lib/quickCaptureFlow';
+import { prepareStableQuickCapture as prepareQuickCapture } from '@/lib/listingStudioPreparation';
 import type { SwishNicheId } from '@/lib/niche';
 import type { CaptureCheckpoint, CaptureDraft, CapturePhoto } from '@/types/capture';
 interface CaptureInput { photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; lead?: Record<string, unknown> | null; }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Menu, Search, X } from 'lucide-react';
+import { Camera, Menu, Search, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-1">
+        <Link to="/studio" aria-label="Open global Listing Studio with Auto Detect" className="flex min-h-11 min-w-11 items-center justify-center rounded-2xl text-primary hover:bg-secondary"><Camera className="h-5 w-5" /></Link>
         <button onClick={() => setSearchOpen(!searchOpen)} aria-label={searchOpen ? 'Close inventory search' : 'Search inventory'} className="flex min-h-11 min-w-11 items-center justify-center rounded-2xl hover:bg-secondary text-muted-foreground hover:text-foreground">
           <Search className="w-4 h-4" />
         </button>

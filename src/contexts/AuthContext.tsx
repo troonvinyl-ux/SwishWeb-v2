@@ -26,13 +26,6 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-function isInvalidStoredSession(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const value = error as { code?: unknown; message?: unknown };
-  const detail = `${String(value.code || '')} ${String(value.message || '')}`.toLowerCase();
-  return /refresh_token_not_found|invalid_refresh_token|refresh token.*(invalid|not found|expired)/.test(detail);
-}
-
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -76,29 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       applySession(next);
     });
     const revision = authRevision;
-    void sb.auth.getSession().then(async ({ data, error }) => {
+    void sb.auth.getSession().then(({ data, error }) => {
       if (!active || revision !== authRevision) return;
-      if (error) {
-        // A revoked/stale token should not brick SWISH login. Clear only this
-        // device's invalid auth token, never the OnSpace Cloud backend key.
-        if (!isInvalidStoredSession(error)) {
-          setStatus('error');
-          setLoading(false);
-          return;
-        }
-        const result = await sb.auth.signOut({ scope: 'local' });
-        if (!active) return;
-        if (result.error && !isInvalidStoredSession(result.error)) {
-          setStatus('error');
-          setLoading(false);
-          return;
-        }
-        applySession(null);
-        return;
-      }
+      if (error) { setStatus('error'); setLoading(false); return; }
       applySession(data.session);
-    }).catch(() => {
-      if (active) { setStatus('error'); setLoading(false); }
     });
     unsubRef.current = () => { active = false; subscription.unsubscribe(); };
   }, [qc]);
@@ -208,7 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     delete document.documentElement.dataset.niche;
     setUser(null);
     setSession(null);
-    // Do NOT call resetClient or clearStoredAnonKey here.
+    // Do NOT call resetClient() or clearStoredAnonKey() here.
     // The backend connection remains active; only the auth session is cleared.
   };
 

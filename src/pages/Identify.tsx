@@ -24,6 +24,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNicheAccess } from '@/hooks/useNicheAccess';
+import { useStudioHandoff } from '@/hooks/useStudioHandoff';
 import { useCoinPhotoPreparation } from '@/hooks/useCoinPhotoPreparation';
 import NicheAccessStatus from '@/components/features/NicheAccessStatus';
 import CoinCaptureDialog from '@/components/features/CoinCaptureDialog';
@@ -53,7 +54,7 @@ import {
 // ---------------------------------------------------------------------------
 
 type Step = 'capture' | 'identifying' | 'review' | 'confirming' | 'confirmed';
-type CoinSide = 'obverse' | 'reverse' | 'edge' | 'detail' | 'reference' | 'extra';
+type CoinSide = 'obverse' | 'reverse' | 'edge' | 'detail' | 'reference' | 'extra' | `extra_${number}`;
 
 interface CoinImage {
   side: CoinSide;
@@ -254,7 +255,7 @@ function ImageSlot({
 export default function Identify() {
   const prepareCoinPhotos = useCoinPhotoPreparation();
   const navigate = useNavigate();
-  const { user, isPlatformOwner } = useAuth();
+  const { user } = useAuth();
 
   // Duplicate-submit guard (ref — not state — so it doesn't cause re-renders)
   const submitGuard = useRef(false);
@@ -279,8 +280,8 @@ export default function Identify() {
   // Existing inventory search (for REQ-INV-002 — update path)
   const [inventorySearch, setInventorySearch] = useState('');
   const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const { nicheIds: entitledNiches, isOwner: verifiedOwnerMembership, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
-  const coinAllowed = entitledNiches.includes('coins') || (isPlatformOwner && verifiedOwnerMembership);
+  const { nicheIds: entitledNiches, isLoading: entitlementsLoading, error: entitlementsError, refetch: refetchEntitlements } = useNicheAccess();
+  const coinAllowed = entitledNiches.includes('coins');
   const specialistIds = getSpecialistIdsForNiche(getActiveNicheId());
   const { data: inventoryResults } = useTable('items', {
     filter: { tenant_id: tenantId },
@@ -288,6 +289,14 @@ export default function Identify() {
     search: { column: 'canonical_title', query: inventorySearch },
     limit: 10,
     enabled: Boolean(tenantId) && coinAllowed && !tenantLoading && !entitlementsLoading && !entitlementsError && specialistIds.length > 0 && inventorySearch.length > 2,
+  });
+
+  useStudioHandoff('coins', session => {
+    const retained = new Map<CoinSide, CoinImage>();
+    const known = new Set(['obverse', 'reverse', 'edge', 'detail', 'reference', 'extra']);
+    session.photos.forEach((photo, index) => { const side = (known.has(photo.slotId) ? photo.slotId : `extra_${index + 1}`) as CoinSide; retained.set(side, { side, file: photo.file, preview: URL.createObjectURL(photo.file) }); });
+    setImages(retained); setMetadata(previous => ({ ...previous, notes: session.notes }));
+    toast.info('Original Studio photos retained. Review both faces, measurements and reference before identification.');
   });
 
   // Voice note
@@ -554,7 +563,7 @@ export default function Identify() {
     // reverse, followed by optional detail/reference images, regardless of upload order.
     const sideOrder: CoinSide[] = ['obverse', 'reverse', 'edge', 'detail', 'reference', 'extra'];
     const orderedImages = Array.from(images.values()).sort(
-      (a, b) => sideOrder.indexOf(a.side) - sideOrder.indexOf(b.side),
+      (a, b) => (sideOrder.includes(a.side) ? sideOrder.indexOf(a.side) : 99) - (sideOrder.includes(b.side) ? sideOrder.indexOf(b.side) : 99),
     );
     let imageDataUrls: string[] = [];
     try {
@@ -943,13 +952,13 @@ export default function Identify() {
           {savedInventoryId && (
             <button
               onClick={() => void handleCreateCoinDraft()}
-              disabled={draftBusy || (Boolean(metadata.numista_number?.trim()) && !parseNumistaNumber(metadata.numista_number)) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)}
+              disabled={draftBusy || !parseNumistaNumber(metadata.numista_number) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)}
               className="btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Tag className="w-4 h-4" />{draftBusy ? 'Pulling eBay draft…' : 'Pull eBay draft'}
             </button>
           )}
-          {((Boolean(metadata.numista_number?.trim()) && !parseNumistaNumber(metadata.numista_number)) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)) && <p className="text-xs leading-5 text-muted-foreground">Actual measured weight and diameter are required. Numista N# is optional; if provided it must be valid.</p>}
+          {(!parseNumistaNumber(metadata.numista_number) || !(Number(metadata.weight) > 0) || !(Number(metadata.diameter) > 0)) && <p className="text-xs leading-5 text-muted-foreground">A valid Numista N#, actual weight and actual diameter are required before SWISH can pull a coin eBay draft.</p>}
           <button
             onClick={() => navigate(savedInventoryId ? `/inventory/${savedInventoryId}` : '/inventory')}
             className="btn-secondary w-full justify-center"

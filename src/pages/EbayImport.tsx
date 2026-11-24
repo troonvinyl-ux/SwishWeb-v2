@@ -7,7 +7,6 @@ import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { getActiveNicheId, getDefaultSpecialistForNiche, getSpecialistIdsForNiche } from '@/lib/niche';
 import { Upload, Download, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import EbaySellerDiscovery from '@/components/features/EbaySellerDiscovery';
 
 type ImportResult = { imported: number; updated: number; skipped: number; errors: string[]; type: string };
 
@@ -305,13 +304,11 @@ export default function EbayImport() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl">
+    <div className="space-y-6 animate-fade-in max-w-xl">
       <div className="page-header">
         <h1 className="page-title">eBay Import / Export</h1>
-        <p className="page-subtitle">Discover already-live eBay listings from your connected seller account, or import CSV/Excel exports. All records use the existing SWISH inventory and specialist ownership.</p>
+        <p className="page-subtitle">Import listings from CSV or Excel directly into the existing SWISH inventory; export real tenant records without uploading private files to public storage.</p>
       </div>
-      <EbaySellerDiscovery tenantId={currentTenantId} />
-      <h2 className="text-base font-semibold">Manual CSV / Excel import and export</h2>
       <div className="swish-card p-5 space-y-4">
         <div>
           <label className="text-xs text-muted-foreground">Import / Export Type</label>

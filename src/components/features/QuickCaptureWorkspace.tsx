@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useQuickCapture } from '@/hooks/useQuickCapture';
 import { useCaptureEvidence } from '@/hooks/useCaptureEvidence';
+import { useStudioHandoff } from '@/hooks/useStudioHandoff';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getSpecialistIdsForNiche, type SwishNicheId } from '@/lib/niche';
 import { coinDraftReadiness } from '@/lib/coinListingGate';
@@ -27,6 +28,12 @@ export default function QuickCaptureWorkspace({ nicheId }: QuickCaptureWorkspace
   const scope = client && user && tenantId ? { client, userId: user.id, tenantId, nicheId, sessionId: flow.sessionId, isCurrent: () => current.current === key } : null;
   useEffect(() => { localStorage.setItem('swish_active_niche', nicheId); document.documentElement.dataset.niche = nicheId; }, [nicheId]);
   useEffect(() => () => { current.current = ''; }, []);
+  useStudioHandoff(profile.data ? nicheId : null, session => {
+    session.photos.forEach(photo => evidence.addPhoto(evidence.slots.find(slot => slot.id === photo.slotId) || { id: photo.slotId, label: photo.label, description: 'Retained original', required: false }, photo.file));
+    const missingViews = evidence.slots.filter(slot => slot.required && !session.photos.some(photo => photo.slotId === slot.id)).map(slot => slot.label);
+    const answers = { notes: session.notes, studio_missing_views: missingViews.join(', ') }; form.reset(answers);
+    if (nicheId !== 'coins') void flow.next({ photos: session.photos.map(photo => ({ ...photo, preview: '' })), specialistId: evidence.specialistId, mode: evidence.mode, answers });
+  });
   const next = form.handleSubmit(answers => { if (!missing.length) void flow.next({ photos: slots.flatMap(slot => photos.filter(photo => photo.slotId === slot.id)), specialistId: evidence.specialistId, mode: evidence.mode, answers, lead: evidence.lead }); });
   if (profile.isPending) return <section role="status" className="swish-card p-6">Loading specialist capture…</section>;
   if (profile.error || !profile.data || !activeSlot) return <section role="alert" className="swish-card space-y-4 p-6"><h1 className="text-xl font-semibold">Scanner configuration unavailable</h1><p>{profile.error?.message || 'No registered evidence views returned.'}</p><Button variant="outline" onClick={() => void profile.refetch()}>Retry</Button></section>;

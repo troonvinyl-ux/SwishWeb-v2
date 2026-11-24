@@ -7,5 +7,5 @@ export interface CaptureMode { id: string; label: string; }
 export interface NativeCaptureProfile { slots: CaptureSlot[]; fields: CaptureField[]; modes: CaptureMode[]; focus: string; barcode: 'start' | 'optional' | 'disabled'; }
 export interface CapturePhoto { slotId: string; label: string; file: File; preview: string; }
 export interface CaptureScope { client: SupabaseClient; userId: string; tenantId: string; nicheId: SwishNicheId; sessionId: string; isCurrent: () => boolean; }
-export interface CaptureCheckpoint { identification?: Record<string, unknown>; itemId?: string; photos?: Record<string, string>; generated?: Record<string, unknown>; listingId?: string; }
+export interface CaptureCheckpoint { itemAttempted?: boolean; draftAttempted?: boolean; identification?: Record<string, unknown>; itemId?: string; photos?: Record<string, string>; generated?: Record<string, unknown>; listingId?: string; }
 export interface CaptureDraft { itemId: string; listingId: string; title: string; description: string; price: number | null; photos: string[]; warnings: string[]; numistaReference?: NumistaReference | null; numistaResearch?: Record<string, unknown>; }
