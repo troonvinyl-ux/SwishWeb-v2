@@ -3,7 +3,9 @@ import { callEdgeFunction } from '@/lib/supabase';
 import { verifyModuleScope } from '@/lib/moduleScope';
 import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
 import { asRecord } from '@/lib/itemPhotos';
-import { normalizeEbayAspects, type EbayAspect } from '@/lib/ebayMusicContract';
+import { normalizeEbayAspects, normalizeEbayConditionPolicy, ebayConditionId, vinylRecordConditionPolicy, type EbayAspect } from '@/lib/ebayMusicContract';
+import { researchScanMarket } from '@/lib/scanMarketResearch';
+import { listingSpecifics } from '@/lib/listingEditorData';
 
 export interface EbaySpecific { name: string; value: string; }
 export interface ScanListingEnrichment {
@@ -15,6 +17,9 @@ export interface ScanListingEnrichment {
   marketError: string | null;
   categoryError: string | null;
   specificsError: string | null;
+  market?: Record<string, unknown> | null;
+  conditionId?: string;
+  conditionError?: string | null;
 }
 
 interface ScanListingEnrichmentInput {
@@ -37,8 +42,8 @@ const aspectAliases: Record<string, string[]> = {
   manufacturer: ['brand', 'brand_name', 'maker', 'manufacturer', 'make'],
   make: ['brand', 'brand_name', 'maker', 'manufacturer', 'make'],
   model: ['model', 'model_number', 'model_name', 'product_model', 'reference'],
-  mpn: ['mpn', 'model_number', 'model', 'sku', 'reference'],
-  manufacturerpartnumber: ['mpn', 'model_number', 'model', 'sku', 'reference'],
+  mpn: ['mpn', 'model_number', 'manufacturer_part_number'],
+  manufacturerpartnumber: ['mpn', 'model_number', 'manufacturer_part_number'],
   type: ['category', 'object_type', 'objecttype', 'product_type', 'producttype', 'item_type', 'itemtype'],
   colour: ['colour', 'color', 'colour_description', 'color_description'],
   color: ['colour', 'color', 'colour_description', 'color_description'],
@@ -47,8 +52,8 @@ const aspectAliases: Record<string, string[]> = {
   department: ['gender_category', 'department'],
   year: ['year', 'issue_year', 'release_year'],
   yearmanufactured: ['year', 'issue_year', 'release_year'],
-  countryregionofmanufacture: ['country_manufacture', 'country_of_manufacture', 'country'],
-  countryofmanufacture: ['country_manufacture', 'country_of_manufacture', 'country'],
+  countryregionofmanufacture: ['country_manufacture', 'country_of_manufacture'],
+  countryofmanufacture: ['country_manufacture', 'country_of_manufacture'],
   condition: ['condition', 'condition_assessment', 'conditionassessment'],
 };
 
@@ -78,7 +83,7 @@ export function prefillEbaySpecifics(attributes: Record<string, unknown>, aspect
   const missingRequired: string[] = [];
   for (const aspect of aspects) {
     const candidate = candidateForAspect(aspect.name, attributes);
-    let value = candidate.slice(0, 65);
+    let value = candidate.length <= 65 && aspect.name.length <= 65 ? candidate : '';
     if (value && aspect.selectionOnly) {
       value = aspect.values.find(option => option.localeCompare(value, undefined, { sensitivity: 'accent' }) === 0) || '';
     }
@@ -104,40 +109,17 @@ export async function enrichScannedItemForListing(input: ScanListingEnrichmentIn
     marketError: null, categoryError: null, specificsError: null,
   };
 
-  if (input.title.trim().length >= 3) {
-    await ensureScope();
-    const market = await callEdgeFunction<Record<string, unknown>>('swish-market-value', {
-      tenantId: input.tenantId,
-      itemId: input.itemId,
-      title: input.title.trim(),
-      specialistId: input.specialistId,
-      attributes: input.attributes,
-      condition: input.condition,
-      imageUrls: input.imageUrls,
-      applyToItem: true,
-    }, input.client);
-    if (market.error) result.marketError = market.error.displayMessage;
-    else if (market.data?.success === true && Object.keys(asRecord(market.data.valuation)).length) result.marketRefreshed = true;
-    else result.marketError = String(market.data?.error || 'No verified market valuation was returned.');
-  } else {
-    result.marketError = 'Add a more specific item title before researching market value.';
-  }
-
-  try {
-    await ensureScope();
-    result.category = await lookupScopedListingCategory({
-      client: input.client,
-      userId: input.userId,
-      tenantId: input.tenantId,
-      nicheId: input.nicheId,
-      title: input.title,
-      attributes: input.attributes,
-      isCurrent,
-    });
-  } catch (error) {
-    result.categoryError = error instanceof Error ? error.message : 'eBay category lookup was unavailable.';
-    return result;
-  }
+  await ensureScope();
+  // Independent research is concurrent; photography and partial drafts never depend on market latency.
+  const [market, category] = await Promise.all([
+    researchScanMarket(input),
+    lookupScopedListingCategory({ ...input, isCurrent }).then(value => ({ value, error: null as string | null }))
+      .catch((cause: unknown) => ({ value: null, error: cause instanceof Error ? cause.message : 'eBay category lookup unavailable.' })),
+  ]);
+  await ensureScope();
+  result.market = market.data; result.marketError = market.error; result.marketRefreshed = Boolean(market.data);
+  result.category = category.value; result.categoryError = category.error;
+  if (!result.category) return result;
 
   try {
     await ensureScope();
@@ -154,13 +136,35 @@ export async function enrichScannedItemForListing(input: ScanListingEnrichmentIn
     result.specificsError = error instanceof Error ? error.message : 'Category item specifics were unavailable.';
   }
 
+  try {
+    await ensureScope();
+    const vinyl = vinylRecordConditionPolicy(result.category.id, input.specialistId);
+    const response = vinyl ? null : await callEdgeFunction<Record<string, unknown>>('swish-ebay-list', {
+      route: 'get_condition_policies', tenantId: input.tenantId, nicheId: input.nicheId, categoryId: result.category.id,
+    }, input.client);
+    if (response?.error) throw response.error;
+    if (!vinyl && response?.data?.success !== true) throw new Error('Current eBay condition choices are unavailable.');
+    const policy = vinyl ? { conditions: vinyl.conditions, required: true } : normalizeEbayConditionPolicy(asRecord(response?.data).policy, result.category.id);
+    const candidate = ebayConditionId(input.condition);
+    result.conditionId = policy.conditions.some(row => row.id === candidate) ? candidate : '';
+    if (policy.required && !result.conditionId) result.conditionError = 'Choose a supported eBay condition after checking the physical item. Photos do not establish testing, grading or sealed-new status.';
+  } catch (cause) { result.conditionError = cause instanceof Error ? cause.message : 'Current eBay condition policy unavailable.'; }
+
   await ensureScope();
   const current = await input.client.from('items').select('id,attributes,updated_at').eq('id', input.itemId).eq('tenant_id', input.tenantId).maybeSingle();
   if (current.error || !current.data?.id || !current.data.updated_at) throw new Error(current.error?.message || 'Saved item could not be read before applying eBay preparation.');
   const currentAttributes = asRecord(current.data.attributes);
+  const sameCategory = String(currentAttributes.ebay_category_id || '') === result.category.id;
+  if (result.aspects.length) {
+    const filled = prefillEbaySpecifics({ ...input.attributes, ...listingSpecifics(currentAttributes.ebay_item_specifics) }, result.aspects);
+    result.specifics = filled.specifics; result.missingRequired = filled.missingRequired;
+  }
   const prepared = {
     ...currentAttributes,
+    ...(result.market ? { market_value_result: result.market } : {}),
+    _scan_listing_preparation: { market_error: result.marketError, category_error: result.categoryError, specifics_error: result.specificsError, condition_error: result.conditionError, reviewed: false },
     ...(result.category ? { ebay_category_id: result.category.id, ebay_category_name: result.category.name } : {}),
+    ebay_condition_id: sameCategory && currentAttributes.ebay_condition_id ? currentAttributes.ebay_condition_id : result.conditionId || '',
     ...(result.aspects.length ? {
       ebay_item_specifics: result.specifics,
       ebay_required_specifics_missing: result.missingRequired,

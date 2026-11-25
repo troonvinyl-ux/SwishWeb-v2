@@ -9,6 +9,7 @@ import { useMusicScope } from '@/hooks/useMusicScope';
 import { startMusicTiming } from '@/lib/musicTiming';
 import { beginScanToLive } from '@/lib/scanToLiveTiming';
 import type { MusicFields, MusicValues, MusicPhoto } from '@/types/music';
+import type { StudioRetainedPhoto } from '@/types/listingStudio';
 export function useMusicSession() {
  const [sessionId]=useState(()=>crypto.randomUUID());
  const [photos,setPhotos]=useState<MusicPhoto[]>([]),[fields,setFields]=useState<MusicFields>({}),[selected,setSelected]=useState('front_sleeve');
@@ -55,5 +56,11 @@ export function useMusicSession() {
   photoRef.current.filter(photo=>photo.slotId===slotId).forEach(photo=>URL.revokeObjectURL(photo.preview));
   const next=photoRef.current.filter(photo=>photo.slotId!==slotId);photoRef.current=next;setPhotos(next);unreview();
  },[unreview]);
- return {sessionId,photos,fields,setFields,form,slots,activeSlot,selected,setSelected,applyFields,markUser,addFiles,remove,setAnalysisCopy};
+ const restoreStudioPhotos = useCallback((originals: StudioRetainedPhoto[], notes: string) => {
+  const aliases: Record<string, string> = { front: 'front_sleeve', back: 'back_sleeve', media: 'label_a', matrix: 'matrix_a' };
+  const retained = originals.map(photo => ({ ...photo, slotId: aliases[photo.slotId] || photo.slotId, preview: URL.createObjectURL(photo.file) }));
+  photoRef.current.forEach(photo => URL.revokeObjectURL(photo.preview)); photoRef.current = retained; setPhotos(retained);
+  form.setValue('condition_notes', notes); unreview();
+ }, [form, unreview]);
+ return {sessionId,photos,fields,setFields,form,slots,activeSlot,selected,setSelected,applyFields,markUser,addFiles,remove,setAnalysisCopy,restoreStudioPhotos};
 }
