@@ -130,6 +130,10 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
   };
   const checkStatus = async () => {
     if (working.current || busy || !userId || !tenantId || !draft.item || !draft.form.id) return;
+    if (pendingExternalId && !draft.form.external_listing_id && draft.form.publish_claim_id) {
+      await recoverPending(pendingExternalId);
+      return;
+    }
     const id = String(draft.form.id), nicheId = listingNicheId(draft.item);
     working.current = true; setChecking(true);
     try {
