@@ -298,3 +298,27 @@
   .swish-inventory-card-copy strong { font-size:13px; }
   .swish-inventory-submit { padding:8px; font-size:11px; }
 }
+
+/* SWISHFlip selling workspace: scoped to listing screens, not the camera. */
+.flip-listing { background:#091e28; color:#fff; border-radius:20px; padding:clamp(12px,2vw,24px); --primary:174 66% 46%; --primary-foreground:198 64% 10%; --card:194 52% 16%; --foreground:0 0% 100%; --muted-foreground:198 21% 80%; --border:194 39% 28%; --secondary:194 49% 19%; }
+.flip-listing [hidden] { display:none !important; }
+.flip-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.flip-brand {font-size:clamp(24px,4vw,36px);font-weight:900;font-style:italic;letter-spacing:-.06em}
+.flip-brand span {color:#28c5b7}
+.flip-heading {font-size:clamp(24px,4vw,32px);font-weight:750;margin:8px 0 16px;line-height:1.2}
+.flip-overview-grid {display:grid;gap:16px;align-items:start}
+@media(min-width:850px){.flip-overview-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.flip-cover {display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;width:100%;background:#14343f;border:1px solid #244650;border-radius:16px;min-height:160px}
+.flip-cover img {width:100%;height:clamp(180px,32vw,340px);object-fit:contain}
+.flip-cover>span {width:100%;display:flex;gap:8px;align-items:center;justify-content:center;background:#dce8eb;color:#091e28;padding:12px;font-weight:650}
+.flip-row,.flip-price,.flip-advice {width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:12px;border:1px solid #2e5966;border-radius:12px;background:#14343f;color:#fff;min-height:48px}
+.flip-row>span,.flip-price>span,.flip-advice>span{flex:1;min-width:0}
+.flip-row svg,.flip-price>svg {color:#28c5b7;flex-shrink:0}
+.flip-row small,.flip-price small {display:block;color:#bccdd4;font-size:13px}
+.flip-price strong {display:block;font-size:32px;line-height:1.2}
+.flip-advice {background:#302b1e;border-color:#96753a;color:#ffcd69}
+.flip-advice svg{flex-shrink:0}
+.flip-primary,.flip-secondary{width:100%;min-height:48px;border-radius:12px;font-size:17px;font-weight:700;padding:12px;display:flex;align-items:center;justify-content:center}
+.flip-primary{background:#28c5b7;color:#091e28}.flip-secondary{border:1px solid #bccdd4;color:#fff}
+.flip-primary:disabled,.flip-secondary:disabled{opacity:.5;cursor:not-allowed}
+.flip-listing button:focus-visible,.flip-listing a:focus-visible{outline:2px solid #ffcd69;outline-offset:3px}
