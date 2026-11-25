@@ -140,7 +140,8 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       }
       if (!draft.dirtyRef.current) draft.commit(fresh); await refreshInventory(); await draft.refresh(); setError(null);
       if (fresh.status === 'active' && fresh.external_listing_id) { setPendingExternalId(null); completeScanToLive(`${userId}:${tenantId}:${id}`, String(fresh.external_listing_id)); }
-      toast.success(fresh.external_listing_id ? 'Existing eBay listing checked' : fresh.publish_claim_id ? 'SWISH still has a pending submission' : 'Saved status checked. Submit when ready.');
+      if (fresh.publish_claim_id && !fresh.external_listing_id) toast.info('Enter the eBay item number to link the pending submission.');
+      else toast.success(fresh.external_listing_id ? 'Existing eBay listing checked' : 'Saved status checked. Submit when ready.');
     } catch (cause) { setError(message(cause)); toast.error(message(cause)); }
     finally { working.current = false; setChecking(false); }
   };
@@ -188,6 +189,35 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       setChangingStatus(false);
     }
   };
+  const recoverPending = async (externalListingId: string) => {
+    if (working.current || !userId || !tenantId || !draft.item || !draft.form.id) return;
+    const listingId = String(draft.form.id), nicheId = listingNicheId(draft.item);
+    working.current = true;
+    setChecking(true);
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is not connected.');
+      await activateModuleScope(client, userId, tenantId, nicheId);
+      const result = await callEdgeFunction<{ success: boolean; externalListingId: string }>('swish-ebay-list', {
+        route: 'recover_pending_publish', tenantId, nicheId, listingId, externalListingId,
+      }, client);
+      if (result.error) throw result.error;
+      if (!result.data?.success || result.data.externalListingId !== externalListingId) throw new Error('SWISH could not confirm the link.');
+      const fresh = await readSubmissionListing(client, tenantId, listingId);
+      if (fresh.external_listing_id !== externalListingId || fresh.publish_claim_id) throw new Error('Refresh to check the saved eBay link.');
+      if (!draft.dirtyRef.current && draft.formRef.current.id === listingId) draft.commit(fresh);
+      setPendingExternalId(null);
+      setError(null);
+      toast.success('Existing eBay listing linked and status updated');
+      await refreshInventory();
+    } catch (cause) {
+      setError(message(cause));
+      toast.error(message(cause));
+    } finally {
+      working.current = false;
+      setChecking(false);
+    }
+  };
   const pendingReason = pendingExternalId ? `eBay accepted listing ${pendingExternalId}, but SWISH is still reconciling the saved listing and stock state. Do not submit again; use Refresh status.` : null;
-  return { publishing, checking, changingStatus, setManualStatus, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form), publicationExternalId: pendingExternalId || String(draft.form.external_listing_id || ''), error, save, publish, checkStatus, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !pendingExternalId && !publicationBlock(draft.form)) };
+  return { publishing, checking, changingStatus, setManualStatus, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form), publicationExternalId: pendingExternalId || String(draft.form.external_listing_id || ''), error, save, publish, checkStatus, recoverPending, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !pendingExternalId && !publicationBlock(draft.form)) };
 }

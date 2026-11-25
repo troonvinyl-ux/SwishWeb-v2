@@ -35,6 +35,7 @@ export default function ListingEditor() {
   const section = ['overview','description','specifics','pricing','delivery','photos','research','preview'].includes(requestedSection) ? requestedSection : 'overview';
   const open = (next: string) => { const p = new URLSearchParams(params); if (next === 'overview') p.delete('section'); else p.set('section', next); setParams(p, { replace: true }); };
   const [confirming, setConfirming] = useState(false);
+  const [recoveryItemNumber, setRecoveryItemNumber] = useState('');
   const draft = useListingEditorDraft(id, tenant.tenantId);
   const upload = useListingPhotoUploads(String(draft.form.item_id || ''), urls => draft.setPhotos(current => [...current, ...urls]));
   const nicheId = draft.item ? listingNicheId(draft.item) : getActiveNicheId();
@@ -71,6 +72,19 @@ export default function ListingEditor() {
     <header className="flip-header"><Link to={`/listings/${id}`} className="btn-ghost" aria-label="Back to saved listing"><ArrowLeft size={22}/></Link><span className="flip-brand">SWISH<span>Flip</span></span><button type="button" className="btn-ghost" onClick={() => void actions.checkStatus()} disabled={actions.busy || !draft.form.id} aria-label="Refresh status"><RefreshCw size={20}/></button></header>
     <PublicationStatus reason={actions.reason} externalId={actions.publicationExternalId} refreshing={actions.checking} onRefresh={() => void actions.checkStatus()} />
     <ListingPublishFeedback message={actions.error} />
+    {Boolean(draft.form.publish_claim_id) && !draft.form.external_listing_id &&
+      <section key={id} className="swish-card space-y-3 p-4">
+        <h2 className="font-semibold">Already live on eBay?</h2>
+        <label htmlFor="recovery-item-number" className="block">eBay item number</label>
+        <input id="recovery-item-number" className="input-field" inputMode="numeric" maxLength={20}
+          value={recoveryItemNumber || actions.publicationExternalId}
+          onChange={event => setRecoveryItemNumber(event.target.value.replace(/\D/g, ''))} />
+        <button type="button" className="btn-secondary"
+          disabled={actions.busy || draft.dirty || !/^\d{6,20}$/.test(recoveryItemNumber || actions.publicationExternalId)}
+          onClick={() => void actions.recoverPending(recoveryItemNumber || actions.publicationExternalId)}>
+          {actions.checking ? 'Checking eBay…' : 'Link existing eBay listing'}
+        </button>
+      </section>}
     <div hidden={section !== 'overview'}>
       <h1 className="flip-heading">{active ? 'Your listing is live!' : 'Ready to sell?'}</h1>
       <div className="flip-overview-grid">
