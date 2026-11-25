@@ -22,7 +22,8 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
     queries.invalidateQueries({ queryKey: ['items'] }),
   ]);
   const [publishing, setPublishing] = useState(false), [checking, setChecking] = useState(false), [error, setError] = useState<string | null>(null), [pendingExternalId, setPendingExternalId] = useState<string | null>(null);
-  const busy = publishing || checking || saveMutation.isPending;
+  const [changingStatus, setChangingStatus] = useState(false);
+  const busy = publishing || checking || changingStatus || saveMutation.isPending;
   const message = (cause: unknown) => cause instanceof EdgeFunctionError ? cause.displayMessage : cause instanceof Error ? cause.message : 'SWISH could not complete the request.';
   const saveCurrent = async () => {
     const edits = draft.editRef.current, id = draft.formRef.current.id;
@@ -143,6 +144,50 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
     } catch (cause) { setError(message(cause)); toast.error(message(cause)); }
     finally { working.current = false; setChecking(false); }
   };
+  const setManualStatus = async (status: 'draft' | 'active' | 'sold' | 'ended') => {
+    if (working.current || busy || draft.dirtyRef.current || !userId || !tenantId || !draft.item || !draft.form.id) return;
+    const id = String(draft.form.id), nicheId = listingNicheId(draft.item);
+    working.current = true;
+    setChangingStatus(true);
+    try {
+      const client = await getSupabaseClientAsync();
+      if (!client) throw new Error('SWISH backend is not connected.');
+      await activateModuleScope(client, userId, tenantId, nicheId);
+      const before = await readSubmissionListing(client, tenantId, id);
+      if (before.status !== draft.formRef.current.status || draft.formRef.current.id !== id) {
+        throw new Error('The saved status changed. Refresh the listing and try again.');
+      }
+      if (before.publish_claim_id || pendingExternalId) throw new Error('Use Refresh status to reconcile the pending eBay submission first.');
+      const linked = /^\d{6,20}$/.test(String(before.external_listing_id || ''));
+      if (status === 'active' && !linked) throw new Error('Live requires a saved eBay item number. Use Refresh status or repair the existing eBay link.');
+      if (status === 'draft' && before.external_listing_id) throw new Error('A listing linked to eBay cannot be moved back to Draft.');
+      const now = new Date().toISOString();
+      let update = client.from('listings').update({
+        status,
+        updated_at: now,
+        ...(status === 'ended' ? { ended_at: before.ended_at || now } : status === 'active' || status === 'draft' ? { ended_at: null } : {}),
+      }).eq('id', id).eq('tenant_id', tenantId).eq('marketplace_id', 'ebay')
+        .eq('status', before.status).is('publish_claim_id', null);
+      if (before.updated_at) update = update.eq('updated_at', before.updated_at);
+      update = before.external_listing_id == null
+        ? update.is('external_listing_id', null)
+        : update.eq('external_listing_id', before.external_listing_id);
+      const { data, error: updateError } = await update.select('*').maybeSingle();
+      if (updateError || !data || data.status !== status) {
+        throw new Error(updateError?.message || 'SWISH could not confirm the status change. Refresh and try again.');
+      }
+      if (draft.formRef.current.id === id) draft.commit(data);
+      setError(null);
+      toast.success('SWISH listing status saved');
+      await refreshInventory();
+    } catch (cause) {
+      setError(message(cause));
+      toast.error(message(cause));
+    } finally {
+      working.current = false;
+      setChangingStatus(false);
+    }
+  };
   const pendingReason = pendingExternalId ? `eBay accepted listing ${pendingExternalId}, but SWISH is still reconciling the saved listing and stock state. Do not submit again; use Refresh status.` : null;
-  return { publishing, checking, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form), publicationExternalId: pendingExternalId || String(draft.form.external_listing_id || ''), error, save, publish, checkStatus, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !pendingExternalId && !publicationBlock(draft.form)) };
+  return { publishing, checking, changingStatus, setManualStatus, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form), publicationExternalId: pendingExternalId || String(draft.form.external_listing_id || ''), error, save, publish, checkStatus, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !pendingExternalId && !publicationBlock(draft.form)) };
 }

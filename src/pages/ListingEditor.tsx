@@ -77,6 +77,25 @@ export default function ListingEditor() {
         <div><button type="button" className="flip-cover" onClick={() => open('photos')}>{draft.photos[0] ? <img src={draft.photos[0]} alt="Main listing photo"/> : <Image size={48}/>}<span><Image size={18}/>{draft.photos.length} photos · View or edit <ChevronRight size={18}/></span></button><h2 className="text-xl font-bold mt-3 break-words">{String(draft.form.title || 'Your item')}</h2><p className="text-sm text-muted-foreground">{[draft.form.category, draft.form.condition].filter(Boolean).map(String).join(' · ')}</p></div>
         <div className="space-y-3"><button type="button" className="flip-price" onClick={() => open('pricing')}><Tag size={24}/><span><small>{price.actual === null ? 'Suggested selling price' : 'Selling price'}</small><strong>{(price.actual ?? price.suggested) === null ? 'Set price' : formatCurrency((price.actual ?? price.suggested)!)}</strong></span><ChevronRight size={20}/></button>
         {missing && <button type="button" className="flip-advice" onClick={() => open(!conditionReady || !specificsReady ? 'specifics' : !draft.photos.length ? 'photos' : !String(draft.form.title || '').trim() ? 'description' : 'pricing')}><Sparkles size={20}/><span>{missing}</span><ChevronRight size={18}/></button>}
+        {draft.form.id && draft.form.marketplace_id === 'ebay' && <div className="space-y-2 rounded-xl border border-border p-3">
+          <label htmlFor="manual-listing-status" className="block font-semibold">SWISH listing status</label>
+          <select id="manual-listing-status" className="input-field"
+            value={draft.form.status === 'live' ? 'active' : String(draft.form.status || '')}
+            disabled={actions.busy || upload.busy || draft.dirty}
+            onChange={event => {
+              const next = event.target.value;
+              if (next === 'draft' || next === 'active' || next === 'sold' || next === 'ended') void actions.setManualStatus(next);
+            }}>
+            <option value="" disabled>Choose status</option>
+            {!['draft', 'active', 'live', 'sold', 'ended'].includes(String(draft.form.status || '')) &&
+              Boolean(draft.form.status) && <option value={String(draft.form.status)} disabled>{String(draft.form.status)}</option>}
+            <option value="draft" disabled={Boolean(draft.form.external_listing_id)}>Draft</option>
+            <option value="active">Live</option>
+            <option value="sold">Sold</option>
+            <option value="ended">Ended</option>
+          </select>
+          <p className="text-sm text-muted-foreground">{actions.changingStatus ? 'Saving status…' : draft.dirty ? 'Save your edits to change status.' : 'Updates the status in SWISH only.'}</p>
+        </div>}
         <div className="space-y-1">{rows.map(row)}<Link className="flip-row" to={`/inventory/${draft.form.item_id}`}><ListChecks size={22}/><span><strong>Advanced details</strong><small>Inventory, cost and specialist information</small></span><ChevronRight size={20}/></Link></div>
         <button type="button" className="flip-primary" disabled={!canSubmit} onClick={() => setConfirming(true)}>{actions.publishing ? 'Publishing…' : 'List on eBay'}</button>
         {!canSubmit && <p className="text-sm text-muted-foreground">{actions.reason || missing || 'Wait for the listing checks to finish, or save your draft.'}</p>}

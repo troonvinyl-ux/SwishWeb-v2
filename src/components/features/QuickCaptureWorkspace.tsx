@@ -34,7 +34,7 @@ export default function QuickCaptureWorkspace({ nicheId }: QuickCaptureWorkspace
     const missingViews = evidence.slots.filter(slot => slot.required && !session.photos.some(photo => photo.slotId === slot.id)).map(slot => slot.label);
     const answers = { notes: session.notes, studio_missing_views: missingViews.join(', ') }; form.reset(answers);
     setHandedOff(true);
-    if (nicheId !== 'coins' || coinDraftReadiness(answers, session.photos).ready) void flow.next({ photos: session.photos.map(photo => ({ ...photo, preview: '' })), specialistId: evidence.specialistId, mode: evidence.mode, answers });
+    if (nicheId !== 'coins' || coinDraftReadiness(answers, session.photos.map(photo => ({ ...photo, preview: '' }))).ready) void flow.next({ photos: session.photos.map(photo => ({ ...photo, preview: '' })), specialistId: evidence.specialistId, mode: evidence.mode, answers });
   });
   useEffect(() => { if (flow.draft) navigate(`/listings/${flow.draft.listingId}/edit`, { replace: true }); }, [flow.draft?.listingId, navigate]);
   const next = form.handleSubmit(answers => { if (photos.length && (!coinReadiness || coinReadiness.ready)) void flow.next({ photos, specialistId: evidence.specialistId, mode: evidence.mode, answers: { ...answers, studio_missing_views: missing.map(slot => slot.label).join(', ') }, lead: evidence.lead }); });
