@@ -322,3 +322,10 @@
 .flip-primary{background:#28c5b7;color:#091e28}.flip-secondary{border:1px solid #bccdd4;color:#fff}
 .flip-primary:disabled,.flip-secondary:disabled{opacity:.5;cursor:not-allowed}
 .flip-listing button:focus-visible,.flip-listing a:focus-visible{outline:2px solid #ffcd69;outline-offset:3px}
+
+/* Quick-list must fit the phone viewport; photo rail scrolls independently. */
+.quick-capture,.quick-capture>*,.quick-capture .swish-card,.quick-capture .capture-camera:not(.is-expanded){min-width:0;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.quick-capture input,.quick-capture select,.quick-capture textarea{min-width:0;max-width:100%}
+.quick-capture .capture-methods{display:flex;flex-wrap:wrap;gap:8px}
+.quick-capture .capture-camera:not(.is-expanded){width:100%;overflow:hidden}
+.quick-capture .capture-camera:not(.is-expanded) .studio-guidance{min-width:0;max-width:100%}

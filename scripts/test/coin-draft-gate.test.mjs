@@ -28,17 +28,18 @@ const { coinItemDraftReadiness, createCoinListingDraft } = load('src/lib/coinLis
 const faces = [{ slotId: 'obverse' }, { slotId: 'reverse' }];
 const complete = { numista_number: 'N#438449', weight: '28.28', diameter: '38.61' };
 
-test('coin drafts require a seller-entered Numista number before the shared draft route', () => {
+test('coin drafts accept both faces without a manually entered Numista number', () => {
   const missing = coinDraftReadiness({ ...complete, numista_number: '' }, faces);
-  assert.equal(missing.ready, false);
-  assert.match(missing.message, /Numista N#/);
+  assert.equal(missing.ready, true);
+  assert.equal(missing.typeId, null);
+  assert.equal(assertCoinDraftReady({}, faces), null);
   assert.throws(() => assertCoinDraftReady({ ...complete, numista_number: '438449?' }, faces), /Numista N#/);
 });
 
-test('coin drafts require both original faces and positive measured weight and diameter', () => {
+test('coin drafts require both original faces and validate supplied measurements', () => {
   assert.match(coinDraftReadiness(complete, [{ slotId: 'obverse' }]).message, /obverse and reverse/);
   assert.match(coinDraftReadiness({ ...complete, weight: '0' }, faces).message, /weight/);
-  assert.match(coinDraftReadiness({ ...complete, diameter: '' }, faces).message, /diameter/);
+  assert.equal(coinDraftReadiness({ ...complete, diameter: '' }, faces).ready, true);
   assert.equal(assertCoinDraftReady(complete, faces), 438449);
 });
 
@@ -95,7 +96,7 @@ test('saved original media is accepted as both faces when an older item has no n
   assert.deepEqual(coinItemDraftReadiness(stored), { ready: true, typeId: 438449 });
 });
 
-test('coin preparation blocks before identification and draft creation when Numista evidence is incomplete', () => {
+test('coin preparation validates supplied references but allows photo-first identification', () => {
   const flow = readFileSync('src/lib/quickCaptureFlow.ts', 'utf8');
   const persistence = readFileSync('src/lib/capturePersistence.ts', 'utf8');
   const workspace = readFileSync('src/components/features/QuickCaptureWorkspace.tsx', 'utf8');

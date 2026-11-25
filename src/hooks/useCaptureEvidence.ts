@@ -15,10 +15,9 @@ export function useCaptureEvidence(nicheId: SwishNicheId, sessionId: string, loc
   const photosRef = useRef(photos); photosRef.current = photos;
   const form = useForm<Record<string, string>>({ resolver: zodResolver(z.record(z.string().max(2000, 'Shorten this observation.')).superRefine((values, ctx) => {
     const typeId = parseNumistaNumber(values.numista_number);
-    if (nicheId === 'coins' && !typeId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['numista_number'], message: 'Enter a valid Numista N# or coin catalogue URL before pulling a draft.' });
-    else if (values.numista_number && !typeId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['numista_number'], message: 'Enter a valid Numista N# or coin catalogue URL.' });
-    if (nicheId === 'coins' && !(Number(values.weight) > 0)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['weight'], message: 'Enter the actual coin weight in grams.' });
-    if (nicheId === 'coins' && !(Number(values.diameter) > 0)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['diameter'], message: 'Enter the actual coin diameter in millimetres.' });
+    if (values.numista_number && !typeId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['numista_number'], message: 'Enter a valid Numista N# or coin catalogue URL.' });
+    if (nicheId === 'coins' && values.weight?.trim() && !(Number(values.weight) > 0)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['weight'], message: 'Enter the actual coin weight in grams.' });
+    if (nicheId === 'coins' && values.diameter?.trim() && !(Number(values.diameter) > 0)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['diameter'], message: 'Enter the actual coin diameter in millimetres.' });
   })), defaultValues: {} });
   const profile = useQuery({ queryKey: ['native_capture_profile', nicheId, specialistId], queryFn: () => loadCaptureProfile(nicheId, specialistId), staleTime: Infinity, retry: false });
   const discCount = form.watch('observed_disc_count') || '1';
