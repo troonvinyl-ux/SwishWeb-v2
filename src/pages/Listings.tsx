@@ -1,109 +1,16 @@
-import { useState } from 'react';
-import { useTable } from '@/hooks/useSupabaseQuery';
-import { formatCurrency, formatDate, statusVariant, truncate } from '@/lib/utils';
-import { Tag, Plus, RefreshCw, Search, ExternalLink } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
-import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
-import { ListingStatusAction, InventoryPriceAction } from '@/components/features/InventoryListingActions';
-import { asRecord } from '@/lib/itemPhotos';
-import type { InventoryEntry } from '@/lib/inventoryNative';
-
+import { Search, RefreshCw, Camera, Tag, AlertCircle } from 'lucide-react';
+import { useListingCollection } from '@/hooks/useListingCollection';
+import { LISTING_TABS } from '@/lib/listingPresentation';
+import { describeBackendFailure } from '@/lib/backendAvailability';
+import ListingCollectionCard from '@/components/features/ListingCollectionCard';
+import '@/components/features/listingCollection.css';
 export default function Listings() {
-  const qc = useQueryClient();
-  const [search, setSearch] = useState('');
-  const { tenantId, isLoading: tenantLoading } = useCurrentTenantId();
-  const niche = getActiveNicheId();
-  const specialistIds = getSpecialistIdsForNiche(niche);
-
-  const { data, isLoading, error } = useTable('listings', {
-    select: '*, items!inner(*)',
-    allPages: true,
-    order: { column: 'created_at', ascending: false },
-    search: search ? { column: 'title', query: search } : undefined,
-    filter: { tenant_id: tenantId, marketplace_id: 'ebay' },
-    inFilter: { 'items.specialist_id': specialistIds },
-    enabled: Boolean(tenantId) && specialistIds.length > 0,
-  });
-
-  const items = (data || []) as Record<string, unknown>[];
-
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Listings</h1>
-          <p className="page-subtitle">{items.length} listings</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => qc.invalidateQueries({ queryKey: ['listings'] })} className="btn-ghost"><RefreshCw className="w-3.5 h-3.5" /></button>
-          <Link to="/listings/new" className="btn-primary"><Plus className="w-3.5 h-3.5" />New Listing</Link>
-        </div>
-      </div>
-
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…" className="input-field pl-8" />
-        </div>
-      </div>
-
-      <div className="swish-card overflow-hidden">
-        {isLoading || tenantLoading ? (
-          <div className="p-8 text-center text-muted-foreground text-sm">Loading listings…</div>
-        ) : error ? (
-          <div className="p-8 text-center text-destructive text-sm">{(error as Error).message}</div>
-        ) : items.length === 0 ? (
-          <div className="p-12 text-center">
-            <Tag className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground text-sm">No listings found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="tbl">
-              <thead><tr>
-                <th>Title</th><th>Platform</th><th>Status</th>
-                <th className="text-right">Price</th><th>Views</th><th>Watchers</th>
-                <th>Listed</th><th></th>
-              </tr></thead>
-              <tbody>
-                {items.map(l => (
-                  <tr key={l.id as string}>
-                    <td>
-                      <div className="font-medium text-xs">{truncate((l.title || 'Untitled') as string, 45)}</div>
-                      {l.external_listing_id && <div className="text-xs text-muted-foreground font-mono">eBay {String(l.external_listing_id)}</div>}
-                    </td>
-                    <td className="text-xs capitalize">eBay</td>
-                    <td>{l.status ? <span className={statusVariant(l.status as string)}>{l.status as string}</span> : '—'}</td>
-                    <td className="text-right text-xs font-semibold swish-gold">{formatCurrency(l.price as number)}</td>
-                    <td className="text-xs text-muted-foreground">{(l.views ?? '—') as number}</td>
-                    <td className="text-xs text-muted-foreground">{(l.watchers ?? '—') as number}</td>
-                    <td className="text-xs text-muted-foreground">{formatDate(l.created_at as string)}</td>
-                    <td>
-                      <div className="flex flex-wrap items-center gap-1">
-                        <Link to={`/listings/${l.id}`} className="btn-secondary py-1 px-2 text-xs">View listing</Link>
-                        <Link to={`/listings/${l.id}/edit`} className="btn-ghost py-1 px-2 text-xs">Edit</Link>
-                        {tenantId && <ListingStatusAction listing={l} tenantId={tenantId} nicheId={niche}/>}
-                        {tenantId && ['active', 'live'].includes(String(l.status || '').toLowerCase()) && (() => {
-                          const item = asRecord(l.items);
-                          const entry: InventoryEntry = { id: String(l.item_id || item.id || ''), item, listing: l,
-                            tab: 'live', sortAt: String(l.created_at || '') };
-                          return <InventoryPriceAction entry={entry} tenantId={tenantId} nicheId={niche}/>;
-                        })()}
-                        {/^\d{6,20}$/.test(String(l.external_listing_id || '')) &&
-                          <a href={'https://www.ebay.co.uk/itm/' + String(l.external_listing_id)}
-                            target="_blank" rel="noopener noreferrer" aria-label="Open linked eBay item" className="btn-ghost py-1 px-2">
-                            <ExternalLink className="w-3 h-3"/></a>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const collection = useListingCollection();
+  return <div className="listing-collection-page space-y-4">
+    <header className="listing-collection-header"><div><p className="text-sm font-semibold uppercase tracking-wider text-primary">Your selling workspace</p><h1 className="mt-1 text-2xl font-bold">Listings</h1><p className="mt-2 text-muted-foreground">Review drafts and follow the existing eBay listing through to sale.</p></div><div className="flex shrink-0 flex-wrap gap-2"><button type="button" className="btn-secondary min-h-11 min-w-11" aria-label="Refresh saved listings" disabled={collection.refreshing} onClick={() => void collection.refresh()}><RefreshCw size={20} /></button><Link to={`/studio/${collection.nicheId}`} className="btn-primary min-h-11"><Camera size={20} />Scan to list</Link></div></header>
+    <nav aria-label="Listing status filters" className="listing-collection-tabs">{LISTING_TABS.map(entry => <button type="button" key={entry.id} aria-current={collection.tab === entry.id ? 'page' : undefined} className={collection.tab === entry.id ? 'is-selected' : ''} onClick={() => collection.change('tab', entry.id)}>{entry.label}<span>{collection.loading || collection.error ? '—' : collection.counts[entry.id]}</span></button>)}</nav>
+    <div><label htmlFor="listing-search" className="mb-2 block font-medium">Search your listings</label><div className="relative"><Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" /><input id="listing-search" type="search" className="input-field min-h-12 pl-12 text-base" value={collection.search} onChange={event => collection.change('search', event.target.value)} placeholder="Title or eBay item number" /></div></div>
+    {collection.loading ? <section role="status" className="swish-card p-8 text-muted-foreground">Opening your saved listings…</section> : collection.error ? <section role="alert" className="swish-card space-y-4 p-6"><h2 className="flex items-center gap-2 text-lg font-semibold"><AlertCircle size={22} />Listings temporarily unavailable</h2><p>{describeBackendFailure(collection.error)}</p><button type="button" className="btn-secondary min-h-11" onClick={() => void collection.refresh()}>Retry saved listings</button></section> : collection.visible.length ? <><p role="status" className="text-sm text-muted-foreground">{collection.visible.length} {collection.visible.length === 1 ? 'listing' : 'listings'} · Saved SWISH state; use the listing’s refresh action to verify eBay</p><section className="listing-collection-grid" aria-label="Your saved listings">{collection.visible.map(listing => <ListingCollectionCard key={String(listing.id)} listing={listing} />)}</section></> : <section className="swish-card space-y-3 p-8 text-center"><Tag size={32} className="mx-auto text-primary" /><h2 className="text-xl font-semibold">{collection.search ? 'No matching listings' : collection.tab === 'draft' ? 'No drafts waiting for review' : 'No listings in this view'}</h2><p className="text-muted-foreground">{collection.search ? 'Try a different title or eBay item number.' : 'Start with a photo, then review the prepared title, price and item details before publishing.'}</p>{collection.search && <button type="button" className="btn-secondary min-h-11" onClick={() => collection.change('search', '')}>Clear search</button>}</section>}
+  </div>;
 }

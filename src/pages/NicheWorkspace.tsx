@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, Bike, Camera, CheckCircle2, Coins, Gem, Grid2X2, Package, Palette, ScanLine, Shirt, ShoppingCart, Smartphone, Sparkles, Store, Tag, Trophy, Wrench } from 'lucide-react';
+import { ArrowRight, Bike, Camera, CheckCircle2, Coins, Gem, Grid2X2, Layers, Package, Palette, ScanLine, Shirt, ShoppingCart, Smartphone, Sparkles, Store, Tag, Trophy, Wrench } from 'lucide-react';
 import { useNicheAccess } from '@/hooks/useNicheAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import NicheAccessStatus from '@/components/features/NicheAccessStatus';
@@ -38,6 +38,7 @@ const CONFIGS: Record<SwishNicheId, WorkspaceConfig> = {
     id: 'coins', name: 'SWISH Coins', shortName: 'Coins', headline: 'Know what you hold before you list it.', detail: 'Ancient · Islamic silver · world · banknotes · gold', accent: '#F5C842', artwork: coinArtwork, icon: Coins, scan: 'Scan Coin',
     actions: [
       { label: 'Scan Coin', detail: 'Capture a coin and check specialist references.', icon: ScanLine, to: '/identify' },
+      { label: 'Rapid Listing', detail: "Continuous coin capture · Collector's Envelope Mode · persistent batch review", icon: Layers, to: '/rapid/coins' },
       { label: 'My Coin Inventory', detail: 'Review saved coins and references.', icon: Package, to: '/inventory' },
       { label: 'eBay Hub', detail: 'Create, publish and monitor listings.', icon: Store, to: '/ebay' },
       { label: 'Orders', detail: 'Manage sales and dispatch.', icon: ShoppingCart, to: '/orders' },
@@ -142,13 +143,14 @@ export default function NicheWorkspace() {
   }
   return (
     <div className="native-workspace" style={{ '--workspace-accent': config.accent } as React.CSSProperties}>
-      <Link to={`/scan/${config.id}`} className="native-workspace-quick-list"><span className="native-workspace-quick-icon"><Camera /></span><span className="min-w-0 flex-1"><strong>Quick List · {config.scan}</strong><small>Capture, research and prepare a private eBay draft</small></span><ArrowRight className="native-workspace-quick-arrow" /></Link>
+      <Link to={`/studio/${config.id}`} className="native-workspace-quick-list"><span className="native-workspace-quick-icon"><Camera /></span><span className="min-w-0 flex-1"><strong>Quick List · {config.scan}</strong><small>Capture, research and prepare a private eBay draft</small></span><ArrowRight className="native-workspace-quick-arrow" /></Link>
+      {config.id === 'coins' && <Link to="/rapid/coins" className="native-workspace-quick-list"><span className="native-workspace-quick-icon"><Layers /></span><span className="min-w-0 flex-1"><strong>Rapid Listing · Collector’s Envelope Mode</strong><small>Capture a collection continuously; review each honest draft when ready</small></span><ArrowRight className="native-workspace-quick-arrow" /></Link>}
       <header className="native-workspace-heading"><span className="native-workspace-heading-icon"><Icon /></span><span className="min-w-0"><small>SWISH / SPECIALIST WORKSPACE</small><h1>{config.name}</h1></span><Link to="/niches" className="native-workspace-switch">Switch <span>↗</span></Link></header>
       <section className="native-workspace-banner"><img src={config.artwork} alt="" aria-hidden="true" /><div className="native-workspace-banner-overlay" /><div className="native-workspace-banner-copy"><p>{config.headline}</p><span>{config.detail}</span></div></section>
       <section className="native-workspace-metrics" aria-label={`${config.shortName} workspace summary`}><div><strong>{number(inventory.data)}</strong><span>Inventory</span></div><div><strong>{number(live)}</strong><span>Live</span></div><div><strong>{number(sold.data)}</strong><span>Sold</span></div></section>
       {metricsError && <div role="alert" className="native-workspace-guidance"><CheckCircle2 /><span><strong>Workspace totals are temporarily unavailable</strong><small>{metricsError instanceof Error ? metricsError.message : 'We could not load live marketplace data.'} <button type="button" onClick={() => void Promise.all([liveListings.refetch(), inventory.refetch(), sold.refetch()])} className="underline">Retry</button></small></span></div>}
       <div className="native-workspace-section-heading"><span>YOUR {config.shortName.toUpperCase()} WORKSPACE</span><p>Choose what you want to do next.</p></div>
-      <section className="native-workspace-actions" aria-label={`${config.shortName} tools`}>{config.actions.map(action => { const ActionIcon = action.icon; return <Link key={action.label} to={action.to === '/identify' ? `/scan/${config.id}` : action.to} className="native-workspace-action"><span className="native-workspace-action-icon"><ActionIcon /></span><span className="native-workspace-action-copy"><strong>{action.label}</strong><small>{action.detail}</small></span><ArrowRight className="native-workspace-action-arrow" /></Link>; })}</section>
+      <section className="native-workspace-actions" aria-label={`${config.shortName} tools`}>{config.actions.map(action => { const ActionIcon = action.icon; return <Link key={action.label} to={action.to === '/identify' ? `/studio/${config.id}` : action.to} className="native-workspace-action"><span className="native-workspace-action-icon"><ActionIcon /></span><span className="native-workspace-action-copy"><strong>{action.label}</strong><small>{action.detail}</small></span><ArrowRight className="native-workspace-action-arrow" /></Link>; })}</section>
       <aside className="native-workspace-guidance"><CheckCircle2 /><span><strong>Capture with confidence</strong><small>{config.guidance}</small></span></aside>
     </div>
   );

@@ -6,7 +6,7 @@ import { captureNumistaReference, parseNumistaNumber, prepareNumistaFaces } from
 import { enrichScannedItemForListing } from '@/lib/scanListingEnrichment';
 import { scanListingAttributes, enrichedScanListing, scanPreparationWarnings } from '@/lib/scanListingFields';
 import type { CaptureCheckpoint, CaptureDraft, CapturePhoto, CaptureScope } from '@/types/capture';
-interface PrepareCaptureOptions { scope: CaptureScope; photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; checkpoint: CaptureCheckpoint; onCheckpoint: (value: CaptureCheckpoint) => void; onProgress: (message: string) => void; lead?: Record<string, unknown> | null; }
+interface PrepareCaptureOptions { scope: CaptureScope; photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; checkpoint: CaptureCheckpoint; onCheckpoint: (value: CaptureCheckpoint) => void | Promise<void>; onProgress: (message: string) => void; lead?: Record<string, unknown> | null; stableItemId?: string; buyerSlots?: string[]; beforeItem?: () => Promise<void>; beforeDraft?: () => Promise<void>; transformGenerated?: (value: Record<string, unknown>) => Record<string, unknown>; }
 async function identifyCapture(options: PrepareCaptureOptions): Promise<Record<string, unknown>> {
   const { scope, photos, specialistId, mode, answers } = options;
   const prepared = await prepareScanPhotos(photos);
@@ -37,32 +37,34 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   if (scope.nicheId !== 'coins' && answers.numista_number && !parseNumistaNumber(answers.numista_number)) throw new Error('Enter a valid Numista N# before continuing.');
   const savedAnswers = numistaTypeId ? canonicalCoinReferenceAnswers(answers, numistaTypeId) : answers;
   const checkpoint: CaptureCheckpoint = { ...options.checkpoint };
-  const keep = (value: CaptureCheckpoint) => { Object.assign(checkpoint, value); onCheckpoint({ ...checkpoint }); };
-  if (!checkpoint.identification) { onProgress('Identifying the photographed evidence…'); keep({ identification: await identifyCapture(options) }); }
+  const keep = async (value: CaptureCheckpoint) => { Object.assign(checkpoint, value); await onCheckpoint({ ...checkpoint }); };
+  if (!checkpoint.identification) { onProgress('Identifying the photographed evidence…'); await keep({ identification: await identifyCapture(options) }); }
   const result = checkpoint.identification!;
-  if (!checkpoint.itemId) { onProgress('Saving this physical item…'); keep({ itemId: await persistCaptureItem(scope, result, specialistId, savedAnswers, mode) }); }
+  if (!checkpoint.itemId) { onProgress('Saving this physical item…'); await options.beforeItem?.(); await keep({ itemId: await persistCaptureItem(scope, result, specialistId, savedAnswers, mode, options.stableItemId) }); }
   onProgress('Attaching permanent original photographs…');
-  const urls = await persistCapturePhotos(scope, checkpoint.itemId!, photos, checkpoint.photos ?? {}, value => keep({ photos: value }));
+  const allUrls = await persistCapturePhotos(scope, checkpoint.itemId!, photos, checkpoint.photos ?? {}, value => keep({ photos: value }));
+  const urls = options.buyerSlots ? photos.flatMap((photo, index) => options.buyerSlots!.includes(photo.slotId) ? [allUrls[index]] : []) : allUrls;
   if (!checkpoint.preparation && !checkpoint.listingId) {
     onProgress('Researching market value, eBay category and item specifics…');
     const preparation = await enrichScannedItemForListing({ client: scope.client, userId: scope.userId, tenantId: scope.tenantId, nicheId: scope.nicheId,
       itemId: checkpoint.itemId!, specialistId, title: captureText(result.canonicalTitle ?? result.title), attributes: scanListingAttributes(result, savedAnswers),
       condition: savedAnswers.condition || '', imageUrls: urls, isCurrent: scope.isCurrent });
-    await assertCaptureScope(scope); keep({ preparation });
+    await assertCaptureScope(scope); await keep({ preparation });
   }
   if (!checkpoint.generated && !checkpoint.listingId) {
     onProgress('Preparing listing title and description…');
     const response = await captureRequest(scope, 'swish-list-generate', { item_id: checkpoint.itemId, tenant_id: scope.tenantId, marketplace_id: 'ebay' });
     const generated = captureRecord(response.listing);
     if (!captureText(generated.title)) throw new Error('Item and photos saved, but listing generation returned no draft. Retry preparation on this item.');
-    keep({ generated: checkpoint.preparation ? enrichedScanListing(generated, checkpoint.preparation) : generated });
+    const enriched = checkpoint.preparation ? enrichedScanListing(generated, checkpoint.preparation) : generated;
+    await keep({ generated: options.transformGenerated ? options.transformGenerated(enriched) : enriched });
   }
   const generated = checkpoint.generated ?? {};
   if (!checkpoint.listingId) {
-    onProgress('Saving the listing draft for your review…'); await assertCaptureScope(scope);
+    onProgress('Saving the listing draft for your review…'); await assertCaptureScope(scope); await options.beforeDraft?.();
     const saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: checkpoint.itemId, p_marketplace_id: 'ebay', p_listing: generated, p_shipping_cost: 0, p_category_id: checkpoint.preparation?.category?.id || null });
     if (saved.error || typeof saved.data !== 'string' || !saved.data) throw new Error(saved.error?.message ?? 'Draft creation was not confirmed. Inspect saved inventory before continuing.');
-    keep({ listingId: saved.data });
+    await keep({ listingId: saved.data });
   }
   await assertCaptureScope(scope);
   const read = await scope.client.from('listings').select('id,title,description,price,external_listing_id,publish_claim_id,status').eq('id', checkpoint.listingId!).eq('tenant_id', scope.tenantId).single();
