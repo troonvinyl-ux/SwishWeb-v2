@@ -21,6 +21,7 @@ import PublicationStatus from '@/components/features/PublicationStatus';
 import ListingPublishFeedback from '@/components/features/ListingPublishFeedback';
 import ListingEditorPhotos from '@/components/features/ListingEditorPhotos';
 import ListingTitleFields from '@/components/features/ListingTitleFields';
+import ListingDeliveryPolicy from '@/components/features/ListingDeliveryPolicy';
 import ListingSaleFields from '@/components/features/ListingSaleFields';
 import ListingCategoryFields from '@/components/features/ListingCategoryFields';
 import EbayItemSpecifics from '@/components/features/EbayItemSpecifics';
@@ -60,7 +61,7 @@ export default function ListingEditor() {
     { key: 'description', label: 'Title & description', hint: draft.form.title ? 'View or edit' : 'Add a title', Icon: FileText },
     { key: 'specifics', label: 'Listing specifics', hint: conditionReady && specificsReady ? 'Review item details' : 'Check required details', Icon: ListChecks },
     { key: 'pricing', label: 'Pricing', hint: price.actual === null ? 'Set your price' : formatCurrency(price.actual), Icon: Tag },
-    { key: 'delivery', label: 'Delivery', hint: 'Check saved eBay policies', Icon: Truck },
+    { key: 'delivery', label: 'Delivery', hint: 'View selected postage and collection', Icon: Truck },
     { key: 'research', label: 'Research & valuation', hint: 'More information', Icon: BarChart3 },
   ];
   const row = (entry: typeof rows[number]) => <button key={entry.key} type="button" className="flip-row" onClick={() => open(entry.key)}><entry.Icon size={22}/><span><strong>{entry.label}</strong><small>{entry.hint}</small></span><ChevronRight size={20}/></button>;
@@ -104,7 +105,7 @@ export default function ListingEditor() {
       <ListingSaleFields form={draft.form} item={draft.item} onChange={draft.change} disabled={disabled} section="pricing" />
       <button className="flip-row" type="button" onClick={() => open('research')}><BarChart3 size={20}/><span><strong>Market research</strong><small>View pricing evidence</small></span><ChevronRight size={20}/></button>
     </div>}
-    {section === 'delivery' && <div><ListingSaleFields form={draft.form} item={draft.item} onChange={draft.change} disabled={disabled} section="delivery" /></div>}
+    {section === 'delivery' && <div><ListingSaleFields form={draft.form} item={draft.item} onChange={draft.change} disabled={disabled} section="delivery" deliveryPolicy={<ListingDeliveryPolicy userId={user?.id} tenantId={tenant.tenantId} nicheId={nicheId} externalId={String(draft.form.external_listing_id || '')} />} /></div>}
     <div hidden={section !== 'research'}>    <ListingMarketSummary item={draft.item} userId={user?.id} tenantId={tenant.tenantId} nicheId={nicheId} disabled={disabled} onApply={price => draft.change('price', price)} />
 </div>
     {section === 'preview' && <section className="swish-card p-4 space-y-3">{draft.photos[0] && <img src={draft.photos[0]} alt="Listing cover" className="w-full max-h-72 object-contain"/>}<h2 className="text-xl font-bold">{String(draft.form.title || '')}</h2><p className="text-2xl font-bold">{price.actual === null ? 'Price not set' : formatCurrency(price.actual)}</p><p>{String(draft.form.condition || '')}</p><p className="whitespace-pre-wrap break-words">{String(draft.form.description || '')}</p><p className="text-sm text-muted-foreground">Draft preview · final buyer charges and delivery are confirmed by eBay.</p></section>}
