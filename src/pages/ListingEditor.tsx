@@ -3,7 +3,7 @@ import { Image, FileText, ListChecks, Truck, Tag, ChevronRight, Sparkles, BarCha
 import { formatCurrency } from '@/lib/utils';
 import { itemPricing } from '@/lib/itemPricing';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useListingEditorDraft } from '@/hooks/useListingEditorDraft';
@@ -17,6 +17,10 @@ import { getActiveNicheId } from '@/lib/niche';
 import { useEbayCategoryMetadata } from '@/hooks/useEbayCategoryMetadata';
 import type { MusicValues } from '@/types/music';
 import ListingMarketSummary from '@/components/features/ListingMarketSummary';
+import ListingReadySummary from '@/components/features/ListingReadySummary';
+import ListingQuickPrice from '@/components/features/ListingQuickPrice';
+import ListingPublishConfirmation from '@/components/features/ListingPublishConfirmation';
+import { listingDescriptionText } from '@/lib/listingPresentation';
 import PublicationStatus from '@/components/features/PublicationStatus';
 import ListingPublishFeedback from '@/components/features/ListingPublishFeedback';
 import ListingEditorPhotos from '@/components/features/ListingEditorPhotos';
@@ -30,7 +34,7 @@ import { supportedEbayCondition, vinylRecordConditionPolicy } from '@/lib/ebayMu
 
 export default function ListingEditor() {
   const { id } = useParams<{ id: string }>(), { user } = useAuth(), tenant = useCurrentTenantId();
-  const [params, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams(), navigate = useNavigate();
   const requestedSection = params.get('section') || 'overview';
   const section = ['overview','description','specifics','pricing','delivery','photos','research','preview'].includes(requestedSection) ? requestedSection : 'overview';
   const open = (next: string) => { const p = new URLSearchParams(params); if (next === 'overview') p.delete('section'); else p.set('section', next); setParams(p, { replace: true }); };
@@ -55,9 +59,20 @@ export default function ListingEditor() {
   if (tenant.isLoading || draft.loading) return <div role="status" className="swish-card p-6 text-muted-foreground">Loading the shared SWISH listing…</div>;
   if (tenant.error || draft.error) return <section role="alert" className="swish-card space-y-4 p-5"><h1 className="text-xl font-semibold">Listing unavailable</h1><p>{tenant.error?.message || draft.error?.message}</p><Link to="/listings" className="btn-secondary">Back to listings</Link></section>;
   const selectedSpecifics = draft.form.item_specifics && typeof draft.form.item_specifics === 'object' ? draft.form.item_specifics as Record<string, unknown> : {};
-  const specificsReady = !metadata.data?.aspectError && (metadata.data?.aspects || []).every(aspect => !aspect.required || (typeof selectedSpecifics[aspect.name] === 'string' && String(selectedSpecifics[aspect.name]).trim() && (!aspect.selectionOnly || aspect.values.includes(String(selectedSpecifics[aspect.name])))));
+  const specificsReady = Boolean(metadata.data) && !metadata.data?.aspectError && (metadata.data?.aspects || []).every(aspect => !aspect.required || (typeof selectedSpecifics[aspect.name] === 'string' && String(selectedSpecifics[aspect.name]).trim() && (!aspect.selectionOnly || aspect.values.includes(String(selectedSpecifics[aspect.name])))));
   const price = itemPricing(draft.item, draft.form);
   const active = ['active', 'live'].includes(String(draft.form.status));
+  const auction = draft.form.listing_type === 'Chinese';
+  const sellingPrice = auction ? Number(draft.form.start_price || draft.form.price) : price.actual;
+  const hasPrice = sellingPrice !== null && Number.isFinite(sellingPrice) && sellingPrice > 0;
+  const resolveHelp = (target: string) => {
+    if (target === 'status') { void actions.checkStatus(); return; }
+    if (target === 'connection') { navigate('/ebay'); return; }
+    if (target === 'account') { navigate('/ebay/account'); return; }
+    if (target === 'inventory') { navigate(`/inventory/${draft.form.item_id}`); return; }
+    open(target === 'delivery' ? 'delivery' : target);
+    if (target === 'specifics') void metadata.refetch();
+  };
   const rows = [
     { key: 'description', label: 'Title & description', hint: draft.form.title ? 'View or edit' : 'Add a title', Icon: FileText },
     { key: 'specifics', label: 'Listing specifics', hint: conditionReady && specificsReady ? 'Review item details' : 'Check required details', Icon: ListChecks },
@@ -66,12 +81,12 @@ export default function ListingEditor() {
     { key: 'research', label: 'Research & valuation', hint: 'More information', Icon: BarChart3 },
   ];
   const row = (entry: typeof rows[number]) => <button key={entry.key} type="button" className="flip-row" onClick={() => open(entry.key)}><entry.Icon size={22}/><span><strong>{entry.label}</strong><small>{entry.hint}</small></span><ChevronRight size={20}/></button>;
-  const canSubmit = actions.canPublish && !upload.busy && !category.busy && conditionReady && specificsReady && draft.photos.length > 0 && Boolean(String(draft.form.title || '').trim()) && price.actual !== null;
-  const missing = !conditionReady || !specificsReady ? 'Check the category, condition and required item details.' : !draft.photos.length ? 'Add a listing photo.' : !String(draft.form.title || '').trim() ? 'Add a title.' : price.actual === null ? 'Set your selling price.' : '';
+  const canSubmit = actions.canPublish && !upload.busy && !category.busy && conditionReady && specificsReady && draft.photos.length > 0 && Boolean(String(draft.form.title || '').trim()) && hasPrice;
+  const missing = !conditionReady || !specificsReady ? 'Check the category, condition and required item details.' : !draft.photos.length ? 'Add a listing photo.' : !String(draft.form.title || '').trim() ? 'Add a title.' : !hasPrice ? 'Set your selling price.' : '';
   return <div className="flip-listing w-full min-w-0 max-w-4xl mx-auto space-y-4">
     <header className="flip-header"><Link to={`/listings/${id}`} className="btn-ghost" aria-label="Back to saved listing"><ArrowLeft size={22}/></Link><span className="flip-brand">SWISH<span>Flip</span></span><button type="button" className="btn-ghost" onClick={() => void actions.checkStatus()} disabled={actions.busy || !draft.form.id} aria-label="Refresh status"><RefreshCw size={20}/></button></header>
     <PublicationStatus reason={actions.reason} externalId={actions.publicationExternalId} refreshing={actions.checking} onRefresh={() => void actions.checkStatus()} />
-    <ListingPublishFeedback message={actions.error} />
+    <ListingPublishFeedback message={actions.error} help={actions.help} onResolve={resolveHelp} />
     {Boolean(draft.form.publish_claim_id) && !draft.form.external_listing_id &&
       <section key={id} className="swish-card space-y-3 p-4">
         <h2 className="font-semibold">Already live on eBay?</h2>
@@ -86,36 +101,18 @@ export default function ListingEditor() {
         </button>
       </section>}
     <div hidden={section !== 'overview'}>
-      <h1 className="flip-heading">{active ? 'Your listing is live!' : 'Ready to sell?'}</h1>
+      <h1 className="flip-heading">{active ? 'Your live listing' : 'Ready to list'}</h1><p className="mb-4 text-muted-foreground">{draft.dirty ? 'Unsaved changes · Review your edits before publishing' : active ? 'Saved eBay identity · Refresh to verify the marketplace state' : 'Saved draft · Review the actual item, price and delivery'}</p>
       <div className="flip-overview-grid">
-        <div><button type="button" className="flip-cover" onClick={() => open('photos')}>{draft.photos[0] ? <img src={draft.photos[0]} alt="Main listing photo"/> : <Image size={48}/>}<span><Image size={18}/>{draft.photos.length} photos · View or edit <ChevronRight size={18}/></span></button><h2 className="text-xl font-bold mt-3 break-words">{String(draft.form.title || 'Your item')}</h2><p className="text-sm text-muted-foreground">{[draft.form.category, draft.form.condition].filter(Boolean).map(String).join(' · ')}</p></div>
-        <div className="space-y-3"><button type="button" className="flip-price" onClick={() => open('pricing')}><Tag size={24}/><span><small>{price.actual === null ? 'Suggested selling price' : 'Selling price'}</small><strong>{(price.actual ?? price.suggested) === null ? 'Set price' : formatCurrency((price.actual ?? price.suggested)!)}</strong></span><ChevronRight size={20}/></button>
+        <ListingReadySummary form={draft.form} item={draft.item} photos={draft.photos} onOpen={open} />
+        <div className="space-y-3"><ListingQuickPrice value={auction ? draft.form.start_price || draft.form.price : draft.form.price} auction={auction} disabled={disabled} onChange={value => draft.change(auction ? 'start_price' : 'price', value)} onOpen={() => open('pricing')} />
         {missing && <button type="button" className="flip-advice" onClick={() => open(!conditionReady || !specificsReady ? 'specifics' : !draft.photos.length ? 'photos' : !String(draft.form.title || '').trim() ? 'description' : 'pricing')}><Sparkles size={20}/><span>{missing}</span><ChevronRight size={18}/></button>}
-        {draft.form.id && draft.form.marketplace_id === 'ebay' && <div className="space-y-2 rounded-xl border border-border p-3">
-          <label htmlFor="manual-listing-status" className="block font-semibold">SWISH listing status</label>
-          <select id="manual-listing-status" className="input-field"
-            value={draft.form.status === 'live' ? 'active' : String(draft.form.status || '')}
-            disabled={actions.busy || upload.busy || draft.dirty}
-            onChange={event => {
-              const next = event.target.value;
-              if (next === 'draft' || next === 'active' || next === 'sold' || next === 'ended') void actions.setManualStatus(next);
-            }}>
-            <option value="" disabled>Choose status</option>
-            {!['draft', 'active', 'live', 'sold', 'ended'].includes(String(draft.form.status || '')) &&
-              Boolean(draft.form.status) && <option value={String(draft.form.status)} disabled>{String(draft.form.status)}</option>}
-            <option value="draft" disabled={Boolean(draft.form.external_listing_id)}>Draft</option>
-            <option value="active">Live</option>
-            <option value="sold">Sold</option>
-            <option value="ended">Ended</option>
-          </select>
-          <p className="text-sm text-muted-foreground">{actions.changingStatus ? 'Saving status…' : draft.dirty ? 'Save your edits to change status.' : 'Updates the status in SWISH only.'}</p>
-        </div>}
+        {draft.form.id && draft.form.marketplace_id === 'ebay' && <section className="space-y-2 rounded-xl border border-border p-3"><h2 className="font-semibold">SWISH listing status · {active ? 'Live' : String(draft.form.status || 'Draft').replace(/_/g, ' ')}</h2><p className="text-sm text-muted-foreground">Marketplace status and stock are reconciled by the shared service, not changed locally.</p><button type="button" className="btn-secondary min-h-11" disabled={actions.busy} onClick={() => void actions.checkStatus()}>Refresh saved status</button></section>}
         <div className="space-y-1">{rows.map(row)}<Link className="flip-row" to={`/inventory/${draft.form.item_id}`}><ListChecks size={22}/><span><strong>Advanced details</strong><small>Inventory, cost and specialist information</small></span><ChevronRight size={20}/></Link></div>
-        <button type="button" className="flip-primary" disabled={!canSubmit} onClick={() => setConfirming(true)}>{actions.publishing ? 'Publishing…' : 'List on eBay'}</button>
-        {!canSubmit && <p className="text-sm text-muted-foreground">{actions.reason || missing || 'Wait for the listing checks to finish, or save your draft.'}</p>}
-        {confirming && canSubmit && <div className="flip-advice"><div className="space-y-2"><strong>Publish this listing to your connected eBay account?</strong><p className="text-sm">Check your price, photos, condition and delivery before confirming.</p><div className="flex gap-2 flex-wrap"><button className="btn-primary" type="button" onClick={() => { setConfirming(false); void actions.publish(); }}>Confirm publication</button><button className="btn-secondary" type="button" onClick={() => setConfirming(false)}>Cancel</button></div></div></div>}
+        {!publicationBlock(draft.form) && <button type="button" className="flip-primary" disabled={!canSubmit} onClick={() => setConfirming(true)}>{actions.publishing ? 'Publishing…' : 'List on eBay'}</button>}
+        {!canSubmit && !active && <p className="text-sm text-muted-foreground">{actions.reason || missing || 'Wait for the listing checks to finish, or save your draft.'}</p>}
+        <ListingPublishConfirmation open={confirming && canSubmit} onOpenChange={setConfirming} onConfirm={() => { setConfirming(false); void actions.publish(); }} />
         <button type="button" onClick={() => void actions.save()} disabled={disabled || !tenant.tenantId || !draft.form.id} className="flip-secondary">{actions.saving ? 'Saving…' : 'Save for later'}</button>
-        <p className="text-center text-sm text-muted-foreground">✦ Powered by SWISH AI</p></div>
+        <p className="text-center text-sm text-muted-foreground">Prepared with SWISH · Seller-reviewed before publication</p></div>
       </div>
     </div>
     {section !== 'overview' && <div className="flex items-center gap-3"><button type="button" className="btn-ghost" onClick={() => open('overview')}><ArrowLeft size={20}/> Overview</button><h1 className="flip-heading">{section === 'photos' ? 'Your photos' : section === 'preview' ? 'Preview listing' : rows.find(r => r.key === section)?.label || 'Listing details'}</h1></div>}
@@ -141,7 +138,7 @@ export default function ListingEditor() {
     {section === 'delivery' && <div><ListingSaleFields form={draft.form} item={draft.item} onChange={draft.change} disabled={disabled} section="delivery" deliveryPolicy={<ListingDeliveryPolicy userId={user?.id} tenantId={tenant.tenantId} nicheId={nicheId} externalId={String(draft.form.external_listing_id || '')} />} /></div>}
     <div hidden={section !== 'research'}>    <ListingMarketSummary item={draft.item} userId={user?.id} tenantId={tenant.tenantId} nicheId={nicheId} disabled={disabled} onApply={price => draft.change('price', price)} />
 </div>
-    {section === 'preview' && <section className="swish-card p-4 space-y-3">{draft.photos[0] && <img src={draft.photos[0]} alt="Listing cover" className="w-full max-h-72 object-contain"/>}<h2 className="text-xl font-bold">{String(draft.form.title || '')}</h2><p className="text-2xl font-bold">{price.actual === null ? 'Price not set' : formatCurrency(price.actual)}</p><p>{String(draft.form.condition || '')}</p><p className="whitespace-pre-wrap break-words">{String(draft.form.description || '')}</p><p className="text-sm text-muted-foreground">Draft preview · final buyer charges and delivery are confirmed by eBay.</p></section>}
+    {section === 'preview' && <section className="swish-card p-4 space-y-3">{draft.photos[0] && <img src={draft.photos[0]} alt="Listing cover" className="w-full max-h-72 object-contain"/>}<h2 className="text-xl font-bold">{String(draft.form.title || '')}</h2><p className="text-2xl font-bold">{price.actual === null ? 'Price not set' : formatCurrency(price.actual)}</p><p>{String(draft.form.condition || '')}</p><p className="whitespace-pre-wrap break-words">{listingDescriptionText(draft.form.description)}</p><p className="text-sm text-muted-foreground">Draft preview · final buyer charges and delivery are confirmed by eBay.</p></section>}
     {section !== 'overview' && <button type="button" className="flip-primary" disabled={disabled} onClick={async () => { if (!draft.dirty || await actions.save()) open('overview'); }}>Done · Save changes</button>}
   </div>;
 }

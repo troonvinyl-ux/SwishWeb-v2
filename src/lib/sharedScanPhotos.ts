@@ -11,6 +11,12 @@ export interface PreparedScanPhotos {
   slots: string[];
 }
 
+const analysisCopies = new WeakMap<File, Promise<string>>();
+function cachedPhoto(file: File): Promise<string> {
+  const existing = analysisCopies.get(file); if (existing) return existing;
+  const pending = preparePhoto(file).catch((cause: unknown) => { analysisCopies.delete(file); throw cause; });
+  analysisCopies.set(file, pending); return pending;
+}
 async function preparePhoto(file: File): Promise<string> {
   if (!file.size) throw new Error('The selected photo is empty');
   if (file.type && !file.type.startsWith('image/')) {
@@ -45,8 +51,10 @@ async function preparePhoto(file: File): Promise<string> {
 
 export async function prepareScanPhotos(photos: readonly ScanPhoto[]): Promise<PreparedScanPhotos> {
   if (!photos.length) throw new Error('Add a photo before identifying the item');
-  // Promise.all preserves the profile order and alignment with labels and slots.
-  const images = await Promise.all(photos.map(photo => preparePhoto(photo.file)));
+  // Decode only newly supplied files, sequentially, to bound phone memory.
+  // Cached bounded copies preserve ordering; full-quality originals are untouched.
+  const images: string[] = [];
+  for (const photo of photos) images.push(await cachedPhoto(photo.file));
   return {
     images,
     imageLabels: photos.map(photo => photo.label),

@@ -36,11 +36,12 @@ test('scanner-to-draft route preserves research and review boundaries', async ()
   assert.match(capture, /p_category_id: enrichment\.category\?\.id \|\| null/);
   assert.doesNotMatch(capture, /route: 'publish'/);
   assert.match(enrichment, /lookupScopedListingCategory/);
-  assert.match(enrichment, /swish-market-value/);
+  assert.match(enrichment, /researchScanMarket/);
+  const market = await readFile('src/lib/scanMarketResearch.ts', 'utf8');
+  assert.match(market, /swish-market-value/);
   assert.match(enrichment, /get_category_aspects/);
-  assert.match(enrichment, /applyToItem: true/);
-  assert.doesNotMatch(workspace, /\/studio\//);
-  assert.match(workspace, /`\/scan\/\$\{config\.id\}`/);
+  assert.match(market, /applyToItem: true/);
+  assert.match(workspace, /`\/studio\/\$\{config\.id\}`/);
   assert.match(editor, /<EbayItemSpecifics/);
   assert.match(save, /form\.item_specifics/);
 });

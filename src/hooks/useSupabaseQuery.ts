@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
+import { backendRead } from '@/lib/backendRequests';
 
 // ---------------------------------------------------------------------------
 // Internal helper — gets a connected client or throws a descriptive error
@@ -42,12 +43,7 @@ export function useTable(table: string, options?: TableOptions) {
     refetchInterval: sharedTable ? 30_000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      // Don't retry schema/auth errors — they won't resolve on their own
-      const msg = (error as Error).message || '';
-      if (msg.includes('does not exist') || msg.includes('permission denied') || msg.includes('not found')) return false;
-      return failureCount < 2;
-    },
+    retry: false,
     queryFn: async () => {
       const sb = await getClient();
       const read = async (start?: number, pageSize = 500) => {
@@ -69,7 +65,7 @@ export function useTable(table: string, options?: TableOptions) {
           if (options?.order?.column !== 'id') q = q.order('id', { ascending: true });
           q = q.range(start, start + pageSize - 1);
         } else if (options?.limit) q = q.limit(options.limit);
-        const { data, error } = await q.returns<Record<string, unknown>[]>();
+        const { data, error } = await backendRead(sb, `table:${table}:${JSON.stringify(options || {})}:${start ?? 'single'}`, signal => q.abortSignal(signal).returns<Record<string, unknown>[]>());
         if (error) throw new Error(error.message);
         return data || [];
       };
@@ -104,7 +100,7 @@ export function useTableRow(table: string, id: string | null | undefined, select
       const sb = await getClient();
       let query = sb.from(table).select(select).eq('id', id!);
       if (tenantId !== undefined) query = query.eq('tenant_id', tenantId);
-      const { data, error } = await query.returns<Record<string, unknown>[]>().single();
+      const { data, error } = await backendRead(sb, `row:${table}:${tenantId || ''}:${id}:${select}`, signal => query.abortSignal(signal).returns<Record<string, unknown>[]>().single());
       if (error) throw new Error(error.message);
       return data;
     },
@@ -206,7 +202,7 @@ export function useCount(
       if (inFilter) Object.entries(inFilter).forEach(([k, values]) => {
         if (Array.isArray(values) && values.length > 0) q = q.in(k, values);
       });
-      const { count, error } = await q;
+      const { count, error } = await backendRead(sb, `count:${table}:${JSON.stringify({ filter, inFilter, select })}`, signal => q.abortSignal(signal), 'background');
       if (error) {
         console.warn(`[SWISH] useCount("${table}") error:`, error.message);
         // Unavailable is not zero stock. Consumers must render an error state.
