@@ -52,9 +52,9 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
     return saved;
   };
   const save = async () => {
-    if (working.current || busy) return; working.current = true; setError(null);
-    try { await saveCurrent(); toast.success('Listing saved'); }
-    catch (cause) { setError(message(cause)); toast.error(message(cause)); }
+    if (working.current || busy) return false; working.current = true; setError(null);
+    try { await saveCurrent(); toast.success('Listing saved'); return true; }
+    catch (cause) { setError(message(cause)); toast.error(message(cause)); return false; }
     finally { working.current = false; }
   };
   const publish = async () => {
