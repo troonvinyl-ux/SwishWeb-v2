@@ -1,0 +1,18 @@
+/* Compact mobile-first advisor; no changes to camera geometry or capture controls. */
+.studio-guidance.swish-compact-guidance {
+  display:flex; align-items:center; gap:8px; min-height:0;
+  padding:6px 10px; border-radius:14px; background:rgba(16,16,16,.76);
+  color:white; box-sizing:border-box;
+}
+.swish-compact-guidance .studio-guidance-copy { flex:1; min-width:0; }
+.swish-compact-guidance .swish-guidance-sparkle { flex:none; color:#f5cc55; }
+.swish-compact-guidance .swish-guidance-instruction {
+  margin:0; font-size:15px; line-height:1.35; font-weight:600; overflow-wrap:anywhere;
+}
+.swish-compact-guidance[data-expanded="false"] .swish-guidance-instruction {
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden;
+}
+.swish-compact-guidance .studio-icon { flex:none; width:44px; height:44px; min-height:44px; padding:8px; }
+.swish-compact-guidance .studio-detail { margin:6px 0 0; font-size:14px; line-height:1.4; }
+.swish-compact-guidance[data-expanded="true"] .studio-guidance-copy { max-height:24dvh; overflow:auto; }
+@media(min-width:768px) { .swish-compact-guidance .swish-guidance-instruction { font-size:16px; } }
