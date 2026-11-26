@@ -6,6 +6,9 @@ import { asRecord } from '@/lib/itemPhotos';
 import { normalizeEbayAspects, normalizeEbayConditionPolicy, ebayConditionId, vinylRecordConditionPolicy, type EbayAspect } from '@/lib/ebayMusicContract';
 import { researchScanMarket } from '@/lib/scanMarketResearch';
 import { listingSpecifics } from '@/lib/listingEditorData';
+import { coinListingFactPatch, prefillCoinListingFacts } from '@/lib/coinListingFacts';
+import { usesNumismaticCategories } from '@/lib/coinCategoryPolicy';
+import { coinListingInput } from '@/lib/coinListingInput';
 
 export interface EbaySpecific { name: string; value: string; }
 export interface ScanListingEnrichment {
@@ -50,7 +53,18 @@ const aspectAliases: Record<string, string[]> = {
   material: ['material', 'materials', 'composition', 'fiber_composition', 'fibre_composition'],
   size: ['size', 'tagged_size', 'labelled_size', 'dimensions'],
   department: ['gender_category', 'department'],
-  year: ['year', 'issue_year', 'release_year'],
+  year: ['year', 'year_made', 'yearMade', 'issue_year', 'date', 'release_year'],
+  yearofissue: ['year', 'issue_year', 'date'],
+  ruler: ['ruler', 'monarch', 'sovereign'],
+  monarch: ['ruler', 'monarch', 'sovereign'],
+  composition: ['composition', 'metal', 'material'],
+  metal: ['composition', 'metal', 'material'],
+  mint: ['mint', 'mint_location', 'mintLocation'],
+  date: ['year', 'year_made', 'yearMade', 'issue_year', 'date'],
+  denomination: ['denomination', 'face_value'],
+  country: ['country', 'country_of_origin', 'countryOfOrigin', 'issuing_country'],
+  countryregionoforigin: ['country', 'country_of_origin', 'countryOfOrigin', 'issuing_country'],
+  countryoforigin: ['country', 'country_of_origin', 'countryOfOrigin', 'issuing_country'],
   yearmanufactured: ['year', 'issue_year', 'release_year'],
   countryregionofmanufacture: ['country_manufacture', 'country_of_manufacture'],
   countryofmanufacture: ['country_manufacture', 'country_of_manufacture'],
@@ -98,6 +112,8 @@ export function prefillEbaySpecifics(attributes: Record<string, unknown>, aspect
  * guesses a category, invents an item-specific value, or submits to eBay.
  */
 export async function enrichScannedItemForListing(input: ScanListingEnrichmentInput): Promise<ScanListingEnrichment> {
+  const numismatic = usesNumismaticCategories(input.nicheId, input.specialistId, input.attributes);
+  if (numismatic) input = { ...input, attributes: prefillCoinListingFacts(input.attributes, input.title) };
   const isCurrent = input.isCurrent || (() => true);
   const ensureScope = async () => {
     if (!isCurrent()) throw new Error('The capture workspace changed. Reopen the scanner and try again.');
@@ -156,11 +172,14 @@ export async function enrichScannedItemForListing(input: ScanListingEnrichmentIn
   const currentAttributes = asRecord(current.data.attributes);
   const sameCategory = String(currentAttributes.ebay_category_id || '') === result.category.id;
   if (result.aspects.length) {
-    const filled = prefillEbaySpecifics({ ...input.attributes, ...listingSpecifics(currentAttributes.ebay_item_specifics) }, result.aspects);
+    const existingSpecifics = listingSpecifics(currentAttributes.ebay_item_specifics);
+    const basis = numismatic ? coinListingInput({ ...current.data, attributes: { ...input.attributes, ...currentAttributes } }, existingSpecifics, input.title) : { ...input.attributes, ...existingSpecifics };
+    const filled = prefillEbaySpecifics(basis, result.aspects);
     result.specifics = filled.specifics; result.missingRequired = filled.missingRequired;
   }
   const prepared = {
     ...currentAttributes,
+    ...(numismatic ? coinListingFactPatch({ ...input.attributes, ...currentAttributes }, input.title) : {}),
     ...(result.market ? { market_value_result: result.market } : {}),
     _scan_listing_preparation: { market_error: result.marketError, category_error: result.categoryError, specifics_error: result.specificsError, condition_error: result.conditionError, reviewed: false },
     ...(result.category ? { ebay_category_id: result.category.id, ebay_category_name: result.category.name, ebay_category_path: result.category.categoryPath || '' } : {}),

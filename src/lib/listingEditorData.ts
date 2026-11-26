@@ -11,6 +11,12 @@ const present = (...values: unknown[]) => values.find(value => value !== null &&
 /** Hydrate only with matching stock; keep the eBay item condition distinct from music grading. */
 export function hydrateListingEditor(listing: Record<string, unknown>, stock: Record<string, unknown>): Record<string, unknown> {
   const attrs = asRecord(stock.attributes), options = asRecord(attrs.ebay_listing_options);
+  const categoryId = present(listing.category_id, attrs.ebay_category_id, stock.ebay_category_id);
+  const attributeCategoryMatches = String(categoryId) === String(attrs.ebay_category_id || '');
+  const stockCategoryMatches = String(categoryId) === String(stock.ebay_category_id || '');
+  // A stale label/path must never make a different authoritative category ID look valid.
+  const category = present(attributeCategoryMatches ? attrs.ebay_category_name : '', stockCategoryMatches ? stock.ebay_category_name : '', listing.category);
+  const categoryPath = present(attributeCategoryMatches ? attrs.ebay_category_path : '', stockCategoryMatches ? stock.ebay_category_path : '', listing.category_path);
   // An explicit empty saved condition ID means the category was changed and
   // its new eBay-valid condition has not been selected yet. Do not synthesize
   // Used/3000 from stock text and make the unfinished draft look publishable.
@@ -18,5 +24,5 @@ export function hydrateListingEditor(listing: Record<string, unknown>, stock: Re
     ? String(attrs.ebay_condition_id ?? '')
     : String(present(stock.ebay_condition_id, listing.condition_id, ebayConditionId(stock.condition)));
   const condition = stock.specialist_id === 'vinyl_records' ? EBAY_MUSIC_CONDITIONS.find(row => row.id === conditionId)?.label || (/^Media\s/i.test(String(stock.condition || '')) ? '' : present(stock.condition, listing.condition)) : present(stock.condition, listing.condition);
-  return { ...listing, category_id: present(listing.category_id, attrs.ebay_category_id, stock.ebay_category_id), category: present(attrs.ebay_category_name, stock.ebay_category_name, listing.category), condition, condition_id: conditionId, condition_description: present(stock.condition_notes, stock.condition_grade, attrs.condition_notes, listing.condition_description), item_specifics: listingSpecifics(attrs.ebay_item_specifics), quantity: present(stock.quantity, attrs.quantity, 1), sku: present(stock.sku, attrs.sku), listing_type: options.listingType || 'FixedPriceItem', auction_duration: options.auctionDays || 7, start_price: options.startPrice || '', reserve_price: options.reservePrice || '', best_offer_enabled: options.bestOfferEnabled === true, dispatch_days: options.dispatchDays || 3 };
+  return { ...listing, category_id: categoryId, category, category_path: String(categoryPath), condition, condition_id: conditionId, condition_description: present(stock.condition_notes, stock.condition_grade, attrs.condition_notes, listing.condition_description), item_specifics: listingSpecifics(attrs.ebay_item_specifics), quantity: present(stock.quantity, attrs.quantity, 1), sku: present(stock.sku, attrs.sku), listing_type: options.listingType || 'FixedPriceItem', auction_duration: options.auctionDays || 7, start_price: options.startPrice || '', reserve_price: options.reservePrice || '', best_offer_enabled: options.bestOfferEnabled === true, dispatch_days: options.dispatchDays || 3 };
 }

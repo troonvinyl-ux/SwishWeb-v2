@@ -22,6 +22,8 @@ export async function persistCollectorEnvelope(scope: CaptureScope, job: RapidCo
   const collectorAttrs = captureRecord(attachCollectorEvidence({}, read.evidence).attributes);
   const attrs = prefillCoinListingFacts({ ...collectorAttrs, ...captureRecord(stock.data.attributes), collector_envelope: read.evidence,
     _rapid_coin_evidence: read.evidence, _collector_research_fields: collectorAttrs._collector_research_fields,
+    observedCharacteristics: { ...captureRecord(captureRecord(stock.data.attributes).observedCharacteristics), ...captureRecord(candidate.observedCharacteristics) },
+    _coin_reread_fields: { ...captureRecord(candidate.coinFields), ...captureRecord(candidate.attributes), ...captureRecord(candidate.attributesConfirmed) },
     _collector_candidate_title: captureText(next.canonicalTitle ?? next.title) }, captureText(next.canonicalTitle ?? next.title));
   const oldTitle = captureText(old.canonicalTitle ?? old.title), title = captureText(next.canonicalTitle ?? next.title);
   const rejectedOrUnattempted = !job.checkpoint.draftAttempted || job.checkpoint.draftFailure?.outcome === 'rejected';

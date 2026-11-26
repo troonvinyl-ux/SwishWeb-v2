@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { loadRapidTypescript } from './lib/load-rapid-typescript.mjs';
 const ts=createRequire(import.meta.url)('typescript');
 async function load(path, rewrite=source=>source) {
  const source=ts.transpileModule(await readFile(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2020}}).outputText;
  return import(`data:text/javascript;base64,${Buffer.from(rewrite(source)).toString('base64')}`);
 }
-const category=await load('src/lib/categoryLookup.ts');
+const category=loadRapidTypescript('src/lib/categoryLookup.ts');
 const scope=await load('src/lib/moduleScope.ts');
 let invoke;
 globalThis.__swishCategoryFixture={...category,...scope,callEdgeFunction:(...args)=>invoke(...args)};
