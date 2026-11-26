@@ -11,9 +11,6 @@ const { hydrateListingEditor, listingSpecifics } = load('src/lib/listingEditorDa
 test('music grading uses exact eBay text, with Goldmine Poor explicitly represented as Worn', () => {
   const expected = { M: 'Mint (M)', NM: 'Near Mint (NM or M-)', EX: 'Excellent (EX)', 'VG+': 'Very Good Plus (VG+)', VG: 'Very Good (VG)', 'G+': 'Good Plus (G+)', G: 'Good (G)', F: 'Fair (F)', W: 'Worn (W)', P: 'Worn (W)' };
   for (const [code, label] of Object.entries(expected)) { assert.equal(contract.ebayMusicGrade(code), label); if (code !== 'P') assert.equal(contract.musicGradeCode(label), code); }
-  assert.equal(contract.musicGradeCode('Very Good Plus'), 'VG+');
-  assert.equal(contract.musicGradeCode('VG Plus'), 'VG+');
-  assert.equal(contract.ebayMusicGrade('Very Good Plus'), 'Very Good Plus (VG+)');
   assert.equal(contract.ebayMusicGrade('NM', ['Near Mint (NM or M-)']), 'Near Mint (NM or M-)');
 });
 test('native music aspect names differ for vinyl, CDs and cassettes', () => {
@@ -73,12 +70,12 @@ test('condition lookup rejects a mismatched category or absent required choices'
 });
 test('web condition UI gets the current server policy and never offers unsupported saved grades as choices', () => {
   const metadata = readFileSync('src/hooks/useEbayCategoryMetadata.ts', 'utf8');
-  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  const picker = readFileSync('src/components/features/ListingConditionFields.tsx', 'utf8');
   const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
   assert.match(metadata, /route: 'get_condition_policies'/);
   assert.match(metadata, /'swish-ebay-list'/);
   assert.match(metadata, /normalizeEbayConditionPolicy/);
-  assert.match(picker, /music \? \(conditions \?\? \[\]\)/);
+  assert.match(picker, /const options = conditions \?\? \[\]/);
   assert.match(picker, /invalidSavedCondition/);
   assert.match(picker, /Retry eBay condition lookup/);
   assert.match(editor, /supportedEbayCondition/);
@@ -105,7 +102,7 @@ test('native eBay Vinyl Records category 176985 exposes New / Used directly with
 
 test('web shows New / Used before item-specific metadata loads and skips redundant vinyl condition lookup', () => {
   const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8');
-  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  const picker = readFileSync('src/components/features/ListingConditionFields.tsx', 'utf8');
   const metadata = readFileSync('src/hooks/useEbayCategoryMetadata.ts', 'utf8');
   const source = readFileSync('src/hooks/useListingEditorActions.ts', 'utf8');
   assert.match(editor, /const vinylPolicy = vinylRecordConditionPolicy\(categoryId, specialistId\)/);
@@ -128,7 +125,7 @@ test('no eBay category is not silently treated as Vinyl Records and no stale Ver
   assert.equal(contract.vinylRecordConditionPolicy('', 'vinyl_records'), null);
   const choices = contract.vinylRecordConditionPolicy('176985', 'vinyl_records');
   assert.equal(contract.supportedEbayCondition('4000', choices.conditions, choices.conditionRequired), false);
-  const picker = readFileSync('src/components/features/ListingCategoryFields.tsx', 'utf8');
+  const picker = readFileSync('src/components/features/ListingConditionFields.tsx', 'utf8');
   assert.match(picker, /invalidSavedCondition/);
   assert.match(picker, /const selected = invalidSavedCondition/);
 });

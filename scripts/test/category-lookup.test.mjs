@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-const ts = createRequire(import.meta.url)('typescript');
-const source = await readFile('src/lib/categoryLookup.ts', 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-const { lookupListingCategory, categorySearchQuery, isRecordedMusicCategory } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputText).toString('base64')}`);
+import { loadRapidTypescript } from './lib/load-rapid-typescript.mjs';
+const coinPolicy = loadRapidTypescript('src/lib/coinCategoryPolicy.ts');
+const coinContext = loadRapidTypescript('src/lib/coinCategoryContext.ts');
+const { lookupListingCategory, categorySearchQuery, isRecordedMusicCategory } = loadRapidTypescript('src/lib/categoryLookup.ts', { '@/lib/coinCategoryPolicy': coinPolicy, '@/lib/coinCategoryContext': coinContext });
 const suggestion = { id: '176985', name: 'CDs', isLeaf: true };
 const ok = (suggestions = [suggestion]) => ({ data: { success: true, suggestions }, error: null });
 
@@ -41,17 +40,15 @@ test('Tunes search carries real music format and bounds the eBay query', () => {
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip', { format: 'CD box set' }), 'music CD Artist Album');
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip', { format: 'Vinyl LP' }), 'vinyl record Artist Album');
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip'), 'recorded music album Artist Album');
-  assert.equal(categorySearchQuery('Roman coin', 'coins'), 'Roman coin');
+  assert.equal(categorySearchQuery('Roman coin', 'coins'), 'ancient roman coin Roman coin');
   assert.equal(categorySearchQuery('A'.repeat(150), 'tunes_flip', { format: 'CD' }).length, 100);
 });
 test('new and saved listing screens use the shared lookup; music avoids coin defaults', async () => {
-  for (const page of ['ListingNew', 'ListingEditor']) {
-    const source = await readFile(`src/pages/${page}.tsx`, 'utf8');
-    assert.match(source, /await lookupScopedListingCategory/);
-    assert.match(source, /const nicheId = getActiveNicheId\(\)/);
-    assert.match(source, /categoryTitleRef.current !== title/);
-    assert.doesNotMatch(source, /route: 'get_category_suggestions'/);
-  }
+  const editor = await readFile('src/pages/ListingEditor.tsx', 'utf8'), hook = await readFile('src/hooks/useListingCategorySuggestion.ts', 'utf8');
+  assert.match(editor, /useListingCategorySuggestion/); assert.match(hook, /await lookupScopedListingCategory/); assert.match(hook, /draft.revisionRef.current !== revision/);
+  const newListing = await readFile('src/pages/ListingNew.tsx', 'utf8');
+  assert.match(newListing, /await lookupScopedListingCategory/); assert.match(newListing, /categoryTitleRef.current !== title/);
+  assert.doesNotMatch(editor, /route: 'get_category_suggestions'/);
   const source = await readFile('src/pages/ListingNew.tsx', 'utf8');
   assert.match(source, /const mappedCategory = isCoinItem \? mapCoinCategory/);
   assert.match(source, /inv.canonical_title/);

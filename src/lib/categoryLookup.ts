@@ -1,7 +1,9 @@
-export interface CategorySuggestion { id: string; name: string; }
+import { isNumismaticCategory, numismaticKind, numismaticSearchQuery, usesNumismaticCategories } from '@/lib/coinCategoryPolicy';
+import { coinCategoryContext, coinCategoryMismatch, coinCategoryRank, coinSearchPrefix } from '@/lib/coinCategoryContext';
+export interface CategorySuggestion { id: string; name: string; categoryPath?: string; }
 interface LookupResponse { data: unknown; error: { message: string; displayMessage?: string; status?: number } | null; }
 type InvokeCategory = (endpoint: string, body: Record<string, unknown>) => Promise<LookupResponse>;
-export interface CategoryLookupContext { nicheId?: string; title?: string; attributes?: Record<string, unknown>; isCurrent?: () => boolean; }
+export interface CategoryLookupContext { nicheId?: string; specialistId?: string; title?: string; attributes?: Record<string, unknown>; isCurrent?: () => boolean; }
 type MusicFormat = 'cd' | 'vinyl' | 'cassette' | null;
 export function musicFormat(attributes: Record<string, unknown> = {}, title = ''): MusicFormat {
   // Discogs formats can be arrays/objects; an unrelated format label must not hide the title.
@@ -24,8 +26,9 @@ export function isRecordedMusicCategory(row: Record<string, unknown>, format: Mu
 }
 
 /** Retain the title and add only the music format actually recorded by the seller. */
-export function categorySearchQuery(title: string, niche: string, attributes: Record<string, unknown> = {}): string {
+export function categorySearchQuery(title: string, niche: string, attributes: Record<string, unknown> = {}, specialistId = ''): string {
   const clean = title.trim().replace(/\s+/g, ' ');
+  if (usesNumismaticCategories(niche, specialistId, attributes)) return numismaticSearchQuery(clean, attributes, specialistId, coinSearchPrefix(coinCategoryContext(clean, attributes), numismaticKind(attributes, specialistId)));
   if (niche !== 'tunes_flip') return clean.slice(0, 100);
   const format = musicFormat(attributes, clean);
   const context = format === 'vinyl' ? 'vinyl record' : format === 'cd' ? 'music CD' : format === 'cassette' ? 'music cassette' : 'recorded music album';
@@ -39,9 +42,15 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
   if (text.length < 2) throw new Error('Enter an item title before suggesting a category.');
   const failures: string[] = [];
   const music = context.nicheId === 'tunes_flip';
+  const coins = usesNumismaticCategories(context.nicheId, context.specialistId, context.attributes);
+  const kind = numismaticKind(context.attributes, context.specialistId);
+  const coinContext = coinCategoryContext(context.title || text, context.attributes);
   const format = musicFormat(context.attributes, context.title);
   const formatQuery = format === 'cd' ? 'music CDs' : format === 'vinyl' ? 'vinyl records' : format === 'cassette' ? 'music cassettes' : 'recorded music albums';
-  const queries = music && formatQuery && text.toLowerCase() !== formatQuery.toLowerCase() ? [text, formatQuery] : [text];
+  const primary = coins ? categorySearchQuery(context.title || text, 'coins', context.attributes, context.specialistId) : text;
+  // Never drop the ancient/hammered tradition or single-versus-lot context on fallback.
+  const fallback = coins ? `${coinSearchPrefix(coinContext, kind)}s` : music ? formatQuery : '';
+  const queries = fallback && primary.toLowerCase() !== fallback.toLowerCase() ? [primary, fallback] : [primary];
   for (const search of queries) {
   for (const endpoint of ['swish-ebay-category', 'swish-ebay-list']) {
     if (context.isCurrent?.() === false) throw new Error('Your workspace or category search changed. Retry from the active item.');
@@ -56,14 +65,17 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
     const payload = result.data && typeof result.data === 'object' ? result.data as Record<string, unknown> : {};
     const suggestions = Array.isArray(payload.suggestions) ? payload.suggestions : [];
     if (payload.success === true) {
-      for (const entry of suggestions) {
-        if (!entry || typeof entry !== 'object') continue;
+      const eligible = suggestions.filter((entry): entry is Record<string, unknown> => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
         const row = entry as Record<string, unknown>;
-        const id = String(row.id ?? '').trim();
-        if (/^[1-9]\d*$/.test(id) && typeof row.name === 'string' && row.name.trim() && row.isLeaf === true && (!music || isRecordedMusicCategory(row, format))) return { id, name: row.name.trim() };
-      }
+        return /^[1-9]\d*$/.test(String(row.id ?? '').trim()) && typeof row.name === 'string' && Boolean(row.name.trim()) && row.isLeaf === true &&
+          (!music || isRecordedMusicCategory(row, format)) && (!coins || isNumismaticCategory(row, kind, coinContext.lot ? 'lot' : 'single') && !coinCategoryMismatch(row, coinContext));
+      });
+      if (coins) eligible.sort((left, right) => coinCategoryRank(right, coinContext) - coinCategoryRank(left, coinContext));
+      const selected = eligible[0];
+      if (selected) return { id: String(selected.id).trim(), name: String(selected.name).trim(), ...(coins && typeof selected.categoryPath === 'string' ? { categoryPath: selected.categoryPath.trim() } : {}) };
     }
-    failures.push(typeof payload.error === 'string' ? payload.error : music ? 'No matching recorded-music category was returned. Clothing and merchandise suggestions were rejected.' : 'No matching eBay leaf category was returned.');
+    failures.push(typeof payload.error === 'string' ? payload.error : coins ? 'No relevant eBay coin category was returned. Art, merchandise and supply categories were rejected; the draft remains editable.' : music ? 'No matching recorded-music category was returned. Clothing and merchandise suggestions were rejected.' : 'No matching eBay leaf category was returned.');
   }
   }
   throw new Error(`Category lookup unavailable. ${failures[failures.length - 1] || 'Add the music format (vinyl, CD or cassette) to the item title and retry.'}`);

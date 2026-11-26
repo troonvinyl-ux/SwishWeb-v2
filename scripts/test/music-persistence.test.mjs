@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url),ts=require('typescript'),cache=new Map();
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 const stubs={
+ '@/lib/scanListingEnrichment':{enrichScannedItemForListing:async()=>({category:{id:'176985',name:'Vinyl Records'},aspects:[],specifics:[],missingRequired:[],marketRefreshed:false,marketError:null,categoryError:null,specificsError:null})},
+ '@/lib/scanListingFields':{enrichedScanListing:generated=>generated},
  '@/lib/captureRequest':{captureRecord:object,assertCaptureScope:async scope=>{if(!scope.isCurrent())throw Error('Workspace changed');}},
  '@/lib/musicApi':{musicRequest:async(scope,name)=>{scope.client.calls.push(name);return {listing:{title:'Generated fixture',description:'Fixture',item_specifics:{Artist:'Fixture Artist'}}};}},
  '@/lib/capturePersistence':{persistCapturePhotos:async(scope,id,photos,previous,checkpoint)=>{const urls={...previous};for(const photo of photos){if(urls[photo.slotId])continue;if(scope.client.failPhoto===photo.slotId)throw Error('Fixture upload failed');scope.client.uploads.push(photo.file);urls[photo.slotId]=`https://fixture.invalid/${id}/${photo.slotId}.jpg`;checkpoint({...urls});}scope.client.tables.items.find(item=>item.id===id).media=Object.values(urls);return Object.values(urls);}},

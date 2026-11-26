@@ -1,10 +1,12 @@
 import { prepareScanPhotos } from '@/lib/sharedScanPhotos';
 import { captureRequest, assertCaptureScope, captureRecord, captureText, captureStrings } from '@/lib/captureRequest';
 import { persistCaptureItem, persistCapturePhotos } from '@/lib/capturePersistence';
+import { prepareSavedCoinPhotos } from '@/lib/itemStudio';
 import { assertCoinDraftReady, canonicalCoinReferenceAnswers } from '@/lib/coinListingGate';
 import { captureNumistaReference, parseNumistaNumber, prepareNumistaFaces } from '@/lib/numistaCapture';
 import { enrichScannedItemForListing } from '@/lib/scanListingEnrichment';
 import { scanListingAttributes, enrichedScanListing, scanPreparationWarnings } from '@/lib/scanListingFields';
+import { discardGeneratedCoinCategory, usesNumismaticCategories } from '@/lib/coinCategoryPolicy';
 import type { CaptureCheckpoint, CaptureDraft, CapturePhoto, CaptureScope } from '@/types/capture';
 interface PrepareCaptureOptions { scope: CaptureScope; photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; checkpoint: CaptureCheckpoint; onCheckpoint: (value: CaptureCheckpoint) => void | Promise<void>; onProgress: (message: string) => void; lead?: Record<string, unknown> | null; stableItemId?: string; buyerSlots?: string[]; beforeItem?: () => Promise<void>; beforeDraft?: () => Promise<void>; transformGenerated?: (value: Record<string, unknown>) => Record<string, unknown>; }
 async function identifyCapture(options: PrepareCaptureOptions): Promise<Record<string, unknown>> {
@@ -44,6 +46,12 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   onProgress('Attaching permanent original photographs…');
   const allUrls = await persistCapturePhotos(scope, checkpoint.itemId!, photos, checkpoint.photos ?? {}, value => keep({ photos: value }));
   const urls = options.buyerSlots ? photos.flatMap((photo, index) => options.buyerSlots!.includes(photo.slotId) ? [allUrls[index]] : []) : allUrls;
+  if (scope.nicheId === 'coins' && !checkpoint.coinStudio) {
+    onProgress('Preparing matched professional coin photographs; originals remain the identification evidence…');
+    const studio = await prepareSavedCoinPhotos(scope.userId, scope.tenantId, checkpoint.itemId!, urls);
+    await assertCaptureScope(scope);
+    await keep({ coinStudio: { prepared: studio.prepared, photos: studio.photos, warnings: studio.warnings } });
+  }
   if (!checkpoint.preparation && !checkpoint.listingId) {
     onProgress('Researching market value, eBay category and item specifics…');
     const preparation = await enrichScannedItemForListing({ client: scope.client, userId: scope.userId, tenantId: scope.tenantId, nicheId: scope.nicheId,
@@ -56,7 +64,8 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
     const response = await captureRequest(scope, 'swish-list-generate', { item_id: checkpoint.itemId, tenant_id: scope.tenantId, marketplace_id: 'ebay' });
     const generated = captureRecord(response.listing);
     if (!captureText(generated.title)) throw new Error('Item and photos saved, but listing generation returned no draft. Retry preparation on this item.');
-    const enriched = checkpoint.preparation ? enrichedScanListing(generated, checkpoint.preparation) : generated;
+    const copy = usesNumismaticCategories(scope.nicheId, specialistId, scanListingAttributes(result, savedAnswers)) ? discardGeneratedCoinCategory(generated) : generated;
+    const enriched = checkpoint.preparation ? enrichedScanListing(copy, checkpoint.preparation) : copy;
     await keep({ generated: options.transformGenerated ? options.transformGenerated(enriched) : enriched });
   }
   const generated = checkpoint.generated ?? {};
@@ -74,7 +83,7 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   const backendReference = captureNumistaReference(result);
   const referenceConflict = reference?.source === 'seller_reference' && backendReference && reference.typeId !== backendReference.typeId ? [`Your Numista ${reference.numistaN} differs from the backend candidate ${backendReference.numistaN}. Resolve the reference against both original faces before listing.`] : [];
   const research = scope.nicheId === 'coins' ? captureRecord(result.numistaImageSearch) : {};
-  return { itemId: checkpoint.itemId!, listingId: checkpoint.listingId!, title: String(read.data.title), description: String(read.data.description || ''), price: read.data.price == null ? null : Number(read.data.price), photos: urls,
-    warnings: [...(answers.studio_missing_views ? [`Incomplete photography: ${answers.studio_missing_views}. These details remain unknown until seller review.`] : []), ...captureStrings(result.warnings), ...captureStrings(result.evidenceContradictory), ...captureStrings(result.missingInformation), ...captureStrings(generated.safety_flags), ...(checkpoint.preparation ? scanPreparationWarnings(checkpoint.preparation) : []), ...referenceConflict],
+  return { itemId: checkpoint.itemId!, listingId: checkpoint.listingId!, title: String(read.data.title), description: String(read.data.description || ''), price: read.data.price == null ? null : Number(read.data.price), photos: checkpoint.coinStudio?.photos ?? urls,
+    warnings: [...(checkpoint.coinStudio?.warnings || []), ...(answers.studio_missing_views ? [`Incomplete photography: ${answers.studio_missing_views}. These details remain unknown until seller review.`] : []), ...captureStrings(result.warnings), ...captureStrings(result.evidenceContradictory), ...captureStrings(result.missingInformation), ...captureStrings(generated.safety_flags), ...(checkpoint.preparation ? scanPreparationWarnings(checkpoint.preparation) : []), ...referenceConflict],
     numistaReference: reference, ...(Object.keys(research).length ? { numistaResearch: research } : {}) };
 }

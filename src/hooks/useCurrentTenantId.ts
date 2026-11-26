@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabaseClient, getSupabaseClientAsync } from '@/lib/supabase';
+import { backendRead } from '@/lib/backendRequests';
 
 /**
  * Resolve the signed-in user's existing SWISH workspace.
@@ -22,12 +23,9 @@ export function useCurrentTenantId() {
       // user's tenant rows, and the native app selects the primary tenant by
       // oldest creation date. Do not independently pick an arbitrary membership
       // row here or the web app can query a different tenant from the native app.
-      const { data, error } = await sb
-        .from('tenants')
-        .select('id')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await backendRead(sb, `tenant:${user.id}`, signal => sb
+        .from('tenants').select('id').order('created_at', { ascending: true })
+        .limit(1).abortSignal(signal).maybeSingle(), 'access');
       if (error) throw new Error('Could not resolve your SWISH workspace. Please retry.');
       return data?.id ? String(data.id) : null;
     },
