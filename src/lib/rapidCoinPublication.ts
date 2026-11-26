@@ -9,7 +9,7 @@ export async function beginRapidPublication(userId: string, tenantId: string, li
   const job = await linkedJob(userId, tenantId, listingId); if (!job) return false;
   await changeRapidJob(job.id, job.scope, current => {
     if (!rapidCanPublish(current)) throw new Error('This coin has an earlier or uncertain submission. Refresh its original status; do not republish.');
-    return { ...current, publication: 'publishing', message: 'Original eBay submission in progress. Do not submit this coin again.' };
+    return { ...current, publication: 'publishing', publicationAttempt: { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, startedAt: Date.now(), outcome: 'pending' }, message: 'Original eBay submission in progress. Do not submit this coin again.' };
   });
   return true;
 }

@@ -10,9 +10,11 @@ import { useListingEditorDraft } from '@/hooks/useListingEditorDraft';
 import { useListingEditorActions } from '@/hooks/useListingEditorActions';
 import { useListingCategorySuggestion } from '@/hooks/useListingCategorySuggestion';
 import { useListingPhotoUploads } from '@/hooks/useListingPhotoUploads';
+import { useListingCoinPhotoPreparation } from '@/hooks/useListingCoinPhotoPreparation';
 import { syncMusicConditionText } from '@/lib/musicConditionText';
 import { publicationBlock } from '@/lib/listingReadiness';
 import { listingNicheId } from '@/lib/listingSubmission';
+import { coinListingCategoryIssue } from '@/lib/listingCoinCategory';
 import { getActiveNicheId } from '@/lib/niche';
 import { useEbayCategoryMetadata } from '@/hooks/useEbayCategoryMetadata';
 import type { MusicValues } from '@/types/music';
@@ -20,6 +22,9 @@ import ListingMarketSummary from '@/components/features/ListingMarketSummary';
 import ListingReadySummary from '@/components/features/ListingReadySummary';
 import ListingQuickPrice from '@/components/features/ListingQuickPrice';
 import ListingPublishConfirmation from '@/components/features/ListingPublishConfirmation';
+import RapidListingFooter from '@/components/features/RapidListingFooter';
+import RapidCoinPriceChoices from '@/components/features/RapidCoinPriceChoices';
+import type { RapidCoinJob } from '@/types/rapidCoin';
 import { listingDescriptionText } from '@/lib/listingPresentation';
 import PublicationStatus from '@/components/features/PublicationStatus';
 import ListingPublishFeedback from '@/components/features/ListingPublishFeedback';
@@ -32,8 +37,9 @@ import EbayItemSpecifics from '@/components/features/EbayItemSpecifics';
 import MusicItemSpecifics from '@/components/features/MusicItemSpecifics';
 import { supportedEbayCondition, vinylRecordConditionPolicy } from '@/lib/ebayMusicContract';
 
-export default function ListingEditor() {
-  const { id } = useParams<{ id: string }>(), { user } = useAuth(), tenant = useCurrentTenantId();
+interface ListingEditorProps { listingId?: string; rapid?: { job: RapidCoinJob; approved: boolean; onNext: () => void }; }
+export default function ListingEditor({ listingId, rapid }: ListingEditorProps = {}) {
+  const { id: routeId } = useParams<{ id: string }>(), id = listingId || routeId, { user } = useAuth(), tenant = useCurrentTenantId();
   const [params, setParams] = useSearchParams(), navigate = useNavigate();
   const requestedSection = params.get('section') || 'overview';
   const section = ['overview','description','specifics','pricing','delivery','photos','research','preview'].includes(requestedSection) ? requestedSection : 'overview';
@@ -41,25 +47,27 @@ export default function ListingEditor() {
   const [confirming, setConfirming] = useState(false);
   const [recoveryItemNumber, setRecoveryItemNumber] = useState('');
   const draft = useListingEditorDraft(id, tenant.tenantId);
+  const coinStudio = useListingCoinPhotoPreparation(draft, user?.id, tenant.tenantId);
   const upload = useListingPhotoUploads(String(draft.form.item_id || ''), urls => draft.setPhotos(current => [...current, ...urls]));
   const nicheId = draft.item ? listingNicheId(draft.item) : getActiveNicheId();
   const specialistId = String(draft.item?.specialist_id || '');
   const categoryId = String(draft.form.category_id || '').trim();
+  const categoryIssue = coinListingCategoryIssue(draft.form, draft.item);
   const music = specialistId === 'vinyl_records';
   const vinylPolicy = vinylRecordConditionPolicy(categoryId, specialistId);
-  const metadata = useEbayCategoryMetadata(user?.id, tenant.tenantId, nicheId, categoryId, specialistId);
+  const metadata = useEbayCategoryMetadata(user?.id, tenant.tenantId, nicheId, categoryIssue ? '' : categoryId, specialistId);
   const conditionPolicy = vinylPolicy ?? metadata.data;
   const actions = useListingEditorActions(draft, user?.id, tenant.tenantId, upload.photos.map(photo => photo.url), metadata.data?.aspects);
   const category = useListingCategorySuggestion(draft, user?.id, tenant.tenantId);
   // New / Used for EBAY_GB Vinyl Records is available immediately; eBay's
   // shared backend still validates actual category policy at publication.
-  const conditionReady = Boolean(categoryId && conditionPolicy &&
+  const conditionReady = Boolean(!categoryIssue && categoryId && conditionPolicy &&
     supportedEbayCondition(draft.form.condition_id, conditionPolicy.conditions, conditionPolicy.conditionRequired));
-  const disabled = actions.busy || upload.busy || category.busy || Boolean(publicationBlock(draft.form));
+  const disabled = actions.busy || coinStudio.busy || upload.busy || category.busy || Boolean(publicationBlock(draft.form));
   if (tenant.isLoading || draft.loading) return <div role="status" className="swish-card p-6 text-muted-foreground">Loading the shared SWISH listing…</div>;
   if (tenant.error || draft.error) return <section role="alert" className="swish-card space-y-4 p-5"><h1 className="text-xl font-semibold">Listing unavailable</h1><p>{tenant.error?.message || draft.error?.message}</p><Link to="/listings" className="btn-secondary">Back to listings</Link></section>;
   const selectedSpecifics = draft.form.item_specifics && typeof draft.form.item_specifics === 'object' ? draft.form.item_specifics as Record<string, unknown> : {};
-  const specificsReady = Boolean(metadata.data) && !metadata.data?.aspectError && (metadata.data?.aspects || []).every(aspect => !aspect.required || (typeof selectedSpecifics[aspect.name] === 'string' && String(selectedSpecifics[aspect.name]).trim() && (!aspect.selectionOnly || aspect.values.includes(String(selectedSpecifics[aspect.name])))));
+  const specificsReady = !categoryIssue && Boolean(metadata.data) && !metadata.data?.aspectError && (metadata.data?.aspects || []).every(aspect => !aspect.required || (typeof selectedSpecifics[aspect.name] === 'string' && String(selectedSpecifics[aspect.name]).trim() && (!aspect.selectionOnly || aspect.values.includes(String(selectedSpecifics[aspect.name])))));
   const price = itemPricing(draft.item, draft.form);
   const active = ['active', 'live'].includes(String(draft.form.status));
   const auction = draft.form.listing_type === 'Chinese';
@@ -81,15 +89,15 @@ export default function ListingEditor() {
     { key: 'research', label: 'Research & valuation', hint: 'More information', Icon: BarChart3 },
   ];
   const row = (entry: typeof rows[number]) => <button key={entry.key} type="button" className="flip-row" onClick={() => open(entry.key)}><entry.Icon size={22}/><span><strong>{entry.label}</strong><small>{entry.hint}</small></span><ChevronRight size={20}/></button>;
-  const canSubmit = actions.canPublish && !upload.busy && !category.busy && conditionReady && specificsReady && draft.photos.length > 0 && Boolean(String(draft.form.title || '').trim()) && hasPrice;
-  const missing = !conditionReady || !specificsReady ? 'Check the category, condition and required item details.' : !draft.photos.length ? 'Add a listing photo.' : !String(draft.form.title || '').trim() ? 'Add a title.' : !hasPrice ? 'Set your selling price.' : '';
+  const canSubmit = actions.canPublish && !coinStudio.busy && !upload.busy && !category.busy && conditionReady && specificsReady && draft.photos.length > 0 && Boolean(String(draft.form.title || '').trim()) && hasPrice;
+  const missing = categoryIssue || (!conditionReady || !specificsReady ? 'Check the category, condition and required item details.' : !draft.photos.length ? 'Add a listing photo.' : !String(draft.form.title || '').trim() ? 'Add a title.' : !hasPrice ? 'Set your selling price.' : '');
   return <div className="flip-listing w-full min-w-0 max-w-4xl mx-auto space-y-4">
-    <header className="flip-header"><Link to={`/listings/${id}`} className="btn-ghost" aria-label="Back to saved listing"><ArrowLeft size={22}/></Link><span className="flip-brand">SWISH<span>Flip</span></span><button type="button" className="btn-ghost" onClick={() => void actions.checkStatus()} disabled={actions.busy || !draft.form.id} aria-label="Refresh status"><RefreshCw size={20}/></button></header>
+    <header className="flip-header"><Link to={rapid ? '/rapid/coins' : `/listings/${id}`} className="btn-ghost" aria-label="Back to saved listing"><ArrowLeft size={22}/></Link><span className="flip-brand">SWISH<span>Flip</span></span><button type="button" className="btn-ghost" onClick={() => void actions.checkStatus()} disabled={actions.busy || !draft.form.id} aria-label="Refresh status"><RefreshCw size={20}/></button></header>
     <PublicationStatus reason={actions.reason} externalId={actions.publicationExternalId} refreshing={actions.checking} onRefresh={() => void actions.checkStatus()} />
     <ListingPublishFeedback message={actions.error} help={actions.help} onResolve={resolveHelp} />
     {Boolean(draft.form.publish_claim_id) && !draft.form.external_listing_id &&
       <section key={id} className="swish-card space-y-3 p-4">
-        <h2 className="font-semibold">Already live on eBay?</h2>
+        <h2 className="font-semibold">Check the original submission</h2><p className="text-base leading-7 text-muted-foreground">If this coin is not on eBay, use Refresh status or eBay sync first. An item number is needed only when eBay actually created a listing; SWISH must verify the original claim before retrying.</p>
         <label htmlFor="recovery-item-number" className="block">eBay item number</label>
         <input id="recovery-item-number" className="input-field" inputMode="numeric" maxLength={20}
           value={recoveryItemNumber || actions.publicationExternalId}
@@ -105,13 +113,14 @@ export default function ListingEditor() {
       <div className="flip-overview-grid">
         <ListingReadySummary form={draft.form} item={draft.item} photos={draft.photos} onOpen={open} />
         <div className="space-y-3"><ListingQuickPrice value={auction ? draft.form.start_price || draft.form.price : draft.form.price} auction={auction} disabled={disabled} onChange={value => draft.change(auction ? 'start_price' : 'price', value)} onOpen={() => open('pricing')} />
+        {rapid && <RapidCoinPriceChoices item={draft.item} disabled={disabled} onApply={value => draft.change(auction ? 'start_price' : 'price', value)} />}
         {missing && <button type="button" className="flip-advice" onClick={() => open(!conditionReady || !specificsReady ? 'specifics' : !draft.photos.length ? 'photos' : !String(draft.form.title || '').trim() ? 'description' : 'pricing')}><Sparkles size={20}/><span>{missing}</span><ChevronRight size={18}/></button>}
         {draft.form.id && draft.form.marketplace_id === 'ebay' && <section className="space-y-2 rounded-xl border border-border p-3"><h2 className="font-semibold">SWISH listing status · {active ? 'Live' : String(draft.form.status || 'Draft').replace(/_/g, ' ')}</h2><p className="text-sm text-muted-foreground">Marketplace status and stock are reconciled by the shared service, not changed locally.</p><button type="button" className="btn-secondary min-h-11" disabled={actions.busy} onClick={() => void actions.checkStatus()}>Refresh saved status</button></section>}
-        <div className="space-y-1">{rows.map(row)}<Link className="flip-row" to={`/inventory/${draft.form.item_id}`}><ListChecks size={22}/><span><strong>Advanced details</strong><small>Inventory, cost and specialist information</small></span><ChevronRight size={20}/></Link></div>
-        {!publicationBlock(draft.form) && <button type="button" className="flip-primary" disabled={!canSubmit} onClick={() => setConfirming(true)}>{actions.publishing ? 'Publishing…' : 'List on eBay'}</button>}
+        <div className="space-y-1">{row({ key: 'photos', label: 'Coin & listing photos', hint: `${draft.photos.length} selected · Prepare centred white photos`, Icon: Image })}{rows.map(row)}<Link className="flip-row" to={`/inventory/${draft.form.item_id}`}><ListChecks size={22}/><span><strong>Advanced details</strong><small>Inventory, cost and specialist information</small></span><ChevronRight size={20}/></Link></div>
+        {!rapid && !publicationBlock(draft.form) && <button type="button" className="flip-primary" disabled={!canSubmit} onClick={() => setConfirming(true)}>{actions.publishing ? 'Publishing…' : 'List on eBay'}</button>}
         {!canSubmit && !active && <p className="text-sm text-muted-foreground">{actions.reason || missing || 'Wait for the listing checks to finish, or save your draft.'}</p>}
         <ListingPublishConfirmation open={confirming && canSubmit} onOpenChange={setConfirming} onConfirm={() => { setConfirming(false); void actions.publish(); }} />
-        <button type="button" onClick={() => void actions.save()} disabled={disabled || !tenant.tenantId || !draft.form.id} className="flip-secondary">{actions.saving ? 'Saving…' : 'Save for later'}</button>
+        {!rapid && <button type="button" onClick={() => void actions.save()} disabled={disabled || !tenant.tenantId || !draft.form.id} className="flip-secondary">{actions.saving ? 'Saving…' : 'Save for later'}</button>}
         <p className="text-center text-sm text-muted-foreground">Prepared with SWISH · Seller-reviewed before publication</p></div>
       </div>
     </div>
@@ -122,10 +131,10 @@ export default function ListingEditor() {
       <button type="button" className="flip-row" onClick={() => open('photos')}><Image size={20}/><span><strong>Photos for buyers</strong><small>{draft.photos.length} selected · Manage photos</small></span><ChevronRight size={20}/></button>
       <button type="button" className="flip-row" onClick={() => open('preview')}><FileText size={20}/><span><strong>Preview listing</strong><small>See your buyer-facing text</small></span><ChevronRight size={20}/></button><div className="flex gap-2">{draft.photos.slice(0,3).map(url => <img key={url} src={url} alt="Selected buyer photo" className="w-24 h-24 object-contain rounded-lg border border-border"/>)}</div>
     </div>
-    <div hidden={section !== 'photos'}>    <ListingEditorPhotos draft={draft} upload={upload} disabled={disabled} /></div>
+    <div hidden={section !== 'photos'}>    <ListingEditorPhotos draft={draft} upload={upload} disabled={disabled} coinStudio={coinStudio} /></div>
     <div hidden={section !== 'specifics'} className="space-y-3">
     {!specificsReady && <p role="status" className="flip-advice">Check the required item specifics. {metadata.data?.aspectError || ''}</p>}
-    <ListingCategoryFields form={draft.form} music={music} conditions={conditionPolicy?.conditions} conditionRequired={conditionPolicy?.conditionRequired} simpleVinylCondition={Boolean(vinylPolicy)} metadataLoading={!vinylPolicy && (metadata.isLoading || metadata.isFetching)} metadataError={!vinylPolicy ? metadata.error?.message : undefined} onRetryConditions={!vinylPolicy ? () => void metadata.refetch() : undefined} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
+    <ListingCategoryFields form={draft.form} music={music} categoryError={categoryIssue} conditions={conditionPolicy?.conditions} conditionRequired={conditionPolicy?.conditionRequired} simpleVinylCondition={Boolean(vinylPolicy)} metadataLoading={!vinylPolicy && (metadata.isLoading || metadata.isFetching)} metadataError={!vinylPolicy ? metadata.error?.message : undefined} onRetryConditions={!vinylPolicy ? () => void metadata.refetch() : undefined} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
     <EbayItemSpecifics categoryId={categoryId} aspects={metadata.data?.aspects || []} value={draft.form.item_specifics} disabled={disabled} onChanged={value => draft.change('item_specifics', value)} />
     <MusicItemSpecifics item={draft.item} values={draft.form.music_values as MusicValues | undefined} aspects={metadata.data?.aspects} disabled={disabled} onChanged={values => { draft.change('music_values', values); const description = syncMusicConditionText(String(draft.formRef.current.description || ''), values); if (description !== draft.formRef.current.description) draft.change('description', description); }} />
 
@@ -139,6 +148,7 @@ export default function ListingEditor() {
     <div hidden={section !== 'research'}>    <ListingMarketSummary item={draft.item} userId={user?.id} tenantId={tenant.tenantId} nicheId={nicheId} disabled={disabled} onApply={price => draft.change('price', price)} />
 </div>
     {section === 'preview' && <section className="swish-card p-4 space-y-3">{draft.photos[0] && <img src={draft.photos[0]} alt="Listing cover" className="w-full max-h-72 object-contain"/>}<h2 className="text-xl font-bold">{String(draft.form.title || '')}</h2><p className="text-2xl font-bold">{price.actual === null ? 'Price not set' : formatCurrency(price.actual)}</p><p>{String(draft.form.condition || '')}</p><p className="whitespace-pre-wrap break-words">{listingDescriptionText(draft.form.description)}</p><p className="text-sm text-muted-foreground">Draft preview · final buyer charges and delivery are confirmed by eBay.</p></section>}
-    {section !== 'overview' && <button type="button" className="flip-primary" disabled={disabled} onClick={async () => { if (!draft.dirty || await actions.save()) open('overview'); }}>Done · Save changes</button>}
+    {!rapid && section !== 'overview' && <button type="button" className="flip-primary" disabled={disabled} onClick={async () => { if (!draft.dirty || await actions.save()) open('overview'); }}>Done · Save changes</button>}
+    {rapid && <RapidListingFooter key={rapid.job.id} job={rapid.job} approved={rapid.approved} actions={actions} canSubmit={canSubmit} loaded={!draft.loading && !metadata.isLoading && !metadata.isFetching && !category.busy && Boolean(categoryIssue || metadata.data || metadata.error)} onNext={rapid.onNext} onEdit={() => open('description')} />}
   </div>;
 }

@@ -47,9 +47,11 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
   const coinContext = coinCategoryContext(context.title || text, context.attributes);
   const format = musicFormat(context.attributes, context.title);
   const formatQuery = format === 'cd' ? 'music CDs' : format === 'vinyl' ? 'vinyl records' : format === 'cassette' ? 'music cassettes' : 'recorded music albums';
-  const primary = coins ? categorySearchQuery(context.title || text, 'coins', context.attributes, context.specialistId) : text;
-  // Never drop the ancient/hammered tradition or single-versus-lot context on fallback.
-  const fallback = coins ? `${coinSearchPrefix(coinContext, kind)}s` : music ? formatQuery : '';
+  const jurisdiction = coinContext.period !== 'ancient' && coinContext.country ? ` ${coinContext.country}` : '';
+  const date = jurisdiction && coinContext.year != null ? ` ${coinContext.year}` : '';
+  const primary = coins ? numismaticSearchQuery(context.title || text, context.attributes, context.specialistId, `${coinSearchPrefix(coinContext, kind)}${jurisdiction}${date}`) : text;
+  // The fallback retains issuing country/date as well as ancient/hammered and single-versus-lot context.
+  const fallback = coins ? `${coinSearchPrefix(coinContext, kind)}s${jurisdiction}${date}` : music ? formatQuery : '';
   const queries = fallback && primary.toLowerCase() !== fallback.toLowerCase() ? [primary, fallback] : [primary];
   for (const search of queries) {
   for (const endpoint of ['swish-ebay-category', 'swish-ebay-list']) {
@@ -73,10 +75,12 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
       });
       if (coins) eligible.sort((left, right) => coinCategoryRank(right, coinContext) - coinCategoryRank(left, coinContext));
       const selected = eligible[0];
+      const ambiguous = coins && selected && eligible.some(row => String(row.id) !== String(selected.id) && coinCategoryRank(row, coinContext) === coinCategoryRank(selected, coinContext));
+      if (ambiguous) { failures.push('Several coin branches match equally. Add the issuing country, date or period to the recorded coin details and retry; no category was selected.'); continue; }
       if (selected) return { id: String(selected.id).trim(), name: String(selected.name).trim(), ...(coins && typeof selected.categoryPath === 'string' ? { categoryPath: selected.categoryPath.trim() } : {}) };
     }
-    failures.push(typeof payload.error === 'string' ? payload.error : coins ? 'No relevant eBay coin category was returned. Art, merchandise and supply categories were rejected; the draft remains editable.' : music ? 'No matching recorded-music category was returned. Clothing and merchandise suggestions were rejected.' : 'No matching eBay leaf category was returned.');
+    failures.push(typeof payload.error === 'string' ? payload.error : coins ? 'No matching eBay coin category was returned for the recorded country, date, period and single/lot scope. Unrelated categories were rejected; the draft remains editable.' : music ? 'No matching recorded-music category was returned. Clothing and merchandise suggestions were rejected.' : 'No matching eBay leaf category was returned.');
   }
   }
-  throw new Error(`Category lookup unavailable. ${failures[failures.length - 1] || 'Add the music format (vinyl, CD or cassette) to the item title and retry.'}`);
+  throw new Error(`Category lookup unavailable. ${failures[failures.length - 1] || (coins ? 'Confirm the issuing country and date or period on this same coin, then retry.' : 'Add the music format (vinyl, CD or cassette) to the item title and retry.')}`);
 }

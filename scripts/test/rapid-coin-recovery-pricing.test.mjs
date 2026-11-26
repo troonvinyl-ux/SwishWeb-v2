@@ -13,7 +13,7 @@ test('a lost original item-insert response recovers by the same physical UUID, n
 });
 test('an uncertain draft attempt is never automatically replayed', async () => {
   let calls = 0; const q = { select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; }, async maybeSingle() { return { data: null, error: null }; } };
-  const service = loadRapidTypescript('src/lib/listingStudioPreparation.ts', { '@/lib/captureRequest': request, '@/lib/quickCaptureFlow': { prepareQuickCapture: async () => { calls++; } } });
+  const service = loadRapidTypescript('src/lib/listingStudioPreparation.ts', { '@/lib/captureRequest': request, '@/lib/captureDraftRecovery': { readOriginalCaptureDraft: async () => null }, '@/lib/quickCaptureFlow': { prepareQuickCapture: async () => { calls++; } } });
   await assert.rejects(service.prepareStableQuickCapture({ scope: { client: { from: () => q }, tenantId: 'tenant' }, checkpoint: { itemId: 'physical-id', draftAttempted: true }, onCheckpoint() {}, onProgress() {} }), /draft save has an uncertain result/); assert.equal(calls, 0);
 });
 test('Market, Quick Sale and Recommended use shared pricing evidence, independent of AI confidence', () => {
