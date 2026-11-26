@@ -9,7 +9,7 @@ export function scanListingAttributes(result: Record<string, unknown>, answers: 
 export function enrichedScanListing(generated: Record<string, unknown>, preparation: ScanListingEnrichment): Record<string, unknown> {
   const market = asRecord(preparation.market), valuation = asRecord(market.valuation), recommendation = asRecord(market.recommendation);
   const suggested = positiveMoney(valuation.recommendedListingPrice, recommendation.recommendedPrice);
-  return { ...generated, ...(preparation.category ? { category_id: preparation.category.id, category: preparation.category.name } : {}),
+  return { ...generated, ...(preparation.category ? { category_id: preparation.category.id, category: preparation.category.name, category_path: preparation.category.categoryPath || '' } : {}),
     ...(suggested !== null ? { recommended_price: suggested } : {}),
     ...(preparation.specifics.length ? { item_specifics: Object.fromEntries(preparation.specifics.map(row => [row.name, row.value])) } : {}),
   };
