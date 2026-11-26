@@ -39,7 +39,7 @@ test('ancient fallback retains era and tradition and never chooses a bulk or mod
     calls.push(body.query); return body.query === 'ancient roman coins' ? ok([bulk, modern, roman]) : ok([bulk, modern]);
   }, input);
   assert.equal(result.id, roman.id); assert.equal(calls.length, 3);
-  assert.ok(calls.every(query => /^ancient roman coin/.test(query))); assert.ok(calls.every(query => !/provisional/i.test(query)));
+  assert.deepEqual(calls, [input.title, input.title, 'ancient roman coins']);
 });
 test('only wrong categories leave an editable draft instead of a guessed ID', async () => {
   let calls = 0;

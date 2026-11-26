@@ -2,24 +2,25 @@ import { AlertTriangle, CheckCircle, Tag } from 'lucide-react';
 import type { EbayCondition } from '@/lib/ebayMusicContract';
 import type { CategorySuggestion } from '@/lib/categoryLookup';
 import ListingConditionFields from '@/components/features/ListingConditionFields';
+import { retainedCoinIdentitySpecifics } from '@/lib/listingCategorySelection';
 interface ListingCategoryFieldsProps {
   form: Record<string, unknown>; disabled: boolean; suggesting: boolean; suggestion: CategorySuggestion | null;
-  onChange: (key: string, value: unknown) => void; onSuggest: () => void; music?: boolean; categoryError?: string | null;
+  onChange: (key: string, value: unknown) => void; onSuggest: () => void; music?: boolean; coins?: boolean; categoryError?: string | null;
   conditions?: EbayCondition[]; conditionRequired?: boolean; simpleVinylCondition?: boolean; metadataLoading?: boolean;
   metadataError?: string; onRetryConditions?: () => void;
 }
-export default function ListingCategoryFields({ form, disabled, suggesting, suggestion, onChange, onSuggest, music = false, categoryError, conditions, conditionRequired, simpleVinylCondition = false, metadataLoading = false, metadataError, onRetryConditions }: ListingCategoryFieldsProps) {
+export default function ListingCategoryFields({ form, disabled, suggesting, suggestion, onChange, onSuggest, music = false, coins = false, categoryError, conditions, conditionRequired, simpleVinylCondition = false, metadataLoading = false, metadataError, onRetryConditions }: ListingCategoryFieldsProps) {
   const category = String(form.category || ''), categoryId = String(form.category_id || ''), categoryPath = String(form.category_path || '');
   const changeLabel = (label: string) => {
     onChange('category', label);
     if (label.trim() !== category.trim()) onChange('category_id', '');
-    onChange('condition_id', ''); onChange('category_path', ''); onChange('item_specifics', {});
+    onChange('condition_id', ''); onChange('category_path', ''); onChange('item_specifics', coins ? retainedCoinIdentitySpecifics(form.item_specifics) : {});
   };
   const useSuggestion = () => {
     if (!suggestion) return;
     const changed = categoryId !== suggestion.id;
     onChange('category', suggestion.name); onChange('category_id', suggestion.id); onChange('category_path', suggestion.categoryPath || '');
-    if (changed) { onChange('condition_id', ''); onChange('item_specifics', {}); }
+    if (changed) { onChange('condition_id', ''); onChange('item_specifics', coins ? retainedCoinIdentitySpecifics(form.item_specifics) : {}); }
   };
   return <fieldset disabled={disabled} className="swish-card space-y-4 p-4 sm:p-5"><legend className="sr-only">Category and condition</legend>
     <h2 className="flex items-center gap-2 text-lg font-semibold"><Tag size={20} className="text-primary"/>Category &amp; Condition</h2>

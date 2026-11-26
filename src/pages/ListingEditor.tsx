@@ -9,6 +9,8 @@ import { useCurrentTenantId } from '@/hooks/useCurrentTenantId';
 import { useListingEditorDraft } from '@/hooks/useListingEditorDraft';
 import { useListingEditorActions } from '@/hooks/useListingEditorActions';
 import { useListingCategorySuggestion } from '@/hooks/useListingCategorySuggestion';
+import { useCoinSpecificPrefill } from '@/hooks/useCoinSpecificPrefill';
+import ListingCoinIdentity from '@/components/features/ListingCoinIdentity';
 import { useListingPhotoUploads } from '@/hooks/useListingPhotoUploads';
 import { useListingCoinPhotoPreparation } from '@/hooks/useListingCoinPhotoPreparation';
 import { syncMusicConditionText } from '@/lib/musicConditionText';
@@ -61,6 +63,7 @@ export default function ListingEditor({ listingId, rapid }: ListingEditorProps =
   const category = useListingCategorySuggestion(draft, user?.id, tenant.tenantId);
   // New / Used for EBAY_GB Vinyl Records is available immediately; eBay's
   // shared backend still validates actual category policy at publication.
+  useCoinSpecificPrefill(draft, metadata.data?.aspects, nicheId, actions.busy || category.busy || Boolean(categoryIssue || publicationBlock(draft.form)));
   const conditionReady = Boolean(!categoryIssue && categoryId && conditionPolicy &&
     supportedEbayCondition(draft.form.condition_id, conditionPolicy.conditions, conditionPolicy.conditionRequired));
   const disabled = actions.busy || coinStudio.busy || upload.busy || category.busy || Boolean(publicationBlock(draft.form));
@@ -134,7 +137,8 @@ export default function ListingEditor({ listingId, rapid }: ListingEditorProps =
     <div hidden={section !== 'photos'}>    <ListingEditorPhotos draft={draft} upload={upload} disabled={disabled} coinStudio={coinStudio} /></div>
     <div hidden={section !== 'specifics'} className="space-y-3">
     {!specificsReady && <p role="status" className="flip-advice">Check the required item specifics. {metadata.data?.aspectError || ''}</p>}
-    <ListingCategoryFields form={draft.form} music={music} categoryError={categoryIssue} conditions={conditionPolicy?.conditions} conditionRequired={conditionPolicy?.conditionRequired} simpleVinylCondition={Boolean(vinylPolicy)} metadataLoading={!vinylPolicy && (metadata.isLoading || metadata.isFetching)} metadataError={!vinylPolicy ? metadata.error?.message : undefined} onRetryConditions={!vinylPolicy ? () => void metadata.refetch() : undefined} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
+    {nicheId === 'coins' && <ListingCoinIdentity item={draft.item} title={String(draft.form.title || '')} form={draft.form} disabled={disabled} onChange={draft.change} />}
+    <ListingCategoryFields form={draft.form} music={music} coins={nicheId === 'coins'} categoryError={categoryIssue || category.error} conditions={conditionPolicy?.conditions} conditionRequired={conditionPolicy?.conditionRequired} simpleVinylCondition={Boolean(vinylPolicy)} metadataLoading={!vinylPolicy && (metadata.isLoading || metadata.isFetching)} metadataError={!vinylPolicy ? metadata.error?.message : undefined} onRetryConditions={!vinylPolicy ? () => void metadata.refetch() : undefined} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
     <EbayItemSpecifics categoryId={categoryId} aspects={metadata.data?.aspects || []} value={draft.form.item_specifics} disabled={disabled} onChanged={value => draft.change('item_specifics', value)} />
     <MusicItemSpecifics item={draft.item} values={draft.form.music_values as MusicValues | undefined} aspects={metadata.data?.aspects} disabled={disabled} onChanged={values => { draft.change('music_values', values); const description = syncMusicConditionText(String(draft.formRef.current.description || ''), values); if (description !== draft.formRef.current.description) draft.change('description', description); }} />
 

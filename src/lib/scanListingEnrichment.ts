@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { callEdgeFunction } from '@/lib/supabase';
 import { verifyModuleScope } from '@/lib/moduleScope';
 import { lookupScopedListingCategory } from '@/lib/scopedCategoryLookup';
+import { CATEGORY_LOOKUP_VERSION } from '@/lib/categoryLookup';
 import { asRecord } from '@/lib/itemPhotos';
 import { normalizeEbayAspects, normalizeEbayConditionPolicy, ebayConditionId, vinylRecordConditionPolicy, type EbayAspect } from '@/lib/ebayMusicContract';
 import { researchScanMarket } from '@/lib/scanMarketResearch';
@@ -12,6 +13,7 @@ import { coinListingInput } from '@/lib/coinListingInput';
 
 export interface EbaySpecific { name: string; value: string; }
 export interface ScanListingEnrichment {
+  categoryLookupVersion?: string;
   category: { id: string; name: string; categoryPath?: string } | null;
   aspects: EbayAspect[];
   specifics: EbaySpecific[];
@@ -121,6 +123,7 @@ export async function enrichScannedItemForListing(input: ScanListingEnrichmentIn
     if (!isCurrent()) throw new Error('The capture workspace changed. Reopen the scanner and try again.');
   };
   const result: ScanListingEnrichment = {
+    categoryLookupVersion: CATEGORY_LOOKUP_VERSION,
     category: null, aspects: [], specifics: [], missingRequired: [], marketRefreshed: false,
     marketError: null, categoryError: null, specificsError: null,
   };
@@ -140,10 +143,10 @@ export async function enrichScannedItemForListing(input: ScanListingEnrichmentIn
   try {
     await ensureScope();
     const metadata = await callEdgeFunction<Record<string, unknown>>('swish-ebay-category', {
-      route: 'get_category_aspects', tenantId: input.tenantId, nicheId: input.nicheId, categoryId: result.category.id,
+      route: 'get_category_aspects', tenantId: input.tenantId, nicheId: input.nicheId, categoryId: result.category.id, forceLive: true,
     }, input.client);
     if (metadata.error) throw metadata.error;
-    if (metadata.data?.success !== true) throw new Error(String(metadata.data?.error || 'Category item specifics were unavailable.'));
+    if (metadata.data?.success !== true || metadata.data?.isLeaf === false) throw new Error(String(metadata.data?.error || 'Category item specifics were unavailable.'));
     result.aspects = normalizeEbayAspects(metadata.data?.aspects);
     const prefilled = prefillEbaySpecifics(input.attributes, result.aspects);
     result.specifics = prefilled.specifics;

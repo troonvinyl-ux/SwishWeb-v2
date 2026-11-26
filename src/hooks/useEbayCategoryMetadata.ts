@@ -17,7 +17,7 @@ export function useEbayCategoryMetadata(userId: string | undefined, tenantId: st
       const vinyl = vinylRecordConditionPolicy(categoryId, specialistId);
       const [aspectsResult, conditionsResult] = await Promise.all([
         callEdgeFunction<Record<string, unknown>>('swish-ebay-category',
-          { route: 'get_category_aspects', tenantId, nicheId, categoryId }, client),
+          { route: 'get_category_aspects', tenantId, nicheId, categoryId, forceLive: true }, client),
         vinyl ? Promise.resolve(null) : callEdgeFunction<Record<string, unknown>>('swish-ebay-list',
           { route: 'get_condition_policies', tenantId, nicheId, categoryId }, client),
       ]);
@@ -34,7 +34,7 @@ export function useEbayCategoryMetadata(userId: string | undefined, tenantId: st
         conditionRequired = policy.required;
       }
       const aspectError = aspectsResult.error?.message ||
-        (aspectsResult.data?.success !== true ? String(aspectsResult.data?.error || 'Category item specifics unavailable.') : '');
+        (aspectsResult.data?.success !== true || aspectsResult.data?.isLeaf === false ? String(aspectsResult.data?.error || 'Category item specifics unavailable.') : '');
       return { aspects: aspectError ? [] : normalizeEbayAspects(aspectsResult.data?.aspects), conditions, conditionRequired, aspectError: aspectError || null };
     },
   });

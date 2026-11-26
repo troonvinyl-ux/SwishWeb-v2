@@ -51,7 +51,9 @@ export function coinCategoryMismatch(row: Record<string, unknown>, context: Coin
   const ancient = /\b(?:ancient|roman|hellenistic|byzantine|celtic)\b/i.test(branch) || /\bgreek\b/i.test(branch) && !/\b(?:modern|european)\b/i.test(branch);
   const hammered = /\b(?:hammered|medieval)\b/i.test(branch);
   if (context.period === 'ancient' && !ancient) return 'The item is described as an ancient coin; choose a relevant ancient-coin branch, not a generic or modern category.';
-  if (context.period === 'hammered' && !hammered) return 'The item is described as hammered/medieval; choose a matching coin branch.';
+  // Manufacturing style and country are listing facts, not mandatory words in a category label.
+  // The normal SWISH service can return a valid broader European/world leaf for this country.
+  if (context.period === 'hammered' && ancient) return 'The recorded medieval/hammered period does not match this ancient-coin branch.';
   if (context.period === 'modern' && (ancient || hammered)) return 'The recorded date/period does not match this ancient or hammered-coin category.';
   const observed = /\bbyzantine\b/i.test(branch) ? 'byzantine' : /\broman\b/i.test(branch) ? 'roman' : /\b(?:greek|hellenistic)\b/i.test(branch) ? 'greek' : null;
   if (context.tradition && observed && context.tradition !== observed) return 'The category belongs to a different ancient issuing tradition from the item being reviewed.';
@@ -59,7 +61,8 @@ export function coinCategoryMismatch(row: Record<string, unknown>, context: Coin
     const subbranch = /\bprovincial\b/i.test(branch) ? 'provincial' : /\brepublic/i.test(branch) ? 'republican' : /\b(?:imperial|empire)\b/i.test(branch) ? 'imperial' : null;
     if (subbranch && subbranch !== context.romanBranch) return 'The Roman category branch differs from the attribution in this draft; review the attribution before changing branches.';
   }
-  if (!context.lot && context.period !== 'ancient' && context.country && countryIn(branch) !== context.country) return `The recorded issuing country is ${context.country}; choose its coin branch rather than a different country or generic fallback.`;
+  const categoryCountry = countryIn(branch);
+  if (!context.lot && context.period !== 'ancient' && context.country && categoryCountry && categoryCountry !== context.country) return `The recorded issuing country is ${context.country}; this category names a different issuing country.`;
   if (context.year != null) {
     const ranges = [...branch.matchAll(/\b(1\d{3}|20\d{2})\s*[-–—]\s*(1\d{3}|20\d{2}|present|date)\b/gi)];
     if (ranges.some(match => context.year! < Number(match[1]) || context.year! > (/present|date/i.test(match[2]) ? Infinity : Number(match[2])))) return 'The coin date falls outside this category’s date range.';

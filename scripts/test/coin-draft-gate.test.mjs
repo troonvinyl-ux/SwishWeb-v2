@@ -13,6 +13,7 @@ const transports = {
   },
   '@/lib/niche': { getSpecialistIdsForNiche: () => ['coins', 'islamic_silver'] },
   '@/lib/sharedScanPhotos': {},
+  '@/lib/scanListingEnrichment': { enrichScannedItemForListing: async () => ({ category: { id: '990001', name: 'Russia', categoryPath: 'Coins > European > Russia' }, specifics: [], market: null }) },
 };
 function load(path) {
   if (cache.has(path)) return cache.get(path);
@@ -82,6 +83,8 @@ test('coin pull uses the shared generator and canonical draft RPC only after ret
   const draft = await createCoinListingDraft(scope, 'coin-fixture');
   assert.deepEqual(client.generatorCalls.map(call => call.name), ['swish-list-generate']);
   assert.equal(client.rpcCalls[0].name, 'swish_create_listing_draft');
+  assert.equal(client.rpcCalls[0].params.p_category_id, '990001');
+  assert.equal(client.rpcCalls[0].params.p_listing.category, 'Russia');
   assert.deepEqual(draft, { listingId: 'coin-listing', reused: false });
   assert.equal((await createCoinListingDraft(scope, 'coin-fixture')).reused, true);
   const missingReference = coinItem({ attributes: { source_scan: coinItem().attributes.source_scan } });

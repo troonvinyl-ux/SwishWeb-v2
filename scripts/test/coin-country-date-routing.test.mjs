@@ -19,13 +19,13 @@ test('single Russian 1759 coin skips unrelated countries, lots, Soviet and feder
   const result = await lookup.lookupListingCategory('tenant', input.title, async () => ok([bulk, italy, soviet, modernRussia, russia]), input);
   assert.equal(result.id, russia.id);
 });
-test('fallback retains issuing country and date, never becoming a generic coins lookup', async () => {
+test('shared title lookup retries issuing country without requiring the date in taxonomy wording', async () => {
   const calls = [];
   const result = await lookup.lookupListingCategory('tenant', input.title, async (_endpoint, body) => {
-    calls.push(body.query); return body.query === 'modern coins Russia 1759' ? ok([italy, russia]) : ok([italy, soviet, bulk]);
+    calls.push(body.query); return body.query === 'Russia coins' ? ok([italy, russia]) : ok([italy, soviet, bulk]);
   }, input);
   assert.equal(result.id, russia.id); assert.equal(calls.length, 3);
-  assert.ok(calls.every(query => /Russia 1759/.test(query)));
+  assert.deepEqual(calls, [input.title, input.title, 'Russia coins']);
 });
 test('saved wrong country is flagged even when stock facts use native column aliases', () => {
   const item = { specialist_id: 'coins', country_of_origin: 'Russia', year_made: 1759, attributes: {} };
@@ -49,8 +49,9 @@ test('ancient mint geography is not a modern issuing-country assertion; BCE and 
   assert.equal(context.coinCategoryContext('Ancient coin 2000 BCE').year, null);
   assert.equal(context.coinCategoryContext('Copper coin', { date_range: '1759–1762' }).year, null);
 });
-test('an equally-ranked pair of different leaves requires clarification rather than taking the first', async () => {
-  await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => ok([russia, { ...russia, id: '990008' }]), input), /match equally/);
+test('equal semantic matches preserve eBay ordering as in normal SWISH quickRequirements', async () => {
+  const result = await lookup.lookupListingCategory('tenant', input.title, async () => ok([russia, { ...russia, id: '990008' }]), input);
+  assert.equal(result.id, russia.id);
 });
 test('only wrong categories fail without guessing or changing the draft', async () => {
   await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => ok([bulk, italy, soviet]), input), /coin category/);
