@@ -35,7 +35,7 @@ import { asRecord } from '@/lib/itemPhotos';
 import { createCoinListingDraft } from '@/lib/coinListingPersistence';
 import { numistaReference, parseNumistaNumber, numistaIdentifyKnownAttributes, numistaAnchoredReview } from '@/lib/numistaCapture';
 import { callEdgeFunction, getSupabaseClientAsync, EdgeFunctionError } from '@/lib/supabase';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useTable } from '@/hooks/useSupabaseQuery';
@@ -1355,6 +1355,8 @@ export default function Identify() {
           </p>
         </div>
       </div>
+
+      <Link to="/rapid/coins" className="btn-secondary min-h-12"><Camera size={20} />Rapid Listing · Collector’s Envelope Mode</Link>
 
       {/* Error banner (from previous failed attempt) */}
       {errorMsg && (

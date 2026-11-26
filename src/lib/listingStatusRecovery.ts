@@ -38,6 +38,35 @@ export async function checkSharedListingStatus({ client, userId, tenantId, niche
   return fresh;
 }
 
+/** Link an accepted item number against the original server claim and verified seller.
+ * SKU-less legacy recovery is decided by the backend, never inferred by the browser. */
+export async function recoverSharedPendingPublication(input: StatusRecoveryInput & { externalListingId: string }): Promise<Record<string, unknown>> {
+  const { client, userId, tenantId, nicheId, listingId, externalListingId } = input;
+  if (!/^\d{6,20}$/.test(externalListingId)) throw new Error('Enter the existing eBay item number.');
+  await activateModuleScope(client, userId, tenantId, nicheId);
+  const read = async () => {
+    const result = await client.from('listings').select('*,items!inner(tenant_id,status,sold_at)')
+      .eq('id', listingId).eq('tenant_id', tenantId).eq('marketplace_id', 'ebay').eq('items.tenant_id', tenantId).single();
+    if (result.error || !result.data) throw new Error('The pending listing is unavailable in this workspace.');
+    return result.data as Record<string, unknown>;
+  };
+  const before = await read();
+  if (before.external_listing_id && String(before.external_listing_id) !== externalListingId) throw new Error('The saved eBay identity changed. Refresh the existing listing.');
+  if (!before.publish_claim_id) {
+    if (String(before.external_listing_id || '') !== externalListingId) throw new Error('No pending server claim was found. Check the existing seller listing before continuing.');
+    return checkSharedListingStatus(input);
+  }
+  const result = await callEdgeFunction<Record<string, unknown>>('swish-ebay-list', {
+    route: 'recover_pending_publish', tenantId, nicheId, listingId, externalListingId,
+  }, client);
+  if (result.error) throw result.error;
+  if (result.data?.success !== true || String(result.data.externalListingId || '') !== externalListingId) throw new Error('SWISH could not verify the existing eBay link. Nothing was resubmitted.');
+  const fresh = await read();
+  if (String(fresh.external_listing_id || '') !== externalListingId || fresh.publish_claim_id || !['active', 'sold', 'ended'].includes(String(fresh.status))) throw new Error('The existing eBay link and original claim are still reconciling. Refresh status; do not submit again.');
+  assertInventoryReconciled(fresh);
+  return fresh;
+}
+
 /** Native-equivalent End flow: one explicit server End request, then scoped
  * readback. Never mark Ended locally from a button click or uncertain response. */
 export async function endSharedEbayListing({ client, userId, tenantId, nicheId, listingId }: StatusRecoveryInput): Promise<Record<string, unknown>> {

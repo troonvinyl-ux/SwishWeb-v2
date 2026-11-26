@@ -1,5 +1,6 @@
 import type { MusicFields, MusicSnapshot, MusicValues } from '@/types/music';
 import { ebayMusicGrade, musicGradeAspects } from '@/lib/ebayMusicContract';
+import { musicContentsEvidence } from '@/lib/listingEvidence';
 export function musicListingTitle(values:MusicValues):string {
  const parts=[values.artist,values.release_title,values.format,values.year,values.label,values.catalogue_number,values.edition].filter(Boolean),words=parts.join(' ').replace(/\s+/g,' ').trim();
  if(words.length<=80)return words;const trimmed=words.slice(0,81);return trimmed.slice(0,trimmed.lastIndexOf(' ')).trim()||words.slice(0,80);
@@ -10,12 +11,13 @@ export function musicSpecifics(values:MusicValues):Record<string,string> {
  return Object.fromEntries(Object.entries(map).flatMap(([key,label])=>{const raw=String(values[key as keyof MusicValues]||'').trim(),value=key==='media_grade'||key==='sleeve_grade'?ebayMusicGrade(raw):raw;return value&&value.length<=65?[[key==='barcode'&&value.length===12?'UPC':label,value]]:[];}));
 }
 export function musicListingDescription(snapshot:MusicSnapshot):string {
- const {values:v,release}=snapshot,lines=[`${v.artist}${v.artist&&v.release_title?' — ':''}${v.release_title}`,'','Release details'];
+ const {values:v,release}=snapshot,contents=musicContentsEvidence(release?.discCount,v.observed_disc_count,v.format),lines=[`${v.artist}${v.artist&&v.release_title?' — ':''}${v.release_title}`,'','Release details'];
  const pairs=[['Format',v.format],['Label',v.label],['Catalogue number',v.catalogue_number],['Release year',v.year],['Release country (not proof of manufacture)',v.country],['Edition',v.edition],['Speed',v.speed],['Record size',v.record_size],['Discs physically present',v.observed_disc_count]];
  for(const[label,value]of pairs)if(value)lines.push(`${label}: ${value}`);
+ lines.push('','Included contents',contents.disclosure,'Missing disc identity is not assumed from catalogue track positions.');
  lines.push('','Condition',`Media: ${v.media_grade||'Not graded'}`,`Sleeve: ${v.sleeve_grade||'Not graded / not applicable'}`,v.play_tested?'Playback: Seller reports play-testing; see the seller’s playback/condition notes. This is not a guarantee of defect-free audio.':'Not play-tested. Photographs cannot establish sound quality or hidden playback defects.');
  if(v.condition_notes)lines.push(v.condition_notes);if(v.features)lines.push(`Features / contents: ${v.features}`);if(v.matrix_runout)lines.push(`Seller-observed matrix / identifiers: ${v.matrix_runout}`);
- if(release){lines.push('',`Discogs individual release: ${release.id}`,release.url,'Data provided by Discogs. Seller checked this catalogue selection against the physical item.');if(release.tracks.length){lines.push('','Tracklisting');for(const track of release.tracks)lines.push([track.position,track.title,track.duration?`(${track.duration})`:''].filter(Boolean).join(' '));}}
+ if(release){lines.push('',`Discogs individual release: ${release.id}`,release.url,'Data provided by Discogs. Seller checked this catalogue selection against the physical item.');if(release.tracks.length&&contents.status==='count_matches'){lines.push('','Catalogue tracklisting — reference only; not independent verification of physical disc identity');for(const track of release.tracks)lines.push([track.position,track.title,track.duration?`(${track.duration})`:''].filter(Boolean).join(' '));}}
  if(!release)lines.push('','Provisional identification — no Discogs release has been confirmed.');
  lines.push('','Please review the seller’s own photographs for condition and included components.');return lines.join('\n');
 }

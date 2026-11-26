@@ -13,8 +13,10 @@ export function photoUrl(value: unknown): string | null {
 /** Use only the app's persisted, fidelity-checked BackgroundErase presentations. */
 export function usableStudio(value: unknown): boolean {
   const result = asRecord(value), quality = asRecord(result.quality);
+  const professional = result.presentationVersion === 'coin-snap-1600-v1';
   return result.version === STUDIO_VERSION && result.status === 'ready' && !!photoUrl(result.enhancedUri)
-    && quality.sourcePixelsOnly === true && quality.fidelityPassed === true;
+    && quality.sourcePixelsOnly === true && quality.fidelityPassed === true
+    && (!professional || quality.pairPassed === true && quality.scaleMatched === true && quality.backgroundWhite === true && quality.colourShiftBounded === true && quality.clippingIntroduced === false && quality.outputWidth === 1600 && quality.outputHeight === 1600);
 }
 export function itemPhotos(item: Record<string, unknown> | null | undefined): ItemPhoto[] {
   if (!item) return [];
@@ -26,7 +28,8 @@ export function itemPhotos(item: Record<string, unknown> | null | undefined): It
   const originals = [...new Set(media.map(photoUrl).filter((url): url is string => !!url))]
     .filter(url => !derivatives.has(url) && !/\/(?:studio|references)\//i.test(url.split('?')[0]));
   return originals.map(original => {
-    const studio = studios.find(value => value.originalUri === original && usableStudio(value));
+    const candidates = studios.filter(value => value.originalUri === original && usableStudio(value));
+    const studio = candidates.find(value => value.presentationVersion === 'coin-snap-1600-v1') ?? candidates[0];
     return { original, presentation: studio ? String(studio.enhancedUri) : original, prepared: !!studio };
   });
 }
