@@ -16,7 +16,7 @@ export default function RapidListingFooter({ job, actions, canSubmit, approved, 
   const publish = async () => {
     if (working.current || actions.busy || !canSubmit || !rapidCanPublish(job)) return;
     working.current = true;
-    await actions.publish().then(finish).finally(() => { working.current = false; });
+    await actions.publish().then(success => success ? finish() : queue.refresh()).finally(() => { working.current = false; });
   };
   useEffect(() => {
     if (!approved) { automatic.current = false; return; }
@@ -35,7 +35,7 @@ export default function RapidListingFooter({ job, actions, canSubmit, approved, 
     <button type="button" className="btn-primary" disabled={!canSubmit || actions.busy || !rapidCanPublish(job)} onClick={() => setConfirming(true)}>{actions.publishing ? 'Publishing…' : 'List & Next'}</button>
     <button type="button" className="btn-secondary" disabled={actions.busy || Boolean(actions.reason)} onClick={() => void save()}>Save & Next</button>
     <button type="button" className="btn-secondary" disabled={actions.busy} onClick={onEdit}>Edit</button>
-    <button type="button" className="btn-ghost" disabled={actions.busy || Boolean(actions.reason)} onClick={() => void defer()}>Review Later</button>
+    <button type="button" className="btn-ghost" disabled={actions.busy} onClick={() => void (actions.reason ? finish() : defer())}>Review Later</button>
     {(job.externalId || ['publishing', 'uncertain'].includes(job.publication)) && <button type="button" className="btn-secondary col-span-2" disabled={actions.busy || recovering} onClick={() => void recover()}>Check / recover original submission</button>}
     <p>{actions.reason || actions.error || job.message}</p>
     <ListingPublishConfirmation open={confirming} onOpenChange={setConfirming} onConfirm={() => { setConfirming(false); void publish(); }} />

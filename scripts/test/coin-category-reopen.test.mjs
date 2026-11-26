@@ -27,7 +27,7 @@ test('a failed live lookup preserves the same draft and does not silently clear 
   const original = structuredClone(form), notices = [];
   const draft = { form, formRef: { current: form }, item: stock, revisionRef: { current: 'first' }, change: () => assert.fail('No category mutation on lookup failure') };
   const { useListingCategorySuggestion } = loadRapidTypescript('src/hooks/useListingCategorySuggestion.ts', {
-    react: { useState: value => [value, () => {}] }, sonner: { toast: { success: () => assert.fail('No successful selection'), error: value => notices.push(value) } },
+    react: { useState: value => [value, () => {}], useRef: value => ({ current: value }) }, '@/hooks/useCoinCategoryAutoselect': { useCoinCategoryAutoselect() {} }, sonner: { toast: { success: () => assert.fail('No successful selection'), error: value => notices.push(value) } },
     '@/lib/supabase': { getSupabaseClientAsync: async () => ({}) }, '@/lib/niche': { getActiveNicheId: () => 'coins' }, '@/lib/listingSubmission': { listingNicheId: () => 'coins' }, '@/lib/itemPhotos': { asRecord: rapidRecord },
     '@/lib/scopedCategoryLookup': { lookupScopedListingCategory: async () => { throw new Error('No relevant ancient coin category returned'); } },
   });
@@ -39,7 +39,7 @@ test('a replacement preserves seller title, notes and pricing and resets only ca
   const draft = { form, formRef: { current: form }, item: stock, revisionRef: { current: 'first' }, change: (key, value) => { form[key] = value; draft.revisionRef.current += key; } };
   const notices = [];
   const { useListingCategorySuggestion } = loadRapidTypescript('src/hooks/useListingCategorySuggestion.ts', {
-    react: { useState: value => [value, () => {}] }, sonner: { toast: { success: value => notices.push(value), error: value => notices.push(value) } },
+    react: { useState: value => [value, () => {}], useRef: value => ({ current: value }) }, '@/hooks/useCoinCategoryAutoselect': { useCoinCategoryAutoselect() {} }, sonner: { toast: { success: value => notices.push(value), error: value => notices.push(value) } },
     '@/lib/supabase': { getSupabaseClientAsync: async () => ({}) }, '@/lib/niche': { getActiveNicheId: () => 'coins' }, '@/lib/listingSubmission': { listingNicheId: () => 'coins' }, '@/lib/itemPhotos': { asRecord: rapidRecord },
     '@/lib/scopedCategoryLookup': { lookupScopedListingCategory: async input => { assert.equal(input.title, title); return { id: '910002', name: 'Roman Imperial', categoryPath }; } },
   });

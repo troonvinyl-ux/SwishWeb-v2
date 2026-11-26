@@ -1,29 +1,38 @@
-import { CheckCircle, Tag } from 'lucide-react';
-import { ebayConditionId, supportedEbayCondition, type EbayCondition } from '@/lib/ebayMusicContract';
-interface ListingCategoryFieldsProps { form: Record<string, unknown>; disabled: boolean; suggesting: boolean; suggestion: { id: string; name: string } | null; onChange: (key: string, value: unknown) => void; onSuggest: () => void; music?: boolean; conditions?: EbayCondition[]; conditionRequired?: boolean; simpleVinylCondition?: boolean; metadataLoading?: boolean; metadataError?: string; onRetryConditions?: () => void; }
-export default function ListingCategoryFields({ form, disabled, suggesting, suggestion, onChange, onSuggest, music = false, conditions, conditionRequired, simpleVinylCondition = false, metadataLoading = false, metadataError, onRetryConditions }: ListingCategoryFieldsProps) {
-  // Music never falls back to a guessed condition list. For category 176985
-  // the live policy may only allow New/Used, not the grading-style IDs.
-  const options = conditions ?? [];
-  const savedCondition = Object.prototype.hasOwnProperty.call(form, 'condition_id') ? String(form.condition_id ?? '') : ebayConditionId(form.condition);
-  const policyLoaded = conditionRequired !== undefined;
-  const invalidSavedCondition = policyLoaded && savedCondition &&
-    !supportedEbayCondition(savedCondition, options, conditionRequired === true);
-  const selected = invalidSavedCondition || !policyLoaded ? '' : savedCondition;
-  const category = String(form.category || '');
-  return <fieldset disabled={disabled} className="swish-card space-y-4 p-4 sm:p-5"><legend className="sr-only">Category and condition</legend><h2 className="flex items-center gap-2 text-lg font-semibold"><Tag size={20} className="text-primary" />Category &amp; Condition</h2>
-    <div><label htmlFor="listing-category">eBay category</label><div className="mt-2 flex flex-col gap-2 sm:flex-row"><input id="listing-category" value={category} onChange={event => { const label = event.target.value; onChange('category', label); if (label.trim() !== category.trim()) onChange('category_id', ''); onChange('condition_id', ''); }} className="input-field min-w-0 flex-1" placeholder="Resolved on submission, or choose a category" /><button type="button" className="btn-secondary min-h-11 shrink-0" disabled={suggesting} onClick={onSuggest}>{suggesting ? 'Finding category…' : 'Find eBay category'}</button></div>
-      {suggestion && <div className="mt-3 space-y-2"><p className="flex items-start gap-2 text-base text-success"><CheckCircle size={20} className="mt-1 shrink-0" />{String(form.category_id || '') === suggestion.id ? `Selected: ${suggestion.name}` : `Suggestion: ${suggestion.name}`}</p>{String(form.category_id || '') !== suggestion.id && <button type="button" className="btn-secondary min-h-11" onClick={() => { onChange('category', suggestion.name); onChange('category_id', suggestion.id); onChange('condition_id', ''); }}>Use {suggestion.name}</button>}</div>}
-      {Boolean(form.category_id) && <p className="mt-2 text-base text-muted-foreground">Selected category: {category || 'eBay category'} · {String(form.category_id)}</p>}
+import { AlertTriangle, CheckCircle, Tag } from 'lucide-react';
+import type { EbayCondition } from '@/lib/ebayMusicContract';
+import type { CategorySuggestion } from '@/lib/categoryLookup';
+import ListingConditionFields from '@/components/features/ListingConditionFields';
+interface ListingCategoryFieldsProps {
+  form: Record<string, unknown>; disabled: boolean; suggesting: boolean; suggestion: CategorySuggestion | null;
+  onChange: (key: string, value: unknown) => void; onSuggest: () => void; music?: boolean; categoryError?: string | null;
+  conditions?: EbayCondition[]; conditionRequired?: boolean; simpleVinylCondition?: boolean; metadataLoading?: boolean;
+  metadataError?: string; onRetryConditions?: () => void;
+}
+export default function ListingCategoryFields({ form, disabled, suggesting, suggestion, onChange, onSuggest, music = false, categoryError, conditions, conditionRequired, simpleVinylCondition = false, metadataLoading = false, metadataError, onRetryConditions }: ListingCategoryFieldsProps) {
+  const category = String(form.category || ''), categoryId = String(form.category_id || ''), categoryPath = String(form.category_path || '');
+  const changeLabel = (label: string) => {
+    onChange('category', label);
+    if (label.trim() !== category.trim()) onChange('category_id', '');
+    onChange('condition_id', ''); onChange('category_path', ''); onChange('item_specifics', {});
+  };
+  const useSuggestion = () => {
+    if (!suggestion) return;
+    const changed = categoryId !== suggestion.id;
+    onChange('category', suggestion.name); onChange('category_id', suggestion.id); onChange('category_path', suggestion.categoryPath || '');
+    if (changed) { onChange('condition_id', ''); onChange('item_specifics', {}); }
+  };
+  return <fieldset disabled={disabled} className="swish-card space-y-4 p-4 sm:p-5"><legend className="sr-only">Category and condition</legend>
+    <h2 className="flex items-center gap-2 text-lg font-semibold"><Tag size={20} className="text-primary"/>Category &amp; Condition</h2>
+    {categoryError && <p role="alert" className="flex items-start gap-2 text-base leading-7 text-warning"><AlertTriangle size={22} className="mt-1 shrink-0"/><span>{categoryError}</span></p>}
+    <div><label htmlFor="listing-category">eBay category</label>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row"><input id="listing-category" value={category} onChange={event => changeLabel(event.target.value)} className="input-field min-w-0 flex-1" placeholder="Find the relevant eBay category"/>
+        <button type="button" className="btn-secondary min-h-11 shrink-0" disabled={suggesting} onClick={onSuggest}>{suggesting ? 'Finding category…' : 'Find eBay category'}</button></div>
+      {suggestion && !categoryError && <div className="mt-3 space-y-2"><p className="flex items-start gap-2 text-base text-success"><CheckCircle size={20} className="mt-1 shrink-0"/>{categoryId === suggestion.id ? `Selected: ${suggestion.name}` : `Suggestion: ${suggestion.name}`}</p>{categoryId !== suggestion.id && <button type="button" className="btn-secondary min-h-11" onClick={useSuggestion}>Use {suggestion.name}</button>}</div>}
+      {categoryId && <p className="mt-2 text-base text-muted-foreground">{categoryError ? 'Category to replace' : 'Selected category'}: {category || 'eBay category'} · {categoryId}</p>}
+      {!categoryError && categoryPath && <p className="mt-2 text-sm text-muted-foreground">{categoryPath}</p>}
     </div>
-    <div><label htmlFor="listing-condition">eBay item condition</label><select id="listing-condition" value={selected} disabled={disabled || !form.category_id || !policyLoaded || options.length === 0} onChange={event => { const option = options.find(row => row.id === event.target.value); onChange('condition', option?.label || ''); onChange('condition_id', event.target.value); }} className="input-field mt-2"><option value="">{metadataLoading && music && !simpleVinylCondition ? 'Loading eBay conditions…' : 'Choose eBay item condition'}</option>{options.map(row => <option key={row.id} value={row.id}>{row.label}</option>)}</select>
-      {simpleVinylCondition && <p className="mt-2 text-sm text-muted-foreground">Choose New or Used. Record and sleeve grades are saved separately; eBay checks the selected condition when you submit.</p>}
-      {invalidSavedCondition && <p role="alert" className="mt-2 text-sm text-warning">Saved eBay condition “{String(form.condition || savedCondition)}” (ID {savedCondition}) is not supported by this category. Choose a supported option shown here and save this draft; your record and sleeve grades stay unchanged.</p>}
-      {!policyLoaded && <p role="status" className="mt-2 text-sm text-muted-foreground">{!form.category_id ? 'No saved eBay category ID. Use Find eBay category and confirm a final category before choosing a condition.' : metadataLoading ? 'Checking conditions supported by the current eBay category…' : 'No condition policy has loaded. Retry the lookup; this category has no verified recovery options.'}</p>}
-      {policyLoaded && conditionRequired === false && options.length === 0 && <div className="mt-2 space-y-2"><p className="text-sm text-muted-foreground">eBay does not require a condition for this category.</p>{savedCondition && <button type="button" className="btn-secondary min-h-11" disabled={disabled} onClick={() => { onChange('condition_id', ''); onChange('condition', ''); }}>Clear the saved, unsupported eBay condition</button>}</div>}
-      {Boolean(form.category_id) && (metadataError || !policyLoaded && !metadataLoading) && onRetryConditions && <button type="button" className="btn-secondary mt-2 min-h-11" onClick={onRetryConditions} disabled={disabled || metadataLoading}>Retry eBay condition lookup</button>}
-      <p className="mt-2 text-base leading-7 text-muted-foreground">{music ? 'Item condition is separate from Record / CD / Cassette and sleeve / case grading above. Brand New requires unopened, unused stock.' : 'The shared eBay service validates the supported conditions for this category.'}</p></div>
-    <div><label htmlFor="listing-condition-notes">Condition description / flaws</label><textarea id="listing-condition-notes" maxLength={1000} value={String(form.condition_description || '')} onChange={event => onChange('condition_description', event.target.value)} rows={3} className="input-field mt-2" placeholder={music ? 'Media/sleeve wear, playback findings, missing inserts, defects' : 'Visible wear, damage, defects and included or missing components'} /></div>
+    <ListingConditionFields form={form} disabled={disabled || Boolean(categoryError)} onChange={onChange} music={music} conditions={conditions} conditionRequired={conditionRequired} simpleVinylCondition={simpleVinylCondition} metadataLoading={metadataLoading} metadataError={metadataError} onRetryConditions={onRetryConditions}/>
+    <div><label htmlFor="listing-condition-notes">Condition description / flaws</label><textarea id="listing-condition-notes" maxLength={1000} value={String(form.condition_description || '')} onChange={event => onChange('condition_description', event.target.value)} rows={3} className="input-field mt-2" placeholder={music ? 'Media/sleeve wear, playback findings, missing inserts, defects' : 'Visible wear, damage, defects and included or missing components'}/></div>
     {metadataError && <p role="status" className="text-base leading-7 text-muted-foreground">Live eBay condition lookup error: {metadataError}. Saved selections remain; this category still requires a supported eBay condition before submitting.</p>}
     <p className="text-base text-muted-foreground">{music ? 'Category, eBay item condition, separate media/sleeve grading and notes are saved together with this draft.' : 'Category, eBay item condition and notes are saved together with this draft.'}</p>
   </fieldset>;

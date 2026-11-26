@@ -1,5 +1,6 @@
 import { prepareQuickCapture } from '@/lib/quickCaptureFlow';
 import { assertCaptureScope } from '@/lib/captureRequest';
+import { readOriginalCaptureDraft } from '@/lib/captureDraftRecovery';
 import type { CaptureCheckpoint, CaptureDraft } from '@/types/capture';
 type PreparationOptions = Parameters<typeof prepareQuickCapture>[0];
 /** Recovery guard around the existing engine, not a second draft/publication pipeline. */
@@ -18,17 +19,15 @@ export async function prepareStableQuickCapture(options: PreparationOptions): Pr
   }
   if (checkpoint.itemAttempted && !checkpoint.itemId && !options.stableItemId) throw new Error('The earlier item save has an uncertain result. Inspect inventory before starting another item; the insert will not be replayed.');
   if (checkpoint.itemId && !checkpoint.listingId) {
-    const existing = await options.scope.client.from('listings').select('id,status,external_listing_id,publish_claim_id').eq('tenant_id', options.scope.tenantId).eq('item_id', checkpoint.itemId).eq('marketplace_id', 'ebay').order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (existing.error) throw new Error('Existing draft lookup failed. Retry readback, not draft creation.');
-    await assertCaptureScope(options.scope);
-    if (existing.data) {
-      if (existing.data.external_listing_id || existing.data.publish_claim_id || !['draft', 'review', 'review_required'].includes(String(existing.data.status))) throw new Error('This item already has a submission. Inspect its saved listing; no new draft or publication was sent.');
-      await keep({ listingId: String(existing.data.id) });
-    } else if (checkpoint.draftAttempted) throw new Error('The earlier draft save has an uncertain result. Inspect this item in inventory; draft creation will not be replayed automatically.');
+    const existingId = await readOriginalCaptureDraft({ scope: options.scope, itemId: checkpoint.itemId, specialistId: options.specialistId, captureId: options.stableItemId });
+    if (existingId) await keep({ listingId: existingId });
+    else if (checkpoint.draftAttempted) throw new Error(checkpoint.draftFailure?.outcome === 'rejected'
+      ? `The earlier draft was rejected: ${checkpoint.draftFailure.message}. Use Check saved draft / resume to retry on this same item.`
+      : 'The earlier draft save has an uncertain result. Use Check saved draft / resume; draft creation will not be replayed automatically.');
   }
   return prepareQuickCapture({ ...options, checkpoint, onCheckpoint: keep,
     beforeItem: async () => { await keep({ itemAttempted: true }); await options.beforeItem?.(); },
-    beforeDraft: async () => { await keep({ draftAttempted: true }); await options.beforeDraft?.(); },
+    beforeDraft: async () => { await options.beforeDraft?.(); await keep({ draftAttempted: true, draftFailure: undefined }); },
     onProgress: options.onProgress,
   });
 }

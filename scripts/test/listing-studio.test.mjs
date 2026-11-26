@@ -25,10 +25,10 @@ test('original retention has explicit count and memory limits', () => {
 });
 test('uncertain item saves are not replayed; existing draft lookup stays tenant scoped', async () => {
   let calls = 0;
-  const { prepareStableQuickCapture } = load('src/lib/listingStudioPreparation.ts', { '@/lib/captureRequest': { assertCaptureScope: async () => undefined }, '@/lib/quickCaptureFlow': { prepareQuickCapture: async () => { calls++; return {}; } } });
+  const { prepareStableQuickCapture } = load('src/lib/listingStudioPreparation.ts', { '@/lib/captureRequest': { assertCaptureScope: async () => undefined }, '@/lib/captureDraftRecovery': { readOriginalCaptureDraft: async () => null }, '@/lib/quickCaptureFlow': { prepareQuickCapture: async () => { calls++; return {}; } } });
   await assert.rejects(prepareStableQuickCapture({ scope: {}, checkpoint: { itemAttempted: true }, onCheckpoint() {}, onProgress() {} }), /uncertain/); assert.equal(calls, 0);
   const source = readFileSync('src/lib/listingStudioPreparation.ts', 'utf8');
-  assert.match(source, /eq\('tenant_id', options.scope.tenantId\)/); assert.match(source, /publish_claim_id/); assert.match(source, /draftAttempted/);
+  assert.match(source, /eq\('tenant_id', options.scope.tenantId\)/); assert.match(readFileSync('src/lib/captureDraftRecovery.ts', 'utf8'), /publish_claim_id/); assert.match(source, /draftAttempted/);
 });
 test('quiet surface keeps guidance below the image and never alters captured evidence', () => {
   const surface = readFileSync('src/components/features/StudioCameraSurface.tsx', 'utf8'), css = readFileSync('src/components/features/listingStudio.css', 'utf8');

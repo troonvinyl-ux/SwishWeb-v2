@@ -18,14 +18,14 @@ test('coin lookup skips a top-ranked Art Prints leaf and retains actual Coins an
 });
 test('art-only results trigger bounded coin-only fallback, never a British-country default', async () => {
   const calls = [];
-  const result = await lookup.lookupListingCategory('tenant', 'Portrait', async (_endpoint, body) => { calls.push(body.query); return body.query === 'collectible coins' ? ok([liveCoin]) : ok([art]); }, context);
-  assert.equal(result.id, liveCoin.id); assert.deepEqual(calls, ['collectible coin Portrait on a worn Italian coin', 'collectible coin Portrait on a worn Italian coin', 'collectible coins']);
+  const result = await lookup.lookupListingCategory('tenant', 'Portrait', async (_endpoint, body) => { calls.push(body.query); return body.query === 'collectible coins Italy' ? ok([liveCoin]) : ok([art]); }, context);
+  assert.equal(result.id, liveCoin.id); assert.deepEqual(calls, ['collectible coin Italy Portrait on a worn Italian coin', 'collectible coin Italy Portrait on a worn Italian coin', 'collectible coins Italy']);
 });
 test('unrelated, supply, wrong-object and non-leaf categories do not become coin selections', async () => {
   for (const row of [art, { ...liveCoin, name: 'Coin Holders' }, { ...liveCoin, name: 'Coins', categoryPath: 'Art > Coins' }, { ...liveCoin, name: 'Banknotes' }, { ...liveCoin, isLeaf: false }, { ...liveCoin, id: 'AI guess' }]) {
     let calls = 0;
     await assert.rejects(lookup.lookupListingCategory('tenant', 'Portrait', async () => { calls++; return ok([row]); }, context), /coin category/);
-    assert.equal(calls, 4);
+    assert.ok(calls >= 4 && calls <= 18, 'Country-led search and tree fallback remain bounded');
   }
 });
 test('coin relevance handles genuine country, ancient and hammered leaves without inventing attribution', () => {
@@ -48,7 +48,7 @@ test('saved Art Prints cannot pass the coin review guard, even with a misleading
   assert.equal(guard.coinListingCategoryIssue({ category_id: '360', category: 'Art Prints' }, { specialist_id: 'collectibles' }), null);
 });
 test('AI-generated category, art specifics and condition IDs are removed before live enrichment', () => {
-  assert.deepEqual(policy.discardGeneratedCoinCategory({ title: 'Worn coin', description: 'Visible wear.', recommended_price: 23.25, category_id: '360', category: 'Art Prints', condition_id: '3000', item_specifics: { Artist: 'Unknown' } }), { title: 'Worn coin', description: 'Visible wear.', recommended_price: 23.25 });
+  assert.deepEqual(policy.discardGeneratedCoinCategory({ title: 'Worn coin', description: 'Visible wear.', recommended_price: 23.25, category_id: '360', category: 'Art Prints', condition_id: '3000', item_specifics: { Artist: 'Unknown' } }), { title: 'Worn coin', description: 'Visible wear.', recommended_price: 23.25, item_specifics: {} });
 });
 test('authorization denials and changed scopes still fail closed without taxonomy fallback', async () => {
   let calls = 0;

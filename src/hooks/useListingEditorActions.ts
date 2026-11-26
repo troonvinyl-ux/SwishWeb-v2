@@ -8,6 +8,7 @@ import { checkSharedListingStatus, recoverSharedPendingPublication, endSharedEba
 import { readAcceptedPublication, retainAcceptedPublication, clearAcceptedPublication } from '@/lib/acceptedPublication';
 import { listingClarification, type ListingHelp } from '@/lib/listingClarification';
 import { listingNicheId, readSubmissionListing, prepareSharedSubmission } from '@/lib/listingSubmission';
+import { coinListingCategoryIssue } from '@/lib/listingCoinCategory';
 import { completeScanToLive } from '@/lib/scanToLiveTiming';
 import { hydrateListingEditor } from '@/lib/listingEditorData';
 import { hasLiveSibling } from '@/lib/inventoryLifecycle';
@@ -86,7 +87,11 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
       const before = await readSubmissionListing(client, tenantId, id);
       if (publicationBlock(before)) { if (!draft.dirtyRef.current) draft.commit(before); throw new Error(publicationBlock(before)!); }
       if (before.publish_claim_id) throw new Error('SWISH is already processing this submission. Use Refresh status rather than submitting again.');
+      const categoryIssue = coinListingCategoryIssue(draft.formRef.current, draft.item);
+      if (categoryIssue) throw new Error(categoryIssue);
       const form = draft.dirtyRef.current ? await saveCurrent() : await readCleanSavedDraft(client, before);
+      const savedCategoryIssue = coinListingCategoryIssue(form, draft.item);
+      if (savedCategoryIssue) throw new Error(savedCategoryIssue);
       const current = await prepareSharedSubmission(client, tenantId, id);
       if (!isCurrent()) throw new Error('The open listing changed. No eBay request was sent.');
       if (rapid) rapidAttempted = await beginRapidPublication(userId, tenantId, id);
@@ -197,5 +202,6 @@ export function useListingEditorActions(draft: ReturnType<typeof useListingEdito
   };
   const retainedId = pendingExternalId || readAcceptedPublication(scope);
   const pendingReason = retainedId ? `eBay accepted listing ${retainedId}, but SWISH is still reconciling the saved listing and stock state. Do not submit again; use Refresh status.` : draft.form.publish_claim_id ? 'SWISH is still checking the original eBay submission. Refresh status or link its existing item number; do not submit again.' : rapidBlocked ? 'The rapid queue retains an earlier attempt. Refresh status to check its server claim and unlock this same draft when safe.' : null;
-  return { publishing, checking, changingStatus, setManualStatus, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form), publicationExternalId: retainedId || String(draft.form.external_listing_id || ''), error, help, save, publish, checkStatus, recoverPending, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !retainedId && !rapidBlocked && !draft.form.publish_claim_id && !publicationBlock(draft.form)) };
+  const categoryIssue = coinListingCategoryIssue(draft.form, draft.item);
+  return { publishing, checking, changingStatus, setManualStatus, busy, saving: saveMutation.isPending, reason: pendingReason || publicationBlock(draft.form) || categoryIssue, publicationExternalId: retainedId || String(draft.form.external_listing_id || ''), error, help, save, publish, checkStatus, recoverPending, canPublish: Boolean(userId && tenantId && draft.item && draft.form.id && !busy && !retainedId && !rapidBlocked && !draft.form.publish_claim_id && !publicationBlock(draft.form) && !categoryIssue) };
 }

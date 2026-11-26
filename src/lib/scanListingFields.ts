@@ -1,9 +1,11 @@
 import { asRecord } from '@/lib/itemPhotos';
+import { prefillCoinListingFacts } from '@/lib/coinListingFacts';
 import { positiveMoney } from '@/lib/itemPricing';
 import type { ScanListingEnrichment } from '@/lib/scanListingEnrichment';
 /** Flatten useful scan suggestions for category research without changing their provenance. */
 export function scanListingAttributes(result: Record<string, unknown>, answers: Record<string, string>): Record<string, unknown> {
-  return { ...result, ...asRecord(result.attributesInferred), ...asRecord(result.attributes), ...asRecord(result.attributesConfirmed), ...answers };
+  const attributes = { ...result, ...asRecord(result.attributesInferred), ...asRecord(result.attributes), ...asRecord(result.attributesConfirmed), ...Object.fromEntries(Object.entries(answers).filter(([, value]) => value.trim())) };
+  return result.specialistId === 'coins' || attributes.collector_envelope ? prefillCoinListingFacts(attributes, String(result.canonicalTitle ?? result.title ?? '')) : attributes;
 }
 /** The shared valuation's explicit recommendation can prefill price; a market midpoint is not a selling price. */
 export function enrichedScanListing(generated: Record<string, unknown>, preparation: ScanListingEnrichment): Record<string, unknown> {

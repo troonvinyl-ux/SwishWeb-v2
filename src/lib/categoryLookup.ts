@@ -1,5 +1,7 @@
 import { isNumismaticCategory, numismaticKind, numismaticSearchQuery, usesNumismaticCategories } from '@/lib/coinCategoryPolicy';
 import { coinCategoryContext, coinCategoryMismatch, coinCategoryRank, coinSearchPrefix } from '@/lib/coinCategoryContext';
+import { coinListingFacts } from '@/lib/coinListingFacts';
+import { browseCoinCategory } from '@/lib/browseCoinCategory';
 export interface CategorySuggestion { id: string; name: string; categoryPath?: string; }
 interface LookupResponse { data: unknown; error: { message: string; displayMessage?: string; status?: number } | null; }
 type InvokeCategory = (endpoint: string, body: Record<string, unknown>) => Promise<LookupResponse>;
@@ -52,7 +54,13 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
   const primary = coins ? numismaticSearchQuery(context.title || text, context.attributes, context.specialistId, `${coinSearchPrefix(coinContext, kind)}${jurisdiction}${date}`) : text;
   // The fallback retains issuing country/date as well as ancient/hammered and single-versus-lot context.
   const fallback = coins ? `${coinSearchPrefix(coinContext, kind)}s${jurisdiction}${date}` : music ? formatQuery : '';
-  const queries = fallback && primary.toLowerCase() !== fallback.toLowerCase() ? [primary, fallback] : [primary];
+  const denomination = coinListingFacts(context.attributes || {}, context.title || text).denomination?.value || '';
+  // A category describes the issuing country, not an exact dated catalogue type. Try clean country-led searches too.
+  const countryQueries = coins && coinContext.country && coinContext.period !== 'ancient' ? [
+    [coinContext.country, denomination, coinContext.year, kind, coinContext.lot ? 'lot' : ''].filter(Boolean).join(' '),
+    `${coinContext.country} ${kind}s${coinContext.lot ? ' lot' : ''}`,
+  ] : [];
+  const queries = [...new Set([primary, ...(fallback ? [fallback] : []), ...countryQueries])];
   for (const search of queries) {
   for (const endpoint of ['swish-ebay-category', 'swish-ebay-list']) {
     if (context.isCurrent?.() === false) throw new Error('Your workspace or category search changed. Retry from the active item.');
@@ -81,6 +89,10 @@ export async function lookupListingCategory(tenantId: string | null, query: stri
     }
     failures.push(typeof payload.error === 'string' ? payload.error : coins ? 'No matching eBay coin category was returned for the recorded country, date, period and single/lot scope. Unrelated categories were rejected; the draft remains editable.' : music ? 'No matching recorded-music category was returned. Clothing and merchandise suggestions were rejected.' : 'No matching eBay leaf category was returned.');
   }
+  }
+  if (coins) {
+    const browsed = await browseCoinCategory({ tenantId, nicheId: context.nicheId, context: coinContext, kind, invoke, isCurrent: context.isCurrent });
+    if (browsed) return browsed;
   }
   throw new Error(`Category lookup unavailable. ${failures[failures.length - 1] || (coins ? 'Confirm the issuing country and date or period on this same coin, then retry.' : 'Add the music format (vinyl, CD or cassette) to the item title and retry.')}`);
 }

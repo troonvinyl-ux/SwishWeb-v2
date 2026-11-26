@@ -1,12 +1,13 @@
 import { prepareScanPhotos } from '@/lib/sharedScanPhotos';
-import { captureRequest, assertCaptureScope, captureRecord, captureText, captureStrings } from '@/lib/captureRequest';
+import { captureRequest, assertCaptureScope, captureRecord, captureText, captureStrings, draftRejectionCode } from '@/lib/captureRequest';
 import { persistCaptureItem, persistCapturePhotos } from '@/lib/capturePersistence';
 import { prepareSavedCoinPhotos } from '@/lib/itemStudio';
 import { assertCoinDraftReady, canonicalCoinReferenceAnswers } from '@/lib/coinListingGate';
 import { captureNumistaReference, parseNumistaNumber, prepareNumistaFaces } from '@/lib/numistaCapture';
 import { enrichScannedItemForListing } from '@/lib/scanListingEnrichment';
 import { scanListingAttributes, enrichedScanListing, scanPreparationWarnings } from '@/lib/scanListingFields';
-import { discardGeneratedCoinCategory, usesNumismaticCategories } from '@/lib/coinCategoryPolicy';
+import { discardGeneratedCoinCategory, usesNumismaticCategories, isNumismaticCategory, numismaticKind } from '@/lib/coinCategoryPolicy';
+import { coinCategoryContext, coinCategoryMismatch } from '@/lib/coinCategoryContext';
 import type { CaptureCheckpoint, CaptureDraft, CapturePhoto, CaptureScope } from '@/types/capture';
 interface PrepareCaptureOptions { scope: CaptureScope; photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; checkpoint: CaptureCheckpoint; onCheckpoint: (value: CaptureCheckpoint) => void | Promise<void>; onProgress: (message: string) => void; lead?: Record<string, unknown> | null; stableItemId?: string; buyerSlots?: string[]; beforeItem?: () => Promise<void>; beforeDraft?: () => Promise<void>; transformGenerated?: (value: Record<string, unknown>) => Record<string, unknown>; }
 async function identifyCapture(options: PrepareCaptureOptions): Promise<Record<string, unknown>> {
@@ -41,7 +42,10 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   const checkpoint: CaptureCheckpoint = { ...options.checkpoint };
   const keep = async (value: CaptureCheckpoint) => { Object.assign(checkpoint, value); await onCheckpoint({ ...checkpoint }); };
   if (!checkpoint.identification) { onProgress('Identifying the photographed evidence…'); await keep({ identification: await identifyCapture(options) }); }
-  const result = checkpoint.identification!;
+  const result = checkpoint.identification!, attributes = scanListingAttributes(result, savedAnswers);
+  const numismatic = usesNumismaticCategories(scope.nicheId, specialistId, attributes), context = coinCategoryContext(captureText(result.canonicalTitle ?? result.title), attributes);
+  const cached = checkpoint.preparation?.category;
+  if (numismatic && !checkpoint.listingId && cached && (!isNumismaticCategory(cached, numismaticKind(attributes, specialistId), context.lot ? 'lot' : 'single') || coinCategoryMismatch(cached, context))) await keep({ preparation: undefined, generated: undefined });
   if (!checkpoint.itemId) { onProgress('Saving this physical item…'); await options.beforeItem?.(); await keep({ itemId: await persistCaptureItem(scope, result, specialistId, savedAnswers, mode, options.stableItemId) }); }
   onProgress('Attaching permanent original photographs…');
   const allUrls = await persistCapturePhotos(scope, checkpoint.itemId!, photos, checkpoint.photos ?? {}, value => keep({ photos: value }));
@@ -68,15 +72,27 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
     const enriched = checkpoint.preparation ? enrichedScanListing(copy, checkpoint.preparation) : copy;
     await keep({ generated: options.transformGenerated ? options.transformGenerated(enriched) : enriched });
   }
-  const generated = checkpoint.generated ?? {};
+  // Only repair generated coin suggestions. The RPC retains the seller’s saved item-specifics array unchanged.
+  // Missing/null/array AI payloads must not recreate the 22023 rejection loop on older checkpoints.
+  const specifics = checkpoint.generated?.item_specifics;
+  const repairSpecifics = numismatic && (!specifics || typeof specifics !== 'object' || Array.isArray(specifics));
+  const generated: Record<string, unknown> = { ...(checkpoint.generated ?? {}), ...(repairSpecifics ? { item_specifics: {} } : {}) };
+  if (repairSpecifics) await keep({ generated });
   if (!checkpoint.listingId) {
     onProgress('Saving the listing draft for your review…'); await assertCaptureScope(scope); await options.beforeDraft?.();
-    const saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: checkpoint.itemId, p_marketplace_id: 'ebay', p_listing: generated, p_shipping_cost: 0, p_category_id: checkpoint.preparation?.category?.id || null });
-    if (saved.error || typeof saved.data !== 'string' || !saved.data) throw new Error(saved.error?.message ?? 'Draft creation was not confirmed. Inspect saved inventory before continuing.');
-    await keep({ listingId: saved.data });
+    await keep({ draftAttempted: true, draftFailure: undefined });
+    let saved: { data: unknown; error: { code?: string; message: string } | null };
+    try { saved = await scope.client.rpc('swish_create_listing_draft', { p_tenant_id: scope.tenantId, p_item_id: checkpoint.itemId, p_marketplace_id: 'ebay', p_listing: generated, p_shipping_cost: 0, p_category_id: checkpoint.preparation?.category?.id || null }); }
+    catch (cause) { await keep({ draftFailure: { outcome: 'uncertain', code: '', message: 'The draft save response was lost. Check the original saved item before retrying.' } }); throw cause; }
+    if (saved.error || typeof saved.data !== 'string' || !saved.data) {
+      const code = draftRejectionCode(saved.error), message = saved.error?.message || 'Draft creation was not confirmed.';
+      await keep({ draftFailure: { outcome: code ? 'rejected' : 'uncertain', code: code || '', message } });
+      throw new Error(code ? `Draft save rejected (${code}): ${message}. Check the same saved draft before retrying.` : `${message} Check the original draft; do not create another coin.`);
+    }
+    await keep({ listingId: saved.data, draftFailure: undefined });
   }
   await assertCaptureScope(scope);
-  const read = await scope.client.from('listings').select('id,title,description,price,external_listing_id,publish_claim_id,status').eq('id', checkpoint.listingId!).eq('tenant_id', scope.tenantId).single();
+  const read = await scope.client.from('listings').select('id,title,description,price,external_listing_id,publish_claim_id,status').eq('id', checkpoint.listingId!).eq('item_id', checkpoint.itemId!).eq('tenant_id', scope.tenantId).single();
   if (read.error || !read.data) throw new Error('Draft saved, but readback is unavailable. Retry readback, not publication.');
   if (read.data.external_listing_id || read.data.publish_claim_id || ['active', 'live'].includes(String(read.data.status))) throw new Error('An existing submission needs inspection. Open this listing; do not publish it again.');
   const reference = scope.nicheId === 'coins' ? captureNumistaReference(result, savedAnswers.numista_number) : null;

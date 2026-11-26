@@ -8,7 +8,7 @@ const positiveMoney = (...values) => values.map(Number).find(value => Number.isF
 function load(path, dependencies = {}) {
   const module = { exports: {} }, compiled = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX }, reportDiagnostics: true });
   assert.equal(compiled.diagnostics?.filter(row => row.category === ts.DiagnosticCategory.Error).length || 0, 0, path);
-  new Function('require', 'module', 'exports', compiled.outputText)(name => dependencies[name] ?? require(name), module, module.exports);
+  new Function('require', 'module', 'exports', compiled.outputText)(name => dependencies[name] ?? (name.startsWith('@/lib/') ? load(`src/${name.slice(2)}.ts`, dependencies) : require(name)), module, module.exports);
   return module.exports;
 }
 const fieldDeps = { '@/lib/itemPhotos': { asRecord: record }, '@/lib/itemPricing': { positiveMoney } };
