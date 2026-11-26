@@ -3,6 +3,8 @@ import { verifyModuleScope } from '@/lib/moduleScope';
 import { getActiveNicheId, getSpecialistIdsForNiche } from '@/lib/niche';
 import { asRecord, itemPhotos, usableStudio } from '@/lib/itemPhotos';
 import { studioImageInput } from '@/lib/studioImageInput';
+import { prepareCoinStudioPair } from '@/lib/coinStudioPair';
+import type { CoinPhotoPreparation } from '@/lib/coinStudioContract';
 interface StudioRequest { userId: string; tenantId: string; itemId: string; original: string; signal: AbortSignal; }
 /** Same BackgroundErase route, metadata/CAS contract and original preservation as native. */
 export async function prepareItemStudioPhoto({ userId, tenantId, itemId, original, signal }: StudioRequest): Promise<Record<string, unknown>> {
@@ -21,6 +23,14 @@ export async function prepareItemStudioPhoto({ userId, tenantId, itemId, origina
   if (initial.error || !initial.data) throw new Error(initial.error?.message || 'Item unavailable in this workspace.');
   const photo = itemPhotos(initial.data).find(value => value.original === original);
   if (!photo) throw new Error('Choose an original photograph attached to this item.');
+  if (nicheId === 'coins') {
+    const faces = itemPhotos(initial.data).slice(0, 2).map(value => value.original);
+    if (faces.includes(original) && faces.length === 2) {
+      const pair = await prepareCoinStudioPair({ userId, tenantId, itemId, originals: faces, signal });
+      if (!pair.prepared || !pair.item) throw new Error(pair.warnings.join(' ') || 'Original coin photos retained.');
+      return pair.item;
+    }
+  }
   if (photo.prepared) return initial.data;
   console.log('[SWISH Studio] Preparing original photo', { itemId, nicheId });
   const imageDataUrl = await studioImageInput(original, signal);
@@ -48,9 +58,12 @@ export async function prepareItemStudioPhoto({ userId, tenantId, itemId, origina
   if (verified.error || !verified.data || !usableStudio(association) || association.originalUri !== original || association.enhancedUri !== studio.enhancedUri || JSON.stringify(verified.data.media) !== JSON.stringify(fresh.data.media)) throw new Error('Saved photo association could not be confirmed. Reload to inspect it before retrying.');
   return verified.data;
 }
-export async function prepareSavedCoinPhotos(userId: string, tenantId: string, itemId: string, originals: string[]): Promise<void> {
-  if (getActiveNicheId() !== 'coins') return;
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 90_000);
-  const run = async () => { for (const original of originals) await prepareItemStudioPhoto({ userId, tenantId, itemId, original, signal: controller.signal }); };
-  return run().finally(() => clearTimeout(timer));
+export async function prepareSavedCoinPhotos(userId: string, tenantId: string, itemId: string, originals: string[]): Promise<CoinPhotoPreparation> {
+  const fallback = (message: string): CoinPhotoPreparation => ({ prepared: false, photos: originals, warnings: [message] });
+  if (getActiveNicheId() !== 'coins' || originals.length < 2) return fallback('Original photographs retained; both faces are required for paired presentation.');
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 150_000);
+  return prepareCoinStudioPair({ userId, tenantId, itemId, originals: originals.slice(0, 2), signal: controller.signal })
+    .then(result => ({ ...result, photos: [...result.photos, ...originals.slice(2)] }))
+    .catch((cause: unknown) => { console.warn('[SWISH Coin Studio] Original-photo fallback', { itemId, reason: cause instanceof Error ? cause.name : 'processing' }); return fallback('Professional coin processing could not be safely completed. Original photographs selected; listing preparation continues.'); })
+    .finally(() => clearTimeout(timer));
 }

@@ -16,7 +16,9 @@ function harness(patch = {}, uploads = []) {
   class EdgeFunctionError extends Error { get displayMessage() { return this.message; } }
   const item = { id: 'stock', tenant_id: 'tenant', specialist_id: 'vinyl_records', updated_at: 'v1', condition: '', attributes: {} }, draft = { form: { ...row }, formRef: { current: { ...row } }, item: { ...item }, photos: ['https://fixture.invalid/front.jpg'], editRef: { current: 0 }, dirtyRef: { current: false }, commit: value => { commits.push(value); draft.formRef.current = { ...draft.formRef.current, ...value }; }, refresh: async () => {} };
   const stubs = {
-    react: { useRef: value => ({ current: value }), useState: value => [value, () => {}] }, sonner: { toast: { success: value => feedback.push(value), warning: value => feedback.push(value), error: value => feedback.push(value) } },
+    react: { useEffect: () => {}, useRef: value => ({ current: value }), useState: value => [value, () => {}] }, sonner: { toast: { info: value => feedback.push(value), success: value => feedback.push(value), warning: value => feedback.push(value), error: value => feedback.push(value) } },
+    '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: async () => {} }) },
+    '@/lib/acceptedPublication': { readAcceptedPublication: () => null, retainAcceptedPublication: () => {}, clearAcceptedPublication: () => {} },
     '@/lib/supabase': { EdgeFunctionError, getSupabaseClientAsync: async () => client, callEdgeFunction: async (name, body) => { events.push('publish'); sends.push({ name, body }); return providerError ? { data: null, error: new EdgeFunctionError(providerError) } : { data: { success: true, externalListingId: '1234567890' }, error: null }; } },
     '@/lib/moduleScope': { activateModuleScope: async () => {} }, '@/lib/niche': { NICHE_SPECIALISTS: { tunes_flip: ['vinyl_records'] }, getActiveNicheId: () => 'coins' },
     '@/lib/listingStatusRecovery': { checkSharedListingStatus: async () => { if (recoveryError) throw new Error(recoveryError); return { ...row, status: 'active', external_listing_id: '1234567890' }; } }, '@/lib/scanToLiveTiming': { completeScanToLive: () => {} },

@@ -9,6 +9,7 @@ function load(path, stubs = {}) {
     reportDiagnostics: true,
   });
   assert.equal(output.diagnostics?.filter(item => item.category === ts.DiagnosticCategory.Error).length || 0, 0, path);
+  stubs['@/lib/backendRequests'] ||= { backendRead: async (_client, _key, operation) => operation(new AbortController().signal) };
   const mod = { exports: {} };
   new Function('require','module','exports',output.outputText)(name => stubs[name] || require(name), mod, mod.exports);
   return mod.exports;

@@ -17,10 +17,10 @@ export function useItemStudio(item: Record<string, unknown> | null) {
       if (locked.current) throw new Error('Photo preparation is already in progress.');
       locked.current = true;
       const flight = new AbortController(); controller.current = flight;
-      const timer = setTimeout(() => flight.abort(), 90_000);
+      const timer = setTimeout(() => flight.abort(), 150_000);
       return prepareItemStudioPhoto({ userId: user.id, tenantId, itemId: String(item.id), original, signal: flight.signal }).finally(() => { clearTimeout(timer); locked.current = false; });
     },
-    onSuccess: () => { if (!mounted.current || current.current !== scope) return; void qc.invalidateQueries({ queryKey: ['items'] }); toast.success('Background removed. Original photo and eBay listing are unchanged.'); },
+    onSuccess: () => { if (!mounted.current || current.current !== scope) return; void qc.invalidateQueries({ queryKey: ['items'] }); toast.success('Smart Studio photographs prepared. Originals and the live eBay listing are unchanged.'); },
     onError: (error: Error) => { if (mounted.current && current.current === scope) toast.error(error.message); },
   });
   return { ...mutation, cancel: () => controller.current?.abort() };

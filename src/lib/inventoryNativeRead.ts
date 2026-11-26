@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { activateModuleScope, verifyModuleScope } from '@/lib/moduleScope';
+import { backendRead } from '@/lib/backendRequests';
 import { type CanonicalCounts, type InventoryEntry, parseCanonicalCounts, projectInventoryRows, inventoryCountsInView } from '@/lib/inventoryNative';
 
 /** Same OnSpace Cloud canonical views / RPC as native SWISH.
@@ -13,8 +14,8 @@ export async function readNativeInventory(
     throw new Error('Select an authorized SWISH account and specialist workspace.');
   await activateModuleScope(client, userId, tenantId, nicheId);
   const readCounts = async () => {
-    const call = client.rpc('swish_inventory_tab_counts', { p_tenant_id: tenantId, p_niche_id: nicheId });
-    const { data, error } = await (signal ? call.abortSignal(signal) : call);
+    if (signal?.aborted) throw new Error('Inventory read was cancelled.');
+    const { data, error } = await backendRead(client, `inventory-counts:${tenantId}:${nicheId}`, deadline => client.rpc('swish_inventory_tab_counts', { p_tenant_id: tenantId, p_niche_id: nicheId }).abortSignal(deadline));
     if (error) throw new Error('Canonical inventory count read failed: ' + error.message);
     return parseCanonicalCounts(data);
   };
@@ -23,12 +24,11 @@ export async function readNativeInventory(
   const PAGE_SIZE = 200;
   for (let offset = 0; offset < 50000; offset += PAGE_SIZE) {
     if (signal?.aborted) throw new Error('Inventory read was cancelled.');
-    let query = client.from('swish_inventory_canonical_rows').select('*')
+    const query = client.from('swish_inventory_canonical_rows').select('*')
       .eq('tenant_id', tenantId).in('specialist_id', specialistIds)
       .order('sort_at', { ascending: false }).order('item_id', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
-    if (signal) query = query.abortSignal(signal);
-    const { data, error } = await query;
+    const { data, error } = await backendRead(client, `inventory-page:${tenantId}:${nicheId}:${specialistIds.join(',')}:${offset}`, deadline => query.abortSignal(deadline));
     if (error) throw new Error('Canonical inventory read failed: ' + error.message);
     const page = (data || []) as unknown as Record<string, unknown>[];
     rows.push(...page);

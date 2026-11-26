@@ -6,10 +6,11 @@ export function useCoinPhotoPreparation() {
   const qc = useQueryClient();
   return (userId: string, tenantId: string, itemId: string, originals: string[]) => {
     if (!originals.length) return;
-    toast.info('Coin saved. Preparing centered background-removed copies; originals are preserved.');
-    void prepareSavedCoinPhotos(userId, tenantId, itemId, originals).then(() => {
+    toast.info('Coin saved. Preparing matched 1600px photographs; originals are preserved.');
+    void prepareSavedCoinPhotos(userId, tenantId, itemId, originals).then(result => {
       void qc.invalidateQueries({ queryKey: ['items'] });
-      toast.success('Coin presentation photos prepared. Original evidence remains available.');
+      if (result.prepared) toast.success('Matched white-background coin photographs prepared. Originals remain available.');
+      else toast.warning(result.warnings.join(' ') || 'Original photographs selected. Listing preparation can continue.');
     }, (error: unknown) => {
       void qc.invalidateQueries({ queryKey: ['items'] });
       toast.warning(`Coin and originals are saved. ${error instanceof Error ? error.message : 'Background removal is unavailable.'} Use Photos & Smart Studio on the item to retry.`);

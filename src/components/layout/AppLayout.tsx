@@ -39,7 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (product) document.documentElement.dataset.niche = product.id;
   }, [product, location.pathname]);
 
-  if (location.pathname.startsWith('/studio')) return <main className="min-h-[100dvh] bg-background text-foreground">{children}</main>;
+  if (location.pathname.startsWith('/studio') || location.pathname.startsWith('/rapid/coins')) return <main className="min-h-[100dvh] bg-background text-foreground">{children}</main>;
 
   if (standalone && product) {
     return <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
