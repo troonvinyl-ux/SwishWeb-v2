@@ -11,6 +11,7 @@ import { musicFormSchema } from '@/lib/musicValidation';
 import type { MusicValues } from '@/types/music';
 import { syncMusicConditionText } from '@/lib/musicConditionText';
 import { jsonEqual } from '@/lib/jsonEquality';
+import { coinListingCategoryIssue } from '@/lib/listingCoinCategory';
 interface EditorSaveInput { client: SupabaseClient; userId: string; tenantId: string; form: Record<string, unknown>; item: Record<string, unknown>; photos: string[]; uploads: string[]; confirmedMusic?: ConfirmedMusicDetails; aspects?: EbayAspect[]; }
 interface ReadbackMismatch { field: string; expected: unknown; actual: unknown; }
 const sameValue = (expected: unknown, actual: unknown) => jsonEqual(expected, actual);
@@ -27,6 +28,8 @@ function throwReadbackMismatch(stage: 'atomic save' | 'metadata retention', list
 export async function saveSharedListingEditor({ client, userId, tenantId, form, item, photos, uploads, confirmedMusic, aspects = [] }: EditorSaveInput): Promise<ListingEditorSaveResult> {
   if (!form.id || form.tenant_id !== tenantId || item.tenant_id !== tenantId || item.id !== form.item_id) throw new Error('Open a saved listing and its stock item in this workspace.');
   if (publicationBlock(form)) throw new Error('Inspect the existing submission before editing this draft.');
+  const categoryIssue = coinListingCategoryIssue(form, item);
+  if (form.category_id && categoryIssue) throw new Error(categoryIssue);
   const title = String(form.title || '').trim(), price = Number(form.price), quantity = Number(form.quantity || 1);
   if (!title || title.length > 80 || !Number.isFinite(price) || price < 0 || !Number.isInteger(quantity) || quantity < 1) throw new Error('Enter a title of up to 80 characters, a non-negative price and a whole quantity.');
   const shipping = Number(form.shipping_cost || 0), floor = Number(form.floor_price || 0), ceiling = Number(form.ceiling_price || 0);
@@ -69,7 +72,7 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   // same category; a category change requires a fresh compatible selection.
   const savedCategoryId = String(attrs.ebay_category_id || item.ebay_category_id || '');
   const categoryId = String(Object.prototype.hasOwnProperty.call(form, 'category_id') ? form.category_id ?? '' : savedCategoryId).trim();
-  const categoryChanged = Boolean(categoryId && categoryId !== savedCategoryId);
+  const categoryChanged = categoryId !== savedCategoryId;
   const categoryName = String(form.category || (!categoryChanged ? attrs.ebay_category_name || item.ebay_category_name : '') || '').trim();
   const conditionId = String(Object.prototype.hasOwnProperty.call(form, 'condition_id') ? form.condition_id ?? '' : (!categoryChanged ? attrs.ebay_condition_id || item.ebay_condition_id || ebayConditionId(form.condition) : '') || '').trim();
   const description = musicValues ? syncMusicConditionText(String(form.description || ''), musicValues) : String(form.description || '');

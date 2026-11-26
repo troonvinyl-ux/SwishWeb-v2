@@ -10,6 +10,8 @@ function harness(prepared) {
     '@/lib/sharedScanPhotos': { prepareScanPhotos: async () => ({ images: ['YQ==', 'Yg=='], imageLabels: ['Obverse', 'Reverse'], slots: ['obverse', 'reverse'] }) }, '@/lib/captureRequest': request,
     '@/lib/capturePersistence': { persistCaptureItem: async () => { calls.push('item'); return 'coin'; }, persistCapturePhotos: async () => { calls.push('originals'); return originals; } },
     '@/lib/itemStudio': { prepareSavedCoinPhotos: async (_u, _t, _id, urls) => { calls.push('studio'); assert.deepEqual(urls, originals); return { prepared, photos: prepared ? ['https://example.test/studio/o.png', 'https://example.test/studio/r.png'] : originals, warnings: prepared ? [] : ['Originals retained'] }; } },
+    '@/lib/coinCategoryPolicy': loadRapidTypescript('src/lib/coinCategoryPolicy.ts'),
+    '@/lib/coinCategoryContext': loadRapidTypescript('src/lib/coinCategoryContext.ts'),
     '@/lib/coinListingGate': { assertCoinDraftReady: () => null }, '@/lib/numistaCapture': { prepareNumistaFaces: async () => [], captureNumistaReference: () => null, parseNumistaNumber: () => null },
     '@/lib/scanListingEnrichment': { enrichScannedItemForListing: async input => { assert.deepEqual(input.imageUrls, originals); calls.push('research'); return { category: null }; } },
     '@/lib/scanListingFields': { scanListingAttributes: value => value, enrichedScanListing: value => value, scanPreparationWarnings: () => [] },

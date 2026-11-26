@@ -9,7 +9,7 @@ import { listingSpecifics } from '@/lib/listingEditorData';
 
 export interface EbaySpecific { name: string; value: string; }
 export interface ScanListingEnrichment {
-  category: { id: string; name: string } | null;
+  category: { id: string; name: string; categoryPath?: string } | null;
   aspects: EbayAspect[];
   specifics: EbaySpecific[];
   missingRequired: string[];
@@ -163,9 +163,9 @@ export async function enrichScannedItemForListing(input: ScanListingEnrichmentIn
     ...currentAttributes,
     ...(result.market ? { market_value_result: result.market } : {}),
     _scan_listing_preparation: { market_error: result.marketError, category_error: result.categoryError, specifics_error: result.specificsError, condition_error: result.conditionError, reviewed: false },
-    ...(result.category ? { ebay_category_id: result.category.id, ebay_category_name: result.category.name } : {}),
+    ...(result.category ? { ebay_category_id: result.category.id, ebay_category_name: result.category.name, ebay_category_path: result.category.categoryPath || '' } : {}),
     ebay_condition_id: sameCategory && currentAttributes.ebay_condition_id ? currentAttributes.ebay_condition_id : result.conditionId || '',
-    ...(result.aspects.length ? {
+    ...(!sameCategory || result.aspects.length ? {
       ebay_item_specifics: result.specifics,
       ebay_required_specifics_missing: result.missingRequired,
     } : {}),

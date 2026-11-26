@@ -38,6 +38,8 @@ function flowHarness(prep = preparation) {
     '@/lib/captureRequest': { captureRecord: record, captureText: value => typeof value === 'string' ? value.trim() : '', captureStrings: value => Array.isArray(value) ? value : [], assertCaptureScope: async value => { if (!value.isCurrent()) throw Error('Workspace changed'); }, captureRequest: async (value, name) => { if (!value.isCurrent()) throw Error('Workspace changed'); calls.push(name); return name === 'swish-identify' ? { identification: { canonicalTitle: 'Fixture audio device', attributesInferred: { brand: 'Fixture' } } } : { listing: { title: 'Fixture audio device', description: 'Untested. Contents shown in photos.' } }; } },
     '@/lib/itemStudio': { prepareSavedCoinPhotos: async (_user, _tenant, _item, photos) => ({ prepared: false, photos, warnings: [] }) },
     '@/lib/capturePersistence': { persistCaptureItem: async () => { calls.push('item'); return 'item-id'; }, persistCapturePhotos: async () => { calls.push('photos'); return ['https://fixture.invalid/original.jpg']; } },
+    '@/lib/coinCategoryPolicy': load('src/lib/coinCategoryPolicy.ts'),
+    '@/lib/coinCategoryContext': load('src/lib/coinCategoryContext.ts'),
     '@/lib/coinListingGate': {}, '@/lib/numistaCapture': { captureNumistaReference: () => null, parseNumistaNumber: () => null },
     '@/lib/scanListingEnrichment': { enrichScannedItemForListing: async () => { calls.push('research'); return prep; } }, '@/lib/scanListingFields': fields,
   };

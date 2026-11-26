@@ -8,8 +8,10 @@ import { assertCoinDraftReady, canonicalCoinReferenceAnswers } from '@/lib/coinL
 import { loadRapidPhotos, uploadRapidOriginals } from '@/lib/rapidCoinPhotos';
 import { changeRapidJob } from '@/lib/rapidCoinDatabase';
 import { collectorEvidence, RAPID_COIN_INSTRUCTIONS, RAPID_LISTING_INSTRUCTIONS, rapidBuyerSlots, rapidListingCopy } from '@/lib/rapidCoinPolicy';
-import { prepareSavedCoinPhotos } from '@/lib/itemStudio';
 import { itemPhotos, asRecord } from '@/lib/itemPhotos';
+import { attachCollectorEvidence } from '@/lib/collectorEnvelopeLead';
+import { readCollectorEnvelope } from '@/lib/readCollectorEnvelope';
+import { persistCollectorEnvelope } from '@/lib/persistCollectorEnvelope';
 import type { CaptureScope, CaptureCheckpoint } from '@/types/capture';
 import type { RapidCoinJob } from '@/types/rapidCoin';
 /** Adapter to SWISH's existing identify, Numista, market, background removal and canonical draft engines. */
@@ -39,7 +41,7 @@ export async function prepareRapidCoin(scope: CaptureScope, initial: RapidCoinJo
     const wrapped = captureRecord(response.result), result = captureRecord(response.identification ?? wrapped.identification ?? response.result ?? response);
     if (!captureText(result.canonicalTitle ?? result.title)) throw new Error('No usable identification returned. Your capture is retained.');
     if (result.specialistId && result.specialistId !== 'coins' || result.objectType && !['coin', 'unknown'].includes(String(result.objectType))) throw new Error('The photographed object needs seller review before creating a coin listing.');
-    const evidence = collectorEvidence(result), anchor = numistaAnchoredReview(response, [result], typeId || '');
+    const evidence = collectorEvidence({ ...response, identification: result }), anchor = numistaAnchoredReview(response, [result], typeId || '');
     if (anchor.visualConflict) evidence.discrepancies.push('Numista research anchor and visual identification differ. Compare the original faces; the anchor was not replaced.');
     const attrs = captureRecord(result.attributes), roles = Array.isArray(attrs.photo_roles) ? attrs.photo_roles.map(captureRecord) : [];
     job = await changeRapidJob(job.id, job.scope, current => ({ ...current, evidence, photos: current.photos.map(photo => {
@@ -47,8 +49,9 @@ export async function prepareRapidCoin(scope: CaptureScope, initial: RapidCoinJo
       return { ...photo, role: photo.slotId === 'envelope' || role === 'evidence' ? 'evidence' : photo.role };
     }) }));
     await keep({ identification: { ...result, ...(anchor.catalogueRetrieved ? { canonicalTitle: captureText(captureRecord(result.numistaVerification ?? response.numistaVerification).title) || result.canonicalTitle } : {}),
-      attributes: { ...attrs, collector_envelope: evidence, _rapid_coin_evidence: evidence, _rapid_capture_id: job.id, listing_generation_instructions: RAPID_LISTING_INSTRUCTIONS,
-        ...(typeId ? { seller_confirmed_numista: typeId } : {}) } } });
+      attributes: { ...captureRecord(attachCollectorEvidence(result, evidence).attributes), _rapid_capture_id: job.id, listing_generation_instructions: RAPID_LISTING_INSTRUCTIONS,
+        ...(typeId ? { seller_confirmed_numista: typeId } : {}) },
+      ...(!anchor.catalogueRetrieved ? { canonicalTitle: attachCollectorEvidence(result, evidence).canonicalTitle || result.canonicalTitle } : {}) } });
   }
   const result = job.checkpoint.identification!, referenceAnswers = typeId ? canonicalCoinReferenceAnswers(job.answers, typeId) : job.answers;
   const answers = { ...referenceAnswers, condition: job.answers.condition || captureText(result.condition), listing_generation_instructions: RAPID_LISTING_INSTRUCTIONS };
@@ -58,11 +61,21 @@ export async function prepareRapidCoin(scope: CaptureScope, initial: RapidCoinJo
     await keep({ itemId: await persistCaptureItem(scope, result, 'coins', answers, engineMode, job.id) });
   }
   await uploadRapidOriginals(scope, job, photos, urls => keep({ photos: urls }));
+  // One automatic envelope-first reread uses full saved originals, not the reduced generic scan copies.
+  // Persist its result before draft preparation so a later save error cannot hide the identified coin.
+  const retainedEvidence = collectorEvidence(job.checkpoint.identification || {});
+  if (job.photos.some(photo => photo.slotId === 'envelope') && !retainedEvidence.transcriptionAvailable && !job.checkpoint.envelopeReadAttempted) {
+    await keep({ envelopeReadAttempted: true });
+    const read = await readCollectorEnvelope(scope, job, engineMode).then(value => ({ value, error: '' })).catch((cause: unknown) => ({ value: null, error: cause instanceof Error ? cause.message : 'Envelope text was not returned.' }));
+    await assertCaptureScope(scope);
+    if (read.value) job = await persistCollectorEnvelope(scope, job, read.value);
+    else await keep({ envelopeReadError: read.error });
+  }
   const draft = await prepareStableQuickCapture({ scope, photos, specialistId: 'coins', mode: engineMode, answers, checkpoint: job.checkpoint,
     stableItemId: job.id, buyerSlots: rapidBuyerSlots(job), transformGenerated: rapidListingCopy, onCheckpoint: keep,
     onProgress: message => { console.log('[SWISH rapid] Stage', job.id, message); } });
-  // BackgroundErase is optional. Only its source-pixels/fidelity-verified presentations may replace buyer selections.
-  await prepareSavedCoinPhotos(scope.userId, scope.tenantId, draft.itemId, draft.photos).catch((cause: unknown) => draft.warnings.push(cause instanceof Error ? cause.message : 'Background removal unavailable; originals selected.'));
+  // The shared quick-capture engine already prepares the pair once, before generating the draft.
+  // A fallback remains a valid draft. Do not spend credits or process derivatives again here.
   await assertCaptureScope(scope);
   const stock = await scope.client.from('items').select('id,attributes,media,updated_at').eq('id', draft.itemId).eq('tenant_id', scope.tenantId).single();
   if (stock.error || !stock.data) throw new Error('Draft saved. Reopen the original item to verify photographs.');
