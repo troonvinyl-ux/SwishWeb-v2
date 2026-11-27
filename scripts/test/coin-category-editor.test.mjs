@@ -7,7 +7,8 @@ function harness() {
   const form = { category_id: '360', category: 'Art Prints', condition_id: '3000', item_specifics: { Artist: 'Unknown' }, title: 'Italian coin', description: 'Visible wear.', price: 23.25, condition_description: 'Scratches and irregular rim.' };
   const draft = { form, formRef: { current: form }, item: { specialist_id: 'coins', attributes: {} }, revisionRef: { current: 'initial' }, change: (key, value) => { form[key] = value; draft.revisionRef.current += ':' + key; } };
   const hook = loadRapidTypescript('src/hooks/useListingCategorySuggestion.ts', {
-    react: { useState: initial => [initial, () => {}] }, sonner: { toast: { success: value => notices.push(value), error: value => notices.push(value) } },
+    react: { useState: initial => [initial, () => {}], useRef: value => ({ current: value }) },
+    '@/hooks/useCoinCategoryAutoselect': { useCoinCategoryAutoselect() {} }, sonner: { toast: { success: value => notices.push(value), error: value => notices.push(value) } },
     '@/lib/supabase': { getSupabaseClientAsync: async () => ({}) }, '@/lib/niche': { getActiveNicheId: () => 'coins' },
     '@/lib/listingSubmission': { listingNicheId: () => 'coins' }, '@/lib/itemPhotos': { asRecord: rapidRecord },
     '@/lib/scopedCategoryLookup': { lookupScopedListingCategory: async input => { calls.push(input); assert.equal(input.isCurrent(), true); return { id: '123456', name: 'Italy', categoryPath: 'Coins > European > Italy' }; } },
@@ -27,7 +28,7 @@ test('an unchanged verified category does not erase seller specifics or conditio
 });
 test('editor marks invalid selections, suppresses art metadata and guards publication before a queue attempt', () => {
   const editor = readFileSync('src/pages/ListingEditor.tsx', 'utf8'), actions = readFileSync('src/hooks/useListingEditorActions.ts', 'utf8');
-  assert.match(editor, /categoryError=\{categoryIssue\}/); assert.match(editor, /categoryIssue \? '' : categoryId/);
+  assert.match(editor, /categoryError=\{categoryIssue \|\| category.error\}/); assert.match(editor, /categoryIssue \? '' : categoryId/);
   assert.ok(actions.indexOf('if (categoryIssue) throw new Error(categoryIssue)') < actions.indexOf('if (rapid) rapidAttempted = await beginRapidPublication'));
   assert.match(actions, /!publicationBlock\(draft.form\) && !categoryIssue/);
   const metadata = readFileSync('src/lib/listingEditorMetadata.ts', 'utf8'); assert.match(metadata, /ebay_category_path/);

@@ -8,6 +8,7 @@ import { enrichScannedItemForListing } from '@/lib/scanListingEnrichment';
 import { scanListingAttributes, enrichedScanListing, scanPreparationWarnings } from '@/lib/scanListingFields';
 import { discardGeneratedCoinCategory, usesNumismaticCategories, isNumismaticCategory, numismaticKind } from '@/lib/coinCategoryPolicy';
 import { coinCategoryContext, coinCategoryMismatch } from '@/lib/coinCategoryContext';
+import { CATEGORY_LOOKUP_VERSION } from '@/lib/categoryLookup';
 import type { CaptureCheckpoint, CaptureDraft, CapturePhoto, CaptureScope } from '@/types/capture';
 interface PrepareCaptureOptions { scope: CaptureScope; photos: CapturePhoto[]; specialistId: string; mode: string; answers: Record<string, string>; checkpoint: CaptureCheckpoint; onCheckpoint: (value: CaptureCheckpoint) => void | Promise<void>; onProgress: (message: string) => void; lead?: Record<string, unknown> | null; stableItemId?: string; buyerSlots?: string[]; beforeItem?: () => Promise<void>; beforeDraft?: () => Promise<void>; transformGenerated?: (value: Record<string, unknown>) => Record<string, unknown>; }
 async function identifyCapture(options: PrepareCaptureOptions): Promise<Record<string, unknown>> {
@@ -45,7 +46,8 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   const result = checkpoint.identification!, attributes = scanListingAttributes(result, savedAnswers);
   const numismatic = usesNumismaticCategories(scope.nicheId, specialistId, attributes), context = coinCategoryContext(captureText(result.canonicalTitle ?? result.title), attributes);
   const cached = checkpoint.preparation?.category;
-  if (numismatic && !checkpoint.listingId && cached && (!isNumismaticCategory(cached, numismaticKind(attributes, specialistId), context.lot ? 'lot' : 'single') || coinCategoryMismatch(cached, context))) await keep({ preparation: undefined, generated: undefined });
+  const staleCategoryFailure = numismatic && checkpoint.preparation?.categoryError && checkpoint.preparation.categoryLookupVersion !== CATEGORY_LOOKUP_VERSION;
+  if (numismatic && !checkpoint.listingId && (staleCategoryFailure || cached && (!isNumismaticCategory(cached, numismaticKind(attributes, specialistId), context.lot ? 'lot' : 'single') || coinCategoryMismatch(cached, context)))) await keep({ preparation: undefined });
   if (!checkpoint.itemId) { onProgress('Saving this physical item…'); await options.beforeItem?.(); await keep({ itemId: await persistCaptureItem(scope, result, specialistId, savedAnswers, mode, options.stableItemId) }); }
   onProgress('Attaching permanent original photographs…');
   const allUrls = await persistCapturePhotos(scope, checkpoint.itemId!, photos, checkpoint.photos ?? {}, value => keep({ photos: value }));
@@ -76,8 +78,12 @@ export async function prepareQuickCapture(options: PrepareCaptureOptions): Promi
   // Missing/null/array AI payloads must not recreate the 22023 rejection loop on older checkpoints.
   const specifics = checkpoint.generated?.item_specifics;
   const repairSpecifics = numismatic && (!specifics || typeof specifics !== 'object' || Array.isArray(specifics));
-  const generated: Record<string, unknown> = { ...(checkpoint.generated ?? {}), ...(repairSpecifics ? { item_specifics: {} } : {}) };
-  if (repairSpecifics) await keep({ generated });
+  const base: Record<string, unknown> = { ...(checkpoint.generated ?? {}), ...(repairSpecifics ? { item_specifics: {} } : {}) };
+  // Apply recovered requirements to the retained copy, without rerunning the generator or replaying a saved draft.
+  const repaired = !checkpoint.listingId && checkpoint.preparation?.category ? enrichedScanListing(base, checkpoint.preparation) : base;
+  // Rebuild only unsaved AI checkpoints; never rewrite a saved listing or replay its creation.
+  const generated = !checkpoint.listingId && options.transformGenerated ? options.transformGenerated(repaired) : repaired;
+  if (repairSpecifics || JSON.stringify(generated) !== JSON.stringify(checkpoint.generated)) await keep({ generated });
   if (!checkpoint.listingId) {
     onProgress('Saving the listing draft for your review…'); await assertCaptureScope(scope); await options.beforeDraft?.();
     await keep({ draftAttempted: true, draftFailure: undefined });

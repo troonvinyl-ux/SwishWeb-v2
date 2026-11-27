@@ -1,7 +1,10 @@
 import { COIN_FACT_ALIASES, coinFieldKey, coinRecord, coinScalar, literalCollectorIdentity, singleCoinYear } from '@/lib/coinFactNormalization';
+import { coinPacketEvidence } from '@/lib/coinPacketEvidence';
 /** Retain literal issue-year candidates separately from ruler reign ranges and ambiguous handwriting. */
 export function collectorCoinFields(attributes: Record<string, unknown>): Record<string, unknown> {
-  const envelope = coinRecord(attributes.collector_envelope ?? attributes._rapid_coin_evidence);
+  const retained = coinRecord(attributes.collector_envelope ?? attributes._rapid_coin_evidence);
+  const packet = coinPacketEvidence(attributes._coin_packet ?? attributes.coinPacket);
+  const envelope = coinScalar(retained.transcription) ? retained : packet ? { ...packet } : retained;
   const transcription = coinScalar(envelope.transcription);
   const literal = literalCollectorIdentity(transcription);
   // AR may share a line with a condition annotation, but it remains collector notation, never tested metal.
@@ -16,7 +19,9 @@ export function collectorCoinFields(attributes: Record<string, unknown>): Record
     if (key === 'year') candidates.push(value);
     else fields[key] = value;
   }
-  const dated = [...candidates, ...COIN_FACT_ALIASES.year.map(key => coinScalar(fields[key])), coinScalar(literal.date)].map(singleCoinYear).filter(Boolean);
+  const uncertainYear = candidates.some(value => /\?|\b(?:uncertain|illegible)\b/i.test(value));
+  if (uncertainYear) { fields.date = candidates.find(value => /\?|\b(?:uncertain|illegible)\b/i.test(value)); fields.year = ''; }
+  const dated = uncertainYear ? [] : [...candidates, ...COIN_FACT_ALIASES.year.map(key => coinScalar(fields[key])), coinScalar(literal.date)].map(singleCoinYear).filter(Boolean);
   const dates = [...new Set(dated)];
   if (dates.length === 1) fields.year = dates[0];
   else if (dates.length > 1) { fields.year = ''; fields.date = ''; }
