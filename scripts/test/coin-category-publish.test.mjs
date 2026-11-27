@@ -33,6 +33,11 @@ test('Art Prints is stopped before a rapid attempt, eBay request or editor save'
   assert.equal(await h.actions.publish(), false); assert.equal(h.sends(), 0); assert.equal(h.attempts(), 0); assert.equal(h.saves(), 0);
   assert.match(h.notices.join(' '), /Art Prints/);
 });
+test('the reported Coins > Coins > Publications category is stopped before saving or submitting a physical coin', async () => {
+  const h = harness('994001', null, { title: 'British India Pice 1204', category: 'Publications', category_path: 'Coins > Coins > Publications' });
+  assert.equal(h.actions.canPublish, false); assert.match(h.actions.reason, /Publications/);
+  assert.equal(await h.actions.publish(), false); assert.equal(h.sends(), 0); assert.equal(h.attempts(), 0); assert.equal(h.saves(), 0);
+});
 test('single Roman coin in Collections/Bulk Lots is blocked before save, queue attempt or publish', async () => {
   const h = harness('3410', null, { title: 'Provisional: Roman Imperial Augustus As', quantity: 1, category: 'Collections/Bulk Lots', category_path: 'Coins > Coins > Collections/Bulk Lots' });
   assert.equal(h.actions.canPublish, false); assert.match(h.actions.reason, /single coin/);

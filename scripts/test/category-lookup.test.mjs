@@ -40,7 +40,7 @@ test('Tunes search carries real music format and bounds the eBay query', () => {
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip', { format: 'CD box set' }), 'music CD Artist Album');
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip', { format: 'Vinyl LP' }), 'vinyl record Artist Album');
   assert.equal(categorySearchQuery('Artist Album', 'tunes_flip'), 'recorded music album Artist Album');
-  assert.equal(categorySearchQuery('Roman coin', 'coins'), 'ancient roman coin Roman coin');
+  assert.equal(categorySearchQuery('Roman coin', 'coins'), 'Roman coin');
   assert.equal(categorySearchQuery('A'.repeat(150), 'tunes_flip', { format: 'CD' }).length, 100);
 });
 test('new and saved listing screens use the shared lookup; music avoids coin defaults', async () => {

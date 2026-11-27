@@ -37,6 +37,7 @@ const paths = [
   'src/components/features/ListingCategoryFields.tsx',
   'src/components/features/ListingConditionFields.tsx',
   'src/lib/coinCategoryPolicy.ts',
+  'src/lib/coinCategoryContext.ts',
   'src/lib/listingCoinCategory.ts',
   'src/lib/categoryLookup.ts',
   'src/lib/scopedCategoryLookup.ts',

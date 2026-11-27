@@ -27,6 +27,13 @@ test('verified member and niche accompany the existing category request',async()
  assert.deepEqual(await lookupScopedListingCategory(input),{id:'176985',name:'CDs'});
  assert.equal(calls.length,1);assert.equal(calls[0].body.tenantId,'tenant-A');assert.equal(calls[0].body.nicheId,'tunes_flip');
 });
+test('saved category selection passes through the same authenticated live requirements service',async()=>{
+ const {input}=fixture(),calls=[];
+ input.attributes={format:'CD',ebay_category_id:'176985',ebay_category_name:'CDs'};
+ invoke=async(endpoint,body)=>{calls.push({endpoint,body});return {data:{success:true,isLeaf:true,marketplaceId:'EBAY_GB',categoryId:'176985',aspects:[]},error:null};};
+ assert.deepEqual(await lookupScopedListingCategory(input),{id:'176985',name:'CDs'});
+ assert.equal(calls.length,1);assert.equal(calls[0].body.route,'get_category_aspects');assert.equal(calls[0].body.forceLive,true);
+});
 test('changed sign-in prevents any category service request',async()=>{
  const {input,setUser}=fixture();setUser('user-B');let calls=0;invoke=async()=>{calls++;return success;};
  await assert.rejects(lookupScopedListingCategory(input),/sign-in changed/);assert.equal(calls,0);

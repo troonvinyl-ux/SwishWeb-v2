@@ -1,6 +1,7 @@
 import { assertCaptureScope, captureText, captureRecord } from '@/lib/captureRequest';
 import { parseNumistaNumber } from '@/lib/numistaCapture';
 import { scanPhotoStoragePath } from '@/lib/sharedScanPhotos';
+import { prefillCoinListingFacts } from '@/lib/coinListingFacts';
 import type { CaptureScope, CapturePhoto } from '@/types/capture';
 /** A missing physical measurement remains unknown, never a fabricated zero. */
 const measured = (value: string | undefined): number | null => value?.trim() && Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null;
@@ -15,10 +16,11 @@ export async function persistCaptureItem(scope: CaptureScope, result: Record<str
     }
   }
   const weight = measured(answers.weight), diameter = measured(answers.diameter), coin = scope.nicheId === 'coins';
-  const attributes = { ...result, ...captureRecord(result.attributesInferred), ...captureRecord(result.attributes), ...captureRecord(result.attributesConfirmed), ...answers, captureMode: mode,
+  const captured = { ...result, ...captureRecord(result.attributesInferred), ...captureRecord(result.attributes), ...captureRecord(result.attributesConfirmed), ...answers, captureMode: mode,
     ...(stableId ? { _rapid_capture_id: stableId } : {}),
     _scan_provenance: { identification: 'AI suggestion — not physical confirmation', seller_fields: Object.keys(answers).filter(key => answers[key]?.trim()) },
     ...(coin && weight !== null ? { supplied_weight_g: weight } : {}), ...(coin && diameter !== null ? { supplied_diameter_mm: diameter } : {}) };
+  const attributes = coin ? prefillCoinListingFacts(captured, captureText(result.canonicalTitle ?? result.title)) : captured;
   const saved = await scope.client.from('items').insert({ ...(stableId ? { id: stableId } : {}), tenant_id: scope.tenantId, specialist_id: specialistId,
     canonical_title: captureText(result.canonicalTitle ?? result.title), description: captureText(result.description), condition: answers.condition || '',
     condition_notes: answers.condition_notes || answers.flaws || answers.issues || '', status: 'review', attributes, media: [], warnings: ['Review AI suggestions against the actual item.'],

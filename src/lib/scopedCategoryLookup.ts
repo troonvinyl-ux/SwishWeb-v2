@@ -8,6 +8,7 @@ interface ScopedCategoryInput {
  tenantId: string;
  nicheId: string;
  title: string;
+ query?: string;
  specialistId?: string;
  attributes: Record<string, unknown>;
  isCurrent: () => boolean;
@@ -20,9 +21,9 @@ export async function lookupScopedListingCategory(input: ScopedCategoryInput) {
  };
  const savedId = String(input.attributes.ebay_category_id || '').trim();
  const savedName = String(input.attributes.ebay_category_name || '').trim();
- const selectedCategory = savedId && savedName ? { id: savedId, name: savedName, categoryPath: String(input.attributes.ebay_category_path || '') } : undefined;
+ const selectedCategory = !input.query && savedId && savedName ? { id: savedId, name: savedName, categoryPath: String(input.attributes.ebay_category_path || '') } : undefined;
  const suggestion = await lookupListingCategory(input.tenantId,
-  categorySearchQuery(input.title, input.nicheId, input.attributes, input.specialistId),
+  categorySearchQuery(input.query || input.title, input.nicheId, input.attributes, input.specialistId),
   async (endpoint, body) => {
    try { await assertScope(); }
    catch (error) { return { data: null, error: { status: 403, message: error instanceof Error ? error.message : 'Module authorization is unavailable.' } }; }
