@@ -74,6 +74,8 @@ export async function saveSharedListingEditor({ client, userId, tenantId, form, 
   const categoryId = String(Object.prototype.hasOwnProperty.call(form, 'category_id') ? form.category_id ?? '' : savedCategoryId).trim();
   const categoryChanged = categoryId !== savedCategoryId;
   const categoryName = String(form.category || (!categoryChanged ? attrs.ebay_category_name || item.ebay_category_name : '') || '').trim();
+  const resolvedCategoryIssue = coinListingCategoryIssue({ ...form, category_id: categoryId, category: categoryName }, item);
+  if (categoryId && resolvedCategoryIssue) throw new Error(resolvedCategoryIssue);
   const conditionId = String(Object.prototype.hasOwnProperty.call(form, 'condition_id') ? form.condition_id ?? '' : (!categoryChanged ? attrs.ebay_condition_id || item.ebay_condition_id || ebayConditionId(form.condition) : '') || '').trim();
   const description = musicValues ? syncMusicConditionText(String(form.description || ''), musicValues) : String(form.description || '');
   if (conditionNotes.length > 1000) throw new Error('Keep eBay condition notes to 1,000 characters.');

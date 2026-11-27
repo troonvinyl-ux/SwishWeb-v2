@@ -35,6 +35,7 @@ import ListingTitleFields from '@/components/features/ListingTitleFields';
 import ListingDeliveryPolicy from '@/components/features/ListingDeliveryPolicy';
 import ListingSaleFields from '@/components/features/ListingSaleFields';
 import ListingCategoryFields from '@/components/features/ListingCategoryFields';
+import ListingCategoryBrowser from '@/components/features/ListingCategoryBrowser';
 import EbayItemSpecifics from '@/components/features/EbayItemSpecifics';
 import MusicItemSpecifics from '@/components/features/MusicItemSpecifics';
 import { supportedEbayCondition, vinylRecordConditionPolicy } from '@/lib/ebayMusicContract';
@@ -138,7 +139,9 @@ export default function ListingEditor({ listingId, rapid }: ListingEditorProps =
     <div hidden={section !== 'specifics'} className="space-y-3">
     {!specificsReady && <p role="status" className="flip-advice">Check the required item specifics. {metadata.data?.aspectError || ''}</p>}
     {nicheId === 'coins' && <ListingCoinIdentity item={draft.item} title={String(draft.form.title || '')} form={draft.form} disabled={disabled} onChange={draft.change} />}
+    {category.progress && <p role="status" className="text-base text-muted-foreground">{category.progress}</p>}
     <ListingCategoryFields form={draft.form} music={music} coins={nicheId === 'coins'} categoryError={categoryIssue || category.error} conditions={conditionPolicy?.conditions} conditionRequired={conditionPolicy?.conditionRequired} simpleVinylCondition={Boolean(vinylPolicy)} metadataLoading={!vinylPolicy && (metadata.isLoading || metadata.isFetching)} metadataError={!vinylPolicy ? metadata.error?.message : undefined} onRetryConditions={!vinylPolicy ? () => void metadata.refetch() : undefined} onChange={draft.change} disabled={disabled} suggesting={category.busy} suggestion={category.suggestion} onSuggest={() => void category.suggest()} />
+    {nicheId === 'coins' && <ListingCategoryBrowser browser={category.browser} disabled={disabled} />}
     <EbayItemSpecifics categoryId={categoryId} aspects={metadata.data?.aspects || []} value={draft.form.item_specifics} disabled={disabled} onChanged={value => draft.change('item_specifics', value)} />
     <MusicItemSpecifics item={draft.item} values={draft.form.music_values as MusicValues | undefined} aspects={metadata.data?.aspects} disabled={disabled} onChanged={values => { draft.change('music_values', values); const description = syncMusicConditionText(String(draft.formRef.current.description || ''), values); if (description !== draft.formRef.current.description) draft.change('description', description); }} />
 

@@ -41,7 +41,7 @@ test('name-only British India and Indian leaves are recognized but still need au
   for (const name of ['Indian', 'British India']) {
     const row = { id: indian.id, name, isLeaf: true };
     assert.equal((await lookup.lookupListingCategory('tenant', input.title, async () => ok([row]), input)).id, row.id);
-    await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => ok([{ ...row, isLeaf: undefined }]), input), /coin category/);
+    await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => ok([{ ...row, isLeaf: undefined }]), input), /verify.*leaf category|coin category/);
     await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => ok([{ ...row, isLeaf: false }]), input), /coin category/);
   }
 });
@@ -75,7 +75,7 @@ test('a British ancestor is not mistaken for a British Indian leaf; wrong countr
 test('shared service errors remain visible rather than being hidden by the final empty query', async () => {
   let calls = 0;
   await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => ++calls === 1 ? { data: null, error: { status: 503, message: 'eBay taxonomy temporarily unavailable' } } : ok([]), input), /eBay taxonomy temporarily unavailable/);
-  assert.equal(calls, 4);
+  assert.equal(calls, 8, 'Suggestions plus bounded native root recovery');
   calls = 0;
   await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => { calls++; return { data: null, error: { status: 403, message: 'Membership required' } }; }, input), /Membership/);
   assert.equal(calls, 1);
@@ -85,5 +85,6 @@ test('no parallel resolver, guessed Indian ID, write or AI request is introduced
     const source = readFileSync(path, 'utf8');
     assert.doesNotMatch(source, /\.rpc\(|\.from\(|fetch\(|chat\/completions|categoryId:\s*['"]\d+/);
   }
-  assert.doesNotMatch(readFileSync('src/lib/categoryLookup.ts', 'utf8'), /browseCoinCategory|resolveCoinCategory|validate_category|get_category_children/);
+  assert.match(readFileSync('src/lib/categoryLookup.ts', 'utf8'), /await browseCoinCategory/);
+  assert.doesNotMatch(readFileSync('src/lib/categoryLookup.ts', 'utf8'), /resolveCoinCategory|validate_category/);
 });

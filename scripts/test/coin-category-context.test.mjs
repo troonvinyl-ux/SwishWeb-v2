@@ -44,7 +44,7 @@ test('ancient fallback retains era and tradition and never chooses a bulk or mod
 test('only wrong categories leave an editable draft instead of a guessed ID', async () => {
   let calls = 0;
   await assert.rejects(lookup.lookupListingCategory('tenant', input.title, async () => { calls++; return ok([bulk, modern, greek]); }, input), /coin category/);
-  assert.equal(calls, 4);
+  assert.equal(calls, 8, 'Suggestions plus bounded native tree recovery');
 });
 test('saved bulk selection, spoofed label and modern-category mismatch are flagged for the same physical coin', () => {
   const item = { specialist_id: 'coins', canonical_title: input.title, attributes: { quantity: 50 } };

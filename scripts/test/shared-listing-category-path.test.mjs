@@ -59,5 +59,8 @@ test('every web preparation entry uses existing generator, category service and 
     assert.match(source, /enrichScannedItemForListing/); assert.match(source, /swish-list-generate/); assert.match(source, /swish_create_listing_draft/);
     assert.doesNotMatch(source, /route:\s*['"]publish/);
   }
-  assert.doesNotMatch(readFileSync('src/lib/categoryLookup.ts', 'utf8'), /(?:browseCoinCategory|resolveCoinCategory|validate_category|get_category_children)/);
+  const source = readFileSync('src/lib/categoryLookup.ts', 'utf8');
+  assert.match(source, /await browseCoinCategory/);
+  assert.doesNotMatch(source, /resolveCoinCategory|validate_category/);
+  assert.match(readFileSync('src/lib/categoryTreeTransport.ts', 'utf8'), /get_category_children/);
 });
