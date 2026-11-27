@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRapidTypescript, rapidFixture, rapidRecord, rapidText, rapidStrings } from './lib/load-rapid-typescript.mjs';
-function harness({ reference = '', unavailable = false, missingEnvelope = false } = {}) {
+const packet = { transcript: 'Hungary\n1673\nLeopold I\n3 Kreuzers\nAR.', fields: { ruler: { value: 'Leopold I', quote: 'Leopold I', uncertain: false }, year: { value: '1673', quote: '1673', uncertain: false }, denomination: { value: '3 Kreuzers', quote: '3 Kreuzers', uncertain: false } }, limitations: [] };
+function harness({ reference = '', unavailable = false, missingEnvelope = false, nativePacket = false, readFailure = '' } = {}) {
   let job = rapidFixture(1, { answers: { numista_number: reference, notes: 'Collector ticket supplied' }, processing: 'processing', lease: { owner: 'worker', until: Date.now() + 180000 } }), inserts = 0, calls = [];
   let item = null;
   const photos = job.photos.map(photo => ({ ...photo, file: {}, preview: '' }));
@@ -11,7 +12,9 @@ function harness({ reference = '', unavailable = false, missingEnvelope = false 
   } };
   const capture = { captureRecord: rapidRecord, captureText: rapidText, captureStrings: rapidStrings, assertCaptureScope: async scope => { if (!scope.isCurrent()) throw Error('Scope changed'); }, captureRequest: async (scope, name, body) => {
     calls.push({ name, body });
-    if (missingEnvelope && calls.filter(call => call.name === 'swish-identify').length > 1) return { identification: { canonicalTitle: 'Russian 5 kopeks 1759', specialistId: 'coins', objectType: 'coin', attributes: { collector_envelope: { transcription: 'Russia / 5 kopeks / 1759', fields: [{ name: 'country', value: 'Russia', source: 'collector' }, { name: 'denomination', value: '5 kopeks', source: 'collector' }, { name: 'date', value: 1759, source: 'collector' }], discrepancies: [] } } } };
+    if (readFailure && body.slots?.[0] === 'envelope') throw Error(readFailure);
+    if (nativePacket) return { identification: { canonicalTitle: 'Leopold I 3 Kreuzers 1673', specialistId: 'coins', objectType: 'coin', attributes: { _coin_packet: packet, photo_roles: [] } } };
+    if (missingEnvelope && body.slots?.[0] === 'envelope') return { identification: { canonicalTitle: 'Russian 5 kopeks 1759', specialistId: 'coins', objectType: 'coin', attributes: { collector_envelope: { transcription: 'Russia / 5 kopeks / 1759', fields: [{ name: 'country', value: 'Russia', source: 'collector' }, { name: 'denomination', value: '5 kopeks', source: 'collector' }, { name: 'date', value: 1759, source: 'collector' }], discrepancies: [] } } } };
     return { identification: { canonicalTitle: missingEnvelope ? 'Unidentified coin' : 'Attributed Roman portrait coin', specialistId: 'coins', objectType: 'coin', confidence: .1, condition: 'Used', attributes: { collector_envelope: missingEnvelope ? {} : { transcription: 'Roman / Hadrian? / silver?', fields: [{ name: 'ruler', value: 'Hadrian?', source: 'collector', note: 'Question mark' }], discrepancies: ['Mint mark not visible'] }, photo_roles: [{ slotId: 'envelope', role: 'coin' }] } } };
   } };
   const policy = loadRapidTypescript('src/lib/rapidCoinPolicy.ts', { '@/lib/captureRequest': capture, '@/lib/listingPresentation': { listingDescriptionText: String } });
@@ -42,7 +45,7 @@ test('three photos generate a complete draft through shared infrastructure despi
   assert.equal(h.job().evidence.transcription, 'Roman / Hadrian? / silver?'); assert.equal(h.item().attributes._rapid_photo_roles[2].role, 'evidence');
   assert.deepEqual(h.job().draft.photos, ['https://fixture.invalid/obverse.jpg', 'https://fixture.invalid/reverse.jpg']);
   assert.equal(h.item().media.length, 3); assert.equal(h.job().draft.price, 45);
-  assert.match(h.calls[0].body.acquisitionContext, /PRIMARY research lead/); assert.equal(h.calls[0].body.captureMode, 'item');
+  assert.ok(h.calls[0].body.acquisitionContext.length < 500); assert.match(h.calls[0].body.knownAttributes.customNotes, /PRIMARY research lead/); assert.equal(h.calls[0].body.captureMode, 'item');
   assert.equal(h.calls[0].body.numistaImages.length, 2);
   assert.equal(h.calls.filter(call => call.name === 'shared-draft').length, 1);
 });
@@ -53,6 +56,30 @@ test('missing envelope OCR is reread once from full saved originals before the s
   assert.equal(h.inserts(), 1); assert.equal(h.job().checkpoint.itemId, 'coin-1'); assert.equal(h.job().checkpoint.envelopeReadAttempted, true);
   assert.equal(h.job().evidence.transcription, 'Russia / 5 kopeks / 1759'); assert.equal(h.item().attributes._collector_research_fields.country, 'Russia');
   assert.match(h.job().draft.title, /Russian 5 kopeks 1759/); assert.equal(h.job().answers.numista_number, '');
+});
+test('native SWISH packet OCR avoids a duplicate read and supplies collector-labelled listing evidence', async () => {
+  const h = harness({ nativePacket: true }); await h.run();
+  assert.equal(h.calls.filter(call => call.name === 'swish-identify').length, 1);
+  assert.equal(h.job().evidence.transcription, packet.transcript); assert.equal(h.job().checkpoint.envelopeReadAttempted, undefined);
+  assert.equal(h.item().attributes.country, 'Hungary'); assert.equal(h.item().attributes.year, '1673');
+  assert.equal(h.item().attributes.denomination, '3 Kreuzers'); assert.equal(h.inserts(), 1);
+});
+test('retained native packet response is reused without any additional identification request', async () => {
+  const h = harness(); h.job().checkpoint.identification = { canonicalTitle: 'Leopold I 3 Kreuzers 1673', specialistId: 'coins', attributes: { _coin_packet: packet } };
+  await h.run(); assert.equal(h.calls.filter(call => call.name === 'swish-identify').length, 0);
+  assert.equal(h.job().evidence.transcription, packet.transcript); assert.equal(h.inserts(), 1);
+});
+test('only the old explicit context rejection is automatically retried after the transport fix', async () => {
+  const h = harness({ missingEnvelope: true }); Object.assign(h.job().checkpoint, { identification: { canonicalTitle: 'Unidentified coin', specialistId: 'coins', attributes: {} }, envelopeReadAttempted: true, envelopeReadError: 'Acquisition context is invalid or too long.' });
+  await h.run(); assert.equal(h.calls.filter(call => call.name === 'swish-identify').length, 1);
+  assert.equal(h.job().evidence.transcriptionAvailable, true); assert.ok(h.job().checkpoint.envelopeReadVersion);
+  const unknown = harness(); Object.assign(unknown.job().checkpoint, { identification: { canonicalTitle: 'Unidentified coin', specialistId: 'coins', attributes: {} }, envelopeReadAttempted: true, envelopeReadError: 'Timed out; result unknown.' });
+  await unknown.run(); assert.equal(unknown.calls.filter(call => call.name === 'swish-identify').length, 0);
+});
+test('a failed envelope read exposes its actual reason while retaining the editable original draft', async () => {
+  const h = harness({ missingEnvelope: true, readFailure: 'Acquisition context is invalid or too long.' }); await h.run();
+  assert.equal(h.job().processing, 'ready'); assert.equal(h.inserts(), 1);
+  assert.match(h.job().message, /Last read: Acquisition context/); assert.match(h.job().message, /Read envelope again/);
 });
 test('seller-confirmed Numista references are passed to the real direct-catalogue contract', async () => {
   const h = harness({ reference: 'N#438449' }); await h.run(); const known = h.calls[0].body.knownAttributes;

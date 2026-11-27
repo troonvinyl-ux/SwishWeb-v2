@@ -7,7 +7,7 @@ export interface ScanMarketResult { data: Record<string, unknown> | null; error:
 export function scanMarketSnapshot(raw: Record<string, unknown>): Record<string, unknown> {
   const fields: Record<string, string[]> = {
     valuation: ['fairMarketValue', 'valuationMid', 'valuationLow', 'valuationHigh', 'recommendedListingPrice', 'valuationConfidence', 'listingPriceRationale', 'valuationWarnings'],
-    recommendation: ['recommendedPrice', 'reasoning'],
+    recommendation: ['recommendedPrice', 'quickSaleRatio', 'reasoning'],
     soldMarket: ['verifiedSoldCount', 'relevantSoldCount', 'medianPrice', 'dataQualityReason', 'source', 'sourceDate'],
     activeAskingPrices: ['relevantCount', 'medianAskingPrice', 'source', 'sourceDate'],
   };
@@ -27,6 +27,8 @@ export async function researchScanMarket(input: ScanMarketInput): Promise<ScanMa
   const result = await callEdgeFunction<Record<string, unknown>>('swish-market-value', {
     tenantId: input.tenantId, itemId: input.itemId, title: input.title.trim(), specialistId: input.specialistId,
     attributes: input.attributes, condition: input.condition, imageUrls: input.imageUrls, applyToItem: true,
+    ...(input.nicheId === 'coins' ? { quickList: true, numistaTypeId: Number(input.attributes.numista_type_id || input.attributes.numistaTypeId) || undefined,
+      valuationInstructions: 'Prioritise verified completed sales, catalogue and specialist auction evidence; distinguish active asking prices. Use established metal/condition and seller pricing preferences. Never reduce a price solely because visual identification confidence is low.' } : {}),
   }, input.client);
   if (result.error) return { data: null, error: result.error.displayMessage };
   if (result.data?.success !== true || !Object.keys(asRecord(result.data.valuation)).length) return { data: null, error: String(result.data?.error || 'No market valuation was returned. Enter your own price or retry research.') };

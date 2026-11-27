@@ -10,6 +10,10 @@ function harness(overrides = {}) {
 test('a clean recorded Russian coin attempts category preselection once, without a save or publication', () => {
   const h = harness(); h.run(); h.run(); assert.deepEqual(h.calls, [true]);
 });
+test('a clean British India draft automatically requests a category once without requiring a Numista reference', () => {
+  const h = harness({ item: { id: 'coin', attributes: { country: 'British India', year: '1204', denomination: 'PICE' } }, form: { id: 'draft', title: 'British India Pice 1204', category_id: '' } });
+  h.run(); h.run(); assert.deepEqual(h.calls, [true]);
+});
 test('dirty drafts, existing valid categories and pending publication claims are not auto-rewritten', () => {
   for (const changes of [{ dirty: true }, { form: { id: 'draft', category_id: 'valid' } }, { form: { id: 'draft', publish_claim_id: 'claim' } }]) {
     const h = harness(changes); h.run(); assert.deepEqual(h.calls, []);
