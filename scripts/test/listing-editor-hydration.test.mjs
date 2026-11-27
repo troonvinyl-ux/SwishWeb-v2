@@ -46,3 +46,14 @@ test('an older response after save cannot erase category, condition or canonical
   view.rows.listings = { ...listing }; view.rows.items = { ...item }; view.render(); const next = view.render(); assert.equal(next.form.category_id, '176985'); assert.equal(next.form.condition_id, '4000'); assert.equal(next.form.condition, 'Very Good'); assert.equal(next.item.updated_at, 'v2');
 });
 test('stock from another tenant never hydrates the editor', () => { const view = harness(); view.rows.listings = listing; view.rows.items = { ...item, tenant_id: 'other' }; view.render(); assert.equal(view.render().form.id, undefined); });
+test('clean refresh adopts saved photo choices rather than retaining the old originals forever', () => {
+  const view = harness(); view.rows.listings = listing; view.rows.items = item; view.render();
+  view.rows.items = { ...item, attributes: { ...item.attributes, ebay_listing_media: [eightPhotos[7]] } }; view.render(); assert.deepEqual(view.render().photos, [eightPhotos[7]]);
+  view.rows.items = { ...item, attributes: { ...item.attributes, ebay_listing_media: [] } }; view.render(); assert.deepEqual(view.render().photos, []);
+});
+test('verified studio item readback updates allowed photo metadata without discarding dirty copy', () => {
+  const view = harness(); view.rows.listings = listing; view.rows.items = item; view.render(); const draft = view.render();
+  draft.change('title', 'My unsaved seller title'); draft.adoptItem({ ...item, updated_at: 'studio-version', attributes: { ...item.attributes, _smart_studio_images: { front: { originalUri: eightPhotos[0] } } } });
+  const next = view.render(); assert.equal(next.form.title, 'My unsaved seller title'); assert.equal(next.dirty, true); assert.equal(next.item.updated_at, 'studio-version');
+  assert.throws(() => next.adoptItem({ ...item, tenant_id: 'another' }), /different stock item/);
+});

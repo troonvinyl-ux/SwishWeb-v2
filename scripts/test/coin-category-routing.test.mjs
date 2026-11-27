@@ -14,23 +14,24 @@ test('coin lookup skips a top-ranked Art Prints leaf and retains actual Coins an
   const calls = [];
   const result = await lookup.lookupListingCategory('tenant', 'Portrait', async (endpoint, body) => { calls.push({ endpoint, body }); return ok([art, liveCoin]); }, context);
   assert.deepEqual(result, { id: liveCoin.id, name: 'Italy', categoryPath: liveCoin.categoryPath });
-  assert.equal(calls.length, 1); assert.equal(calls[0].body.nicheId, 'coins'); assert.match(calls[0].body.query, /^collectible coin /);
+  assert.equal(calls.length, 1); assert.equal(calls[0].body.nicheId, 'coins'); assert.equal(calls[0].body.query, context.title);
 });
 test('art-only results trigger bounded coin-only fallback, never a British-country default', async () => {
   const calls = [];
-  const result = await lookup.lookupListingCategory('tenant', 'Portrait', async (_endpoint, body) => { calls.push(body.query); return body.query === 'collectible coins Italy' ? ok([liveCoin]) : ok([art]); }, context);
-  assert.equal(result.id, liveCoin.id); assert.deepEqual(calls, ['collectible coin Italy Portrait on a worn Italian coin', 'collectible coin Italy Portrait on a worn Italian coin', 'collectible coins Italy']);
+  const result = await lookup.lookupListingCategory('tenant', 'Portrait', async (_endpoint, body) => { calls.push(body.query); return body.query === 'Italy coins' ? ok([liveCoin]) : ok([art]); }, context);
+  assert.equal(result.id, liveCoin.id); assert.deepEqual(calls, [context.title, context.title, 'Italy coins']);
 });
 test('unrelated, supply, wrong-object and non-leaf categories do not become coin selections', async () => {
   for (const row of [art, { ...liveCoin, name: 'Coin Holders' }, { ...liveCoin, name: 'Coins', categoryPath: 'Art > Coins' }, { ...liveCoin, name: 'Banknotes' }, { ...liveCoin, isLeaf: false }, { ...liveCoin, id: 'AI guess' }]) {
     let calls = 0;
     await assert.rejects(lookup.lookupListingCategory('tenant', 'Portrait', async () => { calls++; return ok([row]); }, context), /coin category/);
-    assert.ok(calls >= 4 && calls <= 18, 'Country-led search and tree fallback remain bounded');
+    assert.equal(calls, 4, 'Shared title lookup and one country retry remain bounded');
   }
 });
 test('coin relevance handles genuine country, ancient and hammered leaves without inventing attribution', () => {
   for (const name of ['Italy', 'Roman', 'Hammered', 'Other']) assert.equal(policy.isNumismaticCategory({ name, categoryPath: `Coins > ${name}` }), true);
-  assert.equal(policy.isNumismaticCategory({ name: 'Italy' }), false);
+  assert.equal(policy.isNumismaticCategory({ name: 'Italy' }), true);
+  assert.equal(policy.isNumismaticCategory({ name: 'Unrecognized category' }), false);
   assert.equal(policy.isNumismaticCategory({ name: 'Ancient Coins' }), true);
   assert.equal(policy.isNumismaticCategory({ id: '360', name: 'Coins' }), false);
   assert.equal(policy.isNumismaticCategory({ name: 'Banknotes', categoryPath: 'Coins > Banknotes' }, 'banknote'), true);

@@ -14,7 +14,7 @@ function harness(patch = {}, uploads = []) {
     maybeSingle: async () => { onUpdate?.(); if (!filters.every(filter => filter(row))) return { data: null, error: null }; if (mutation) { updates.push(mutation); row = { ...row, ...mutation }; } return { data: { ...row }, error: null }; },
   }; } };
   class EdgeFunctionError extends Error { get displayMessage() { return this.message; } }
-  const item = { id: 'stock', tenant_id: 'tenant', specialist_id: 'vinyl_records', updated_at: 'v1', condition: '', attributes: {} }, draft = { form: { ...row }, formRef: { current: { ...row } }, item: { ...item }, photos: ['https://fixture.invalid/front.jpg'], editRef: { current: 0 }, dirtyRef: { current: false }, commit: value => { commits.push(value); draft.formRef.current = { ...draft.formRef.current, ...value }; }, refresh: async () => {} };
+  const item = { id: 'stock', tenant_id: 'tenant', specialist_id: 'vinyl_records', updated_at: 'v1', condition: '', attributes: {} }, draft = { form: { ...row }, formRef: { current: { ...row } }, item: { ...item }, photos: ['https://fixture.invalid/front.jpg'], editRef: { current: 0 }, dirtyRef: { current: false }, revisionRef: { current: 'initial' }, commit: value => { commits.push(value); draft.formRef.current = { ...draft.formRef.current, ...value }; }, refresh: async () => {} };
   const stubs = {
     react: { useEffect: () => {}, useRef: value => ({ current: value }), useState: value => [value, () => {}] }, sonner: { toast: { info: value => feedback.push(value), success: value => feedback.push(value), warning: value => feedback.push(value), error: value => feedback.push(value) } },
     '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: async () => {} }) },
